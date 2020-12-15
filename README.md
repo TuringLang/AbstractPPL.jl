@@ -12,5 +12,3 @@ This will likely take some time, but the hope is to unify VarInfo, improving its
 modularity.  The package will also host other future work like `NoVarInfo` for potential integration
 with non-tracing PPLs, `GraphVarInfo` for BUGS style models with statically known dependency
 structure, and generic modelling combinators (e.g. For, Switch, IID ) that are common for all PPLs.
-
-Not related to https://github.com/JuliaPPL/AbstractPPL.jl.
