@@ -1,9 +1,13 @@
 module AbstractPPL
 
-# VarInfo
-export AbstractVarInfo
+
+include("varname.jl")
+include("abstractmodel.jl")
+include("abstractvarinfo.jl")
+
 
 # Abstract model functions
+export AbstractModel
 export logjoint,
     logprior
 
@@ -11,5 +15,10 @@ export logjoint,
 export VarName,
     inspace,
     subsumes
+export @varname
+
+# VarInfo
+export AbstractVarInfo
+
 
 end # module
