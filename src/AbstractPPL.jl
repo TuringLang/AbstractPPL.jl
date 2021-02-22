@@ -2,21 +2,17 @@ module AbstractPPL
 
 
 include("varname.jl")
-include("abstractmodel.jl")
-include("abstractvarinfo.jl")
+include("abstractpp.jl")
 
 
 # Abstract model functions
-export AbstractModel
+export AbstractProbabilisticProgram
 
 # VarName
 export VarName,
     inspace,
     subsumes
 export @varname
-
-# VarInfo
-export AbstractVarInfo
 
 
 end # module
