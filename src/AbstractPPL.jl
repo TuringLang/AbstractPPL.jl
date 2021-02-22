@@ -8,8 +8,6 @@ include("abstractvarinfo.jl")
 
 # Abstract model functions
 export AbstractModel
-export logjoint,
-    logprior
 
 # VarName
 export VarName,
