@@ -9,9 +9,11 @@ include("abstractpp.jl")
 export AbstractProbabilisticProgram
 
 # VarName
-export VarName,
-    inspace,
-    subsumes
+export inspace,
+    getsym,
+    getindexing,
+    subsumes,
+    VarName
 export @varname
 
 
