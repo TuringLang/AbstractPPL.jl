@@ -2,6 +2,7 @@ name = "AbstractPPL"
 uuid = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
 keywords = ["probablistic programming"]
 license = "MIT"
+desc = "Common interfaces for probabilistic programming"
 version = "0.1.0"
 
 [deps]
@@ -10,4 +11,3 @@ AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 [compat]
 AbstractMCMC = "2"
 julia = "1"
-
