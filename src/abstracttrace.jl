@@ -1,6 +1,6 @@
 """
-    AbstractTrace
+    AbstractModelTrace
 
 Common base class for various trace or "variable info" types.
 """
-abstract type AbstractTrace end
+abstract type AbstractModelTrace end

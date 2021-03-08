@@ -3,10 +3,8 @@ module AbstractPPL
 
 include("varname.jl")
 include("abstractpp.jl")
+include("abstracttrace.jl")
 
-
-# Abstract model functions
-export AbstractProbabilisticProgram
 
 # VarName
 export inspace,
@@ -15,6 +13,14 @@ export inspace,
     subsumes,
     VarName
 export @varname
+
+
+# Abstract model functions
+export AbstractProbabilisticProgram
+
+
+# Abstract traces
+export AbstractModelTrace
 
 
 end # module
