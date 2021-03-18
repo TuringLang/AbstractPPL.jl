@@ -2,8 +2,8 @@ module AbstractPPL
 
 
 include("varname.jl")
-include("abstractpp.jl")
-include("abstracttrace.jl")
+include("abstractprobprog.jl")
+include("abstractmodeltrace.jl")
 
 
 # VarName
