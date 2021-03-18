@@ -22,7 +22,7 @@ x[Colon(),1][2]
 julia> vn.indexing
 ((Colon(), 1), (2,))
 
-julia> VarName(DynamicPPL.@vsym(x[:, 1][1+1]), DynamicPPL.@vinds(x[:, 1][1+1]))
+julia> VarName(AbstractPPL.@vsym(x[:, 1][1+1]), AbstractPPL.@vinds(x[:, 1][1+1]))
 x[Colon(),1][2]
 ```
 """
@@ -253,7 +253,7 @@ varname(expr::Symbol) = VarName(expr)
 function varname(expr::Expr)
     if Meta.isexpr(expr, :ref)
         sym, inds = vsym(expr), vinds(expr)
-        return :($(DynamicPPL.VarName)($(QuoteNode(sym)), $inds))
+        return :($(AbstractPPL.VarName)($(QuoteNode(sym)), $inds))
     else
         throw("Malformed variable name $(expr)!")
     end
@@ -266,14 +266,29 @@ end
 A macro that returns the variable symbol given the input variable expression `expr`.
 For example, `@vsym x[1]` returns `:x`.
 
+## Examples
+
 ```jldoctest
-julia> AbstractPPL.@vsym x[1]
+julia> AbstractPPL.@vsym x
+:x
+
+julia> AbstractPPL.@vsym x[1,1][2,3]
+:x
+
+julia> AbstractPPL.@vsym x[end]
 :x
 ```
 """
 macro vsym(expr::Union{Expr, Symbol})
     return QuoteNode(vsym(expr))
 end
+
+"""
+    vsym(expr)
+
+Return name part of the [`@varname`](@ref)-compatible expression `expr` as a symbol for input of the
+[`VarName`](@ref) constructor."""
+function vsym end
 
 vsym(expr::Symbol) = expr
 function vsym(expr::Expr)
@@ -289,9 +304,23 @@ end
 
 Returns a tuple of tuples of the indices in `expr`.
 
+## Examples
+
 ```jldoctest
-julia> AbstractPPL.@vinds x[1, :][2]
-((1, Colon()), (2,))
+julia> AbstractPPL.@vinds x
+()
+
+julia> AbstractPPL.@vinds x[1,1][2,3]
+((1, 1), (2, 3))
+
+julia> AbstractPPL.@vinds x[:,1][2,:]
+((Colon(), 1), (2, Colon()))
+
+julia> AbstractPPL.@vinds x[2:3,1][2,1:2]
+((2:3, 1), (2, 1:2))
+
+julia> AbstractPPL.@vinds x[2:3,2:3][[1,2],[1,2]]
+((2:3, 2:3), ([1, 2], [1, 2]))
 ```
 
 !!! compat "Julia 1.5"
@@ -301,6 +330,25 @@ julia> AbstractPPL.@vinds x[1, :][2]
 macro vinds(expr::Union{Expr, Symbol})
     return esc(vinds(expr))
 end
+
+
+"""
+    vinds(expr)
+
+Return the indexing part of the [`@varname`](@ref)-compatible expression `expr` as an expression
+suitable for input of the [`VarName`](@ref) constructor.
+
+## Examples
+
+```jldoctest
+julia> AbstractPPL.vinds(:(x[end]))
+:((((lastindex)(x),),))
+
+julia> AbstractPPL.vinds(:(x[1, end]))
+:(((1, (lastindex)(x, 2)),))
+```
+"""
+function vinds end
 
 vinds(expr::Symbol) = Expr(:tuple)
 function vinds(expr::Expr)
