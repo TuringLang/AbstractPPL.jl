@@ -7,12 +7,17 @@ include("abstractmodeltrace.jl")
 
 
 # VarName
-export inspace,
+export VarName,
     getsym,
     getindexing,
+    inspace,
     subsumes,
-    VarName
-export @varname
+    varname,
+    vinds,
+    vsym,
+    @varname,
+    @vinds,
+    @vsym
 
 
 # Abstract model functions
