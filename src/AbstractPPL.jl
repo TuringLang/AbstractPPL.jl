@@ -3,7 +3,22 @@ module AbstractPPL
 
 include("varname.jl")
 include("contexts.jl")
-include("abstractpp.jl")
+include("abstractprobprog.jl")
+include("abstractmodeltrace.jl")
+
+
+# VarName
+export VarName,
+    getsym,
+    getindexing,
+    inspace,
+    subsumes,
+    varname,
+    vinds,
+    vsym,
+    @varname,
+    @vinds,
+    @vsym
 
 
 # Abstract model functions
@@ -15,11 +30,9 @@ export generate,
     logprior,
     sample
 
-# VarName
-export VarName,
-    inspace,
-    subsumes
-export @varname
+
+# Abstract traces
+export AbstractModelTrace
 
 
 end # module

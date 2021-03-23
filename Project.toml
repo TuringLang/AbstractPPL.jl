@@ -1,8 +1,16 @@
 name = "AbstractPPL"
 uuid = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
-authors = ["Philipp Gabler <phipsgabler@users.noreply.github.com>"]
-version = "0.1.0"
+keywords = ["probablistic programming"]
+license = "MIT"
+desc = "Common interfaces for probabilistic programming"
+version = "0.1.2"
+
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
+[compat]
+AbstractMCMC = "2"
+StatsBase = "0.33.4"
+julia = "1"
