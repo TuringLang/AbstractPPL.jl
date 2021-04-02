@@ -1,5 +1,5 @@
 """
-    VarName(sym[, indexing=()])
+    VarName{sym}(indexing::Tuple=())
 
 A variable identifier for a symbol `sym` and indices `indexing` in the format
 returned by [`@vinds`](@ref).
@@ -28,9 +28,9 @@ x[Colon(),1][2]
 """
 struct VarName{sym, T<:Tuple}
     indexing::T
-end
 
-VarName(sym::Symbol, indexing::Tuple = ()) = VarName{sym, typeof(indexing)}(indexing)
+    VarName{sym}(indexing::Tuple=()) where {sym} = new{sym,typeof(indexing)}(indexing)
+end
 
 """
     VarName(vn::VarName[, indexing=()])
@@ -46,7 +46,7 @@ x
 ```
 """
 function VarName(vn::VarName, indexing::Tuple = ())
-    return VarName{getsym(vn), typeof(indexing)}(indexing)
+    return VarName{getsym(vn)}(indexing)
 end
 
 
@@ -249,11 +249,11 @@ macro varname(expr::Union{Expr, Symbol})
     return esc(varname(expr))
 end
 
-varname(expr::Symbol) = VarName(expr)
+varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 function varname(expr::Expr)
     if Meta.isexpr(expr, :ref)
         sym, inds = vsym(expr), vinds(expr)
-        return :($(AbstractPPL.VarName)($(QuoteNode(sym)), $inds))
+        return :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
     else
         throw("Malformed variable name $(expr)!")
     end
