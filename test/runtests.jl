@@ -2,7 +2,7 @@
 if VERSION < v"1.2"
     using Pkg: Pkg
     Pkg.activate(@__DIR__)
-    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    Pkg.develop(Pkg.PackageSpec(; path=dirname(@__DIR__)))
     Pkg.instantiate()
 end
 
