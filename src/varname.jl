@@ -10,19 +10,19 @@ stores the indices requires to access the random variable from the Julia variabl
 as a tuple of tuples. Each element of the tuple thereby contains the indices of one indexing
 operation.
 
-`VarName`s can be manually constructed using the `VarName(sym, indexing)` constructor, or from an
+`VarName`s can be manually constructed using the `VarName{sym}(indexing)` constructor, or from an
 indexing expression through the [`@varname`](@ref) convenience macro.
 
 # Examples
 
 ```jldoctest
-julia> vn = VarName(:x, ((Colon(), 1), (2,)))
+julia> vn = VarName{:x}(((Colon(), 1), (2,)))
 x[Colon(),1][2]
 
 julia> vn.indexing
 ((Colon(), 1), (2,))
 
-julia> VarName(AbstractPPL.@vsym(x[:, 1][1+1]), AbstractPPL.@vinds(x[:, 1][1+1]))
+julia> @varname x[:, 1][1+1]
 x[Colon(),1][2]
 ```
 """
@@ -33,7 +33,7 @@ struct VarName{sym, T<:Tuple}
 end
 
 """
-    VarName(vn::VarName[, indexing=()])
+    VarName(vn::VarName, indexing=())
 
 Return a copy of `vn` with a new index `indexing`.
 
@@ -269,13 +269,13 @@ For example, `@vsym x[1]` returns `:x`.
 ## Examples
 
 ```jldoctest
-julia> AbstractPPL.@vsym x
+julia> @vsym x
 :x
 
-julia> AbstractPPL.@vsym x[1,1][2,3]
+julia> @vsym x[1,1][2,3]
 :x
 
-julia> AbstractPPL.@vsym x[end]
+julia> @vsym x[end]
 :x
 ```
 """
@@ -307,19 +307,19 @@ Returns a tuple of tuples of the indices in `expr`.
 ## Examples
 
 ```jldoctest
-julia> AbstractPPL.@vinds x
+julia> @vinds x
 ()
 
-julia> AbstractPPL.@vinds x[1,1][2,3]
+julia> @vinds x[1,1][2,3]
 ((1, 1), (2, 3))
 
-julia> AbstractPPL.@vinds x[:,1][2,:]
+julia> @vinds x[:,1][2,:]
 ((Colon(), 1), (2, Colon()))
 
-julia> AbstractPPL.@vinds x[2:3,1][2,1:2]
+julia> @vinds x[2:3,1][2,1:2]
 ((2:3, 1), (2, 1:2))
 
-julia> AbstractPPL.@vinds x[2:3,2:3][[1,2],[1,2]]
+julia> @vinds x[2:3,2:3][[1,2],[1,2]]
 ((2:3, 2:3), ([1, 2], [1, 2]))
 ```
 
@@ -341,10 +341,10 @@ suitable for input of the [`VarName`](@ref) constructor.
 ## Examples
 
 ```jldoctest
-julia> AbstractPPL.vinds(:(x[end]))
+julia> vinds(:(x[end]))
 :((((lastindex)(x),),))
 
-julia> AbstractPPL.vinds(:(x[1, end]))
+julia> vinds(:(x[1, end]))
 :(((1, (lastindex)(x, 2)),))
 ```
 """
