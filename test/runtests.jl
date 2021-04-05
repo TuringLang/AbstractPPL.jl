@@ -1,3 +1,11 @@
+# Activate test environment on older Julia versions
+if VERSION < v"1.2"
+    using Pkg: Pkg
+    Pkg.activate(@__DIR__)
+    Pkg.develop(Pkg.PackageSpec(; path=dirname(@__DIR__)))
+    Pkg.instantiate()
+end
+
 using AbstractPPL
 using Documenter
 using Test
@@ -7,9 +15,7 @@ using Test
         DocMeta.setdocmeta!(
             AbstractPPL,
             :DocTestSetup,
-            quote
-            using AbstractPPL
-            end;
+            :(using AbstractPPL);
             recursive=true,
         )
         doctest(AbstractPPL; manual=false)
