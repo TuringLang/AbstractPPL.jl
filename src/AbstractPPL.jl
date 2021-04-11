@@ -1,12 +1,5 @@
 module AbstractPPL
 
-
-include("varname.jl")
-include("contexts.jl")
-include("abstractprobprog.jl")
-include("abstractmodeltrace.jl")
-
-
 # VarName
 export VarName,
     getsym,
@@ -23,16 +16,14 @@ export VarName,
 
 # Abstract model functions
 export AbstractProbabilisticProgram
-export generate,
-    logdensity,
-    logjoint,
-    loglikelihood,
-    logprior,
-    sample
 
 
 # Abstract traces
 export AbstractModelTrace
 
+include("varname.jl")
+include("abstractprobprog.jl")
+include("abstractmodeltrace.jl")
+include("deprecations.jl")
 
 end # module

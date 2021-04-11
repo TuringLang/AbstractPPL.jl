@@ -11,6 +11,8 @@ using Documenter
 using Test
 
 @testset "AbstractPPL.jl" begin
+    include("deprecations.jl")
+
     @testset "doctests" begin
         DocMeta.setdocmeta!(
             AbstractPPL,
