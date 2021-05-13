@@ -255,7 +255,7 @@ function varname(expr::Expr)
         sym, inds = vsym(expr), vinds(expr)
         return :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
     else
-        throw("Malformed variable name $(expr)!")
+        error("Malformed variable name $(expr)!")
     end
 end
 
@@ -295,7 +295,7 @@ function vsym(expr::Expr)
     if Meta.isexpr(expr, :ref)
         return vsym(expr.args[1])
     else
-        throw("Malformed variable name $(expr)!")
+        error("Malformed variable name $(expr)!")
     end
 end
 
@@ -363,6 +363,6 @@ function vinds(expr::Expr)
         init = vinds(ex.args[1]).args
         return Expr(:tuple, init..., last)
     else
-        throw("VarName: Mis-formed variable name $(expr)!")
+        error("Mis-formed variable name $(expr)!")
     end
 end

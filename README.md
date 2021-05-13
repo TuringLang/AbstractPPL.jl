@@ -20,3 +20,5 @@ simplified models such as GPs, GLMs, or plain log-density problems.
 
 A more short term goal is to start a process of cleanly refactoring and justifying parts of
 AbstractPPL.jl’s design, and hopefully to get on closer terms with Soss.jl.
+
+See [interface draft](interface.md).
