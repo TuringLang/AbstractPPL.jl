@@ -15,7 +15,10 @@ export VarName,
 
 
 # Abstract model functions
-export AbstractProbabilisticProgram
+export AbstractProbabilisticProgram,
+    condition,
+    decondition,
+    logdensity
 
 
 # Abstract traces
