@@ -1,3 +1,5 @@
+using Setfield
+
 """
     VarName{sym}(indexing::Tuple=())
 
@@ -26,10 +28,10 @@ julia> @varname x[:, 1][1+1]
 x[Colon(),1][2]
 ```
 """
-struct VarName{sym, T<:Tuple}
+struct VarName{sym, T}
     indexing::T
 
-    VarName{sym}(indexing::Tuple=()) where {sym} = new{sym,typeof(indexing)}(indexing)
+    VarName{sym}(indexing=()) where {sym} = new{sym,typeof(indexing)}(indexing)
 end
 
 """
@@ -89,13 +91,18 @@ getindexing(vn::VarName) = vn.indexing
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getindexing(vn)), h)
 Base.:(==)(x::VarName, y::VarName) = getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
 
-function Base.show(io::IO, vn::VarName)
+function Base.show(io::IO, vn::VarName{<:Any, <:Tuple})
     print(io, getsym(vn))
     for indices in getindexing(vn)
         print(io, "[")
         join(io, indices, ",")
         print(io, "]")
     end
+end
+
+function Base.show(io::IO, vn::VarName{<:Any, <:Lens})
+    print(io, getsym(vn))
+    Setfield.print_application(io, vn.indexing)
 end
 
 
