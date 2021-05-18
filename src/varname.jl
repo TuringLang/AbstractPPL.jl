@@ -279,13 +279,26 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
     Julia 1.5.
 """
 macro varname(expr::Union{Expr, Symbol})
-    return esc(varname(expr))
+    return varname(expr)
 end
 
 varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 function varname(expr::Expr)
-    if Meta.isexpr(expr, :ref)
-        sym, inds = vsym(expr), vinds(expr)
+    if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
+        sym = vsym(expr)
+
+        # Need to recursively unwrap until we reach the outer-most variable.
+        # TODO: implement as recursion?
+        curexpr = expr
+        while !(curexpr.args[1] isa Symbol)
+            curexpr = curexpr.args[1]
+        end
+
+        # Then we replace the variable with `_`, to get an expression we can
+        # use `lensmacro` on.
+        curexpr.args[1] = :_
+        inds = Setfield.lensmacro(identity, expr)
+
         return :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
     else
         error("Malformed variable name $(expr)!")
@@ -325,7 +338,7 @@ function vsym end
 
 vsym(expr::Symbol) = expr
 function vsym(expr::Expr)
-    if Meta.isexpr(expr, :ref)
+    if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         return vsym(expr.args[1])
     else
         error("Malformed variable name $(expr)!")
