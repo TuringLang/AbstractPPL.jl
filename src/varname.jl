@@ -1,4 +1,5 @@
 using Setfield
+import Setfield: PropertyLens, ComposedLens, IdentityLens, IndexLens
 
 """
     VarName{sym}(indexing::Tuple=())
@@ -218,6 +219,31 @@ const ConcreteIndex = Union{Int, AbstractVector{Int}} # this include all kinds o
 _issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
 _issubrange(i::Union{ConcreteIndex, Colon}, j::Colon) = true
 _issubrange(i::Colon, j::ConcreteIndex) = true
+
+# Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
+# checking `subsumes` for every level. This for example means that if we are comparing
+# `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
+# each other since at the same level/depth they access different properties.
+subsumes(t::ComposedLens, u::ComposedLens) = subsumes(t.outer, u.outer) && subsumes(t.inner, u.inner)
+
+# If `t` is still a composed lens, then there is no way it can subsume `u` since `u` is a
+# leaf of the "lens-tree".
+subsumes(t::ComposedLens, u::PropertyLens) = false
+# Here we need to check if `u.outer` (i.e. the next lens to be applied from `u`) is
+# subsumed by `t`, since this would mean that the rest of the composition is also subsumed
+# by `t`.
+subsumes(t::PropertyLens, u::ComposedLens) = subsumes(t, u.outer)
+
+# For `PropertyLens` either they have the same `name` and thus they are indeed the same.
+subsumes(t::PropertyLens{name}, u::PropertyLens{name}) where {name} = true
+# Otherwise they represent different properties, and thus are not the same.
+subsumes(t::PropertyLens, u::PropertyLens) = false
+
+# Indices subsumes if they are subindices, i.e. we just call `_issubindex`.
+# FIXME: Does not support `DynamicIndexLens`.
+# FIXME: Does not correctly handle cases such as `subsumes(x, x[:])`
+#        (but neither did old implementation).
+subsumes(t::IndexLens, u::IndexLens) = _issubindex(t.indices, u.indices)
 
 
 
