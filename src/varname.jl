@@ -93,11 +93,13 @@ function Base.show(io::IO, vn::VarName)
     print(io, getsym(vn))
     for indices in getindexing(vn)
         print(io, "[")
-        join(io, indices, ",")
+        join(io, map(replace_colon_string, indices), ",")
         print(io, "]")
     end
 end
 
+replace_colon_string(x) = x
+replace_colon_string(::Colon) = ":"
 
 """
     Symbol(vn::VarName)
