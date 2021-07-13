@@ -93,7 +93,7 @@ function Base.show(io::IO, vn::VarName)
     print(io, getsym(vn))
     for indices in getindexing(vn)
         print(io, "[")
-        join(io, map(replace_colon_string, indices), ",")
+        join(io, map(prettify_index, indices), ",")
         print(io, "]")
     end
 end
