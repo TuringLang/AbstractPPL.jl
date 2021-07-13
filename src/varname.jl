@@ -98,8 +98,8 @@ function Base.show(io::IO, vn::VarName)
     end
 end
 
-replace_colon_string(x) = x
-replace_colon_string(::Colon) = ":"
+prettify_index(x) = string(x)
+prettify_index(::Colon) = ":"
 
 """
     Symbol(vn::VarName)
