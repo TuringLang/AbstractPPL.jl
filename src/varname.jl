@@ -224,6 +224,10 @@ A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing
 The `sym` value is taken from the actual variable name, and the index values are put appropriately
 into the constructor (and resolved at runtime).
 
+NB: `begin` and `end` indexing can be used, but remember that they depend on _runtime values_ --
+their usage requires that the array over which the indexing expression is defined is defined, in
+order for `firstindex` and `lastindex` to work in the expanded code.
+
 ## Examples
 
 ```jldoctest
@@ -241,6 +245,9 @@ julia> @varname(x[:, 1][2]).indexing
 
 julia> @varname(x[1,2][1+5][45][3]).indexing
 ((1, 2), (6,), (45,), (3,))
+
+julia> let a = [42]; @varname(a[1][end][3]); end
+a[1][1][3]
 ```
 
 !!! compat "Julia 1.5"
@@ -334,6 +341,14 @@ macro vinds(expr::Union{Expr, Symbol})
 end
 
 
+@static if VERSION < v"1.5.0-DEV.666"
+    _replace_ref_begin_end(ex, withex) = Base.replace_ref_end_!(copy(ex), withex)[1]
+    _index_replacement_for(s) = :($lastindex($s))
+else
+    _replace_ref_begin_end(ex, withex) = Base.replace_ref_begin_end_!(copy(ex), withex)[1]
+    _index_replacement_for(s) = :($firstindex($s)), :($lastindex($s))
+end
+
 """
     vinds(expr)
 
@@ -348,23 +363,30 @@ julia> vinds(:(x[end]))
 
 julia> vinds(:(x[1, end]))
 :(((1, (lastindex)(x, 2)),))
+
+julia> vinds(:(x[1][end]))
+:(((1,), ((lastindex)(x),)))
+
+julia> vinds(:(x[1][2, end, :][3]))
+:(((1,), (2, (lastindex)(x), :), (3,)))
 ```
 """
-function vinds end
+function vinds(expr)
+    index_replacement = _index_replacement_for(vsym(expr))
+    bare_vinds = _vinds(expr)
+    return _replace_ref_begin_end(bare_vinds, index_replacement)
+end
 
-vinds(expr::Symbol) = Expr(:tuple)
-function vinds(expr::Expr)
+_vinds(expr::Symbol) = Expr(:tuple)
+function _vinds(expr::Expr)
     if Meta.isexpr(expr, :ref)
         ex = copy(expr)
-        @static if VERSION < v"1.5.0-DEV.666"
-            Base.replace_ref_end!(ex)
-        else
-            Base.replace_ref_begin_end!(ex)
-        end
+        init = _vinds(ex.args[1]).args
         last = Expr(:tuple, ex.args[2:end]...)
-        init = vinds(ex.args[1]).args
         return Expr(:tuple, init..., last)
     else
         error("Mis-formed variable name $(expr)!")
     end
 end
+
+
