@@ -342,10 +342,12 @@ end
 
 
 @static if VERSION < v"1.5.0-DEV.666"
-    _replace_ref_begin_end(ex, withex) = Base.replace_ref_end_!(copy(ex), withex)[1]
+    _replace_ref_begin_end(ex, withex) = Base.replace_ref_end_!(copy(ex), withex)
+    _replace_ref_begin_end(ex::Symbol, withex) = Base.replace_ref_end_!(ex, withex)
     _index_replacement_for(s) = :($lastindex($s))
 else
-    _replace_ref_begin_end(ex, withex) = Base.replace_ref_begin_end_!(copy(ex), withex)[1]
+    _replace_ref_begin_end(ex, withex) = Base.replace_ref_begin_end_!(copy(ex), withex)
+    _replace_ref_begin_end(ex::Symbol, withex) = Base.replace_ref_begin_end_!(ex, withex)
     _index_replacement_for(s) = :($firstindex($s)), :($lastindex($s))
 end
 
@@ -372,21 +374,62 @@ julia> vinds(:(x[1][2, end, :][3]))
 ```
 """
 function vinds(expr)
-    index_replacement = _index_replacement_for(vsym(expr))
-    bare_vinds = _vinds(expr)
-    return _replace_ref_begin_end(bare_vinds, index_replacement)
+    indexing = _straighten_indexing(expr)
+    head = vsym(expr)
+
+    cached_exprs = Vector{Pair{Symbol, Expr}}()
+    
+    # see https://github.com/JuliaLang/julia/blob/bb5b98e72a151c41471d8cc14cacb495d647fb7f/base/views.jl#L17-L75
+    inds, _ = foldl(indexing, init=(Expr[], head)) do (inds, partial), ixs
+        S = (partial == head) ? head : gensym(:S)
+        used_S = false
+        
+        nixs = length(ixs)
+        if nixs == 1
+            ixs[1], used_S = _replace_ref_begin_end(
+                ixs[1],
+                (:($firstindex($S)), :($lastindex($S)))
+            )
+        elseif nixs > 1
+            for i in eachindex(ixs)
+                ixs[i], used = _replace_ref_begin_end(
+                    ixs[i],
+                    (:($firstindex($S, $i)), :($lastindex($S, $i)))
+                )
+                used_S |= used
+            end
+        end
+
+        if used_S && partial !== head
+            # partial = Expr(:ref, S, ixs...)
+            push!(cached_exprs, S => partial)
+        # else
+        end
+        partial = Expr(:ref, partial, ixs...)
+        
+        
+        inds = push!(inds, Expr(:tuple, ixs...))
+        inds, partial
+    end
+    
+    tuple_expr = Expr(:tuple, inds...)
+    cached_assignments = [:($S = $partial) for (S, partial) in cached_exprs]
+    return Expr(:let, Expr(:block, cached_assignments...), tuple_expr)
 end
 
-_vinds(expr::Symbol) = Expr(:tuple)
-function _vinds(expr::Expr)
+_straighten_indexing(expr::Symbol) = Vector{Any}[]
+function _straighten_indexing(expr::Expr)
     if Meta.isexpr(expr, :ref)
-        ex = copy(expr)
-        init = _vinds(ex.args[1]).args
-        last = Expr(:tuple, ex.args[2:end]...)
-        return Expr(:tuple, init..., last)
+        init = _straighten_indexing(expr.args[1])
+        last = expr.args[2:end]
+        return push!(init, last)
     else
         error("Mis-formed variable name $(expr)!")
     end
 end
+
+
+
+
 
 
