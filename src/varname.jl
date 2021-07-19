@@ -368,18 +368,24 @@ julia> vinds(:(x[1, end]))
 :(((1, (lastindex)(x, 2)),))
 
 julia> vinds(:(x[1][end]))
-:(((1,), ((lastindex)(x),)))
+:(let var"##S#321" = x[1]
+      ((1,), ((lastindex)(var"##S#321"),))
+  end)
 
 julia> vinds(:(x[1][2, end, :][3]))
-:(((1,), (2, (lastindex)(x), :), (3,)))
+:(let var"##S#322" = x[1]
+      ((1,), (2, (lastindex)(var"##S#322", 2), :), (3,))
+  end)
 ```
 """
 function vinds(expr, head = vsym(expr))
-    indexing = _straighten_indexing(expr)
-    cached_exprs = Vector{Pair{Symbol, Expr}}()
-    
     # see https://github.com/JuliaLang/julia/blob/bb5b98e72a151c41471d8cc14cacb495d647fb7f/base/views.jl#L17-L75
-    inds, _ = foldl(indexing, init=(Expr[], head)) do (inds, partial), ixs
+    indexing = _straighten_indexing(expr)
+    inds = Expr[]  # collection of result indices
+    partial = head  # partial :ref expressions, used in caching
+    cached_exprs = Vector{Pair{Symbol, Expr}}()  # cache for partial expressions in a :let
+    
+    for ixs in indexing
         S = (partial == head) ? head : gensym(:S)
         used_S = false
         
@@ -410,13 +416,16 @@ function vinds(expr, head = vsym(expr))
             partial = Expr(:ref, partial, ixs...)
         end
         
-        inds = push!(inds, Expr(:tuple, ixs...))
-        inds, partial
+        push!(inds, Expr(:tuple, ixs...))
     end
     
     tuple_expr = Expr(:tuple, inds...)
-    cached_assignments = [:($S = $partial) for (S, partial) in cached_exprs]
-    return Expr(:let, Expr(:block, cached_assignments...), tuple_expr)
+    if length(cached_exprs) > 0
+        cached_assignments = [:($S = $partial) for (S, partial) in cached_exprs]
+        return Expr(:let, Expr(:block, cached_assignments...), tuple_expr)
+    else
+        return tuple_expr
+    end
 end
 
 _straighten_indexing(expr::Symbol) = Vector{Any}[]
