@@ -359,7 +359,7 @@ end
     vinds(expr)
 
 Return the indexing part of the [`@varname`](@ref)-compatible expression `expr` as an expression
-suitable for input of the [`VarName`](@ref) constructor.
+suitable for input of the [`VarName`](@ref) constructor (i.e., a tuple of tuples).
 
 ## Examples
 
@@ -392,14 +392,17 @@ function vinds(expr, head = vsym(expr))
     cached_exprs = Vector{Pair{Symbol, Expr}}()  # cache for partial expressions in a :let
     
     for ixs in indexing
+        # S becomes the name of the cached variable
         S = (partial == head) ? head : gensym(:S)
         used_S = false
         
         nixs = length(ixs)
         if nixs == 1
+            # for 1D indexing, just use `lastindex(x)`
             ixs[1], used = _replace_ref_begin_end(ixs[1], _index_replacement_for(S))
             used_S |= used
         elseif nixs > 1
+            # otherwise, we need `lastindex(x, i)`
             for i in eachindex(ixs)
                 ixs[i], used = _replace_ref_begin_end(ixs[i], _index_replacement_for(S, i))
                 used_S |= used
@@ -407,6 +410,8 @@ function vinds(expr, head = vsym(expr))
         end
 
         if used_S && partial !== head
+            # cache that expression if we actually used it, and use the new name in the
+            # partial expression
             push!(cached_exprs, S => partial)
             partial = Expr(:ref, S, ixs...)
         else
@@ -415,16 +420,34 @@ function vinds(expr, head = vsym(expr))
         
         push!(inds, Expr(:tuple, ixs...))
     end
-    
+
+    # finally make the tuple of tuples
     tuple_expr = Expr(:tuple, inds...)
-    if length(cached_exprs) > 0
+    
+    if length(cached_exprs) == 0 
+        return tuple_expr
+    else
+        # construct one big let expression
         cached_assignments = [:($S = $partial) for (S, partial) in cached_exprs]
         return Expr(:let, Expr(:block, cached_assignments...), tuple_expr)
-    else
-        return tuple_expr
     end
 end
 
+
+"""
+    _straighten_indexing(expr)
+
+Extract a list of lists of (raw) indices of an iterated `:ref` expression.
+
+```julia
+julia> _straighten_indexing(:(x[begin][2, end, :][2][end]))
+4-element Array{Array{Any,1},1}:
+ [:begin]
+ [2, :end, :(:)]
+ [2]
+ [:end]
+```
+"""
 _straighten_indexing(expr::Symbol) = Vector{Any}[]
 function _straighten_indexing(expr::Expr)
     if Meta.isexpr(expr, :ref)
