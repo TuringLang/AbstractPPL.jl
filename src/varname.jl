@@ -346,11 +346,14 @@ end
     _replace_ref_begin_end(ex, withex) = Base.replace_ref_end_!(copy(ex), withex)
     _replace_ref_begin_end(ex::Symbol, withex) = Base.replace_ref_end_!(ex, withex)
     _index_replacement_for(s) = :($lastindex($s))
+    _index_replacement_for(s, n) = :($lastindex($s, $n))
 else
     _replace_ref_begin_end(ex, withex) = Base.replace_ref_begin_end_!(copy(ex), withex)
     _replace_ref_begin_end(ex::Symbol, withex) = Base.replace_ref_begin_end_!(ex, withex)
     _index_replacement_for(s) = :($firstindex($s)), :($lastindex($s))
+    _index_replacement_for(s, n) = :($firstindex($s, $n)), :($lastindex($s, $n))
 end
+
 
 """
     vinds(expr)
@@ -361,17 +364,24 @@ suitable for input of the [`VarName`](@ref) constructor.
 ## Examples
 
 ```jldoctest
-julia> x = [1]; eval(vinds(:(x[end])))
-((1,),)
+julia> x = [10, 20, 30]; eval(vinds(:(x[end])))
+((3,),)
 
-julia> x = [1 2]; eval(vinds(:(x[1, end])))
+
+julia> x = [10 20]; eval(vinds(:(x[1, end])))
 ((1, 2),)
 
-julia> x = [[1]]; eval(vinds(:(x[1][end])))
-((1,), (1,))
+julia> x = [[1, 2]]; eval(vinds(:(x[1][end])))
+((1,), (2,))
 
-julia> x = [fill([1,2,3], 2,2,2)]; eval(vinds(:(x[begin][2, end, :][3])))
-((1,), (2, 2, Colon()), (3,))
+julia> x = [fill([[10], [20, 30]], 2, 2, 2)]
+       if VERSION < v"1.5.0-DEV.666"
+            eval(vinds(:(x[1][2, end, :][2][end])))
+       else
+            eval(vinds(Meta.parse("x[begin][2, end, :][2][end]")))
+       end
+((1,), (2, 2, Colon()), (2,), (2,))
+
 ```
 """
 function vinds(expr, head = vsym(expr))
@@ -387,27 +397,18 @@ function vinds(expr, head = vsym(expr))
         
         nixs = length(ixs)
         if nixs == 1
-            ixs[1], used = _replace_ref_begin_end(
-                ixs[1],
-                (:($firstindex($S)), :($lastindex($S)))
-            )
+            ixs[1], used = _replace_ref_begin_end(ixs[1], _index_replacement_for(S))
             used_S |= used
         elseif nixs > 1
             for i in eachindex(ixs)
-                ixs[i], used = _replace_ref_begin_end(
-                    ixs[i],
-                    (:($firstindex($S, $i)), :($lastindex($S, $i)))
-                )
+                ixs[i], used = _replace_ref_begin_end(ixs[i], _index_replacement_for(S, i))
                 used_S |= used
             end
         end
 
         if used_S && partial !== head
             push!(cached_exprs, S => partial)
-        end
-
-        if length(cached_exprs) > 0 && cached_exprs[end][2] == partial
-            partial = Expr(:ref, cached_exprs[end][1], ixs...)
+            partial = Expr(:ref, S, ixs...)
         else
             partial = Expr(:ref, partial, ixs...)
         end
