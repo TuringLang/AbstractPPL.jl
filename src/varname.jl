@@ -261,8 +261,9 @@ end
 varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 function varname(expr::Expr)
     if Meta.isexpr(expr, :ref)
-        sym, inds = vsym(expr), vinds(expr)
-        return :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
+        head = vsym(expr)
+        inds = vinds(expr, head)
+        return :($(AbstractPPL.VarName){$(QuoteNode(head))}($inds))
     else
         error("Malformed variable name $(expr)!")
     end
@@ -373,10 +374,8 @@ julia> vinds(:(x[1][2, end, :][3]))
 :(((1,), (2, (lastindex)(x), :), (3,)))
 ```
 """
-function vinds(expr)
+function vinds(expr, head = vsym(expr))
     indexing = _straighten_indexing(expr)
-    head = vsym(expr)
-
     cached_exprs = Vector{Pair{Symbol, Expr}}()
     
     # see https://github.com/JuliaLang/julia/blob/bb5b98e72a151c41471d8cc14cacb495d647fb7f/base/views.jl#L17-L75
@@ -386,10 +385,11 @@ function vinds(expr)
         
         nixs = length(ixs)
         if nixs == 1
-            ixs[1], used_S = _replace_ref_begin_end(
+            ixs[1], used = _replace_ref_begin_end(
                 ixs[1],
                 (:($firstindex($S)), :($lastindex($S)))
             )
+            used_S |= used
         elseif nixs > 1
             for i in eachindex(ixs)
                 ixs[i], used = _replace_ref_begin_end(
@@ -401,12 +401,14 @@ function vinds(expr)
         end
 
         if used_S && partial !== head
-            # partial = Expr(:ref, S, ixs...)
             push!(cached_exprs, S => partial)
-        # else
         end
-        partial = Expr(:ref, partial, ixs...)
-        
+
+        if length(cached_exprs) > 0 && cached_exprs[end][2] == partial
+            partial = Expr(:ref, cached_exprs[end][1], ixs...)
+        else
+            partial = Expr(:ref, partial, ixs...)
+        end
         
         inds = push!(inds, Expr(:tuple, ixs...))
         inds, partial
