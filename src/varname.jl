@@ -361,21 +361,17 @@ suitable for input of the [`VarName`](@ref) constructor.
 ## Examples
 
 ```jldoctest
-julia> vinds(:(x[end]))
-:((((lastindex)(x),),))
+julia> x = [1]; eval(vinds(:(x[end])))
+((1,),)
 
-julia> vinds(:(x[1, end]))
-:(((1, (lastindex)(x, 2)),))
+julia> x = [1 2]; eval(vinds(:(x[1, end])))
+((1, 2),)
 
-julia> vinds(:(x[1][end]))
-:(let var"##S#321" = x[1]
-      ((1,), ((lastindex)(var"##S#321"),))
-  end)
+julia> x = [[1]]; eval(vinds(:(x[1][end])))
+((1,), (1,))
 
-julia> vinds(:(x[1][2, end, :][3]))
-:(let var"##S#322" = x[1]
-      ((1,), (2, (lastindex)(var"##S#322", 2), :), (3,))
-  end)
+julia> x = [fill([1,2,3], 2,2,2)]; eval(vinds(:(x[begin][2, end, :][3])))
+((1,), (2, 2, Colon()), (3,))
 ```
 """
 function vinds(expr, head = vsym(expr))
