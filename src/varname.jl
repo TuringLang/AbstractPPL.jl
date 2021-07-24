@@ -224,10 +224,6 @@ A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing
 The `sym` value is taken from the actual variable name, and the index values are put appropriately
 into the constructor (and resolved at runtime).
 
-NB: `begin` and `end` indexing can be used, but remember that they depend on _runtime values_ --
-their usage requires that the array over which the indexing expression is defined is defined, in
-order for `firstindex` and `lastindex` to work in the expanded code.
-
 ## Examples
 
 ```jldoctest
@@ -249,6 +245,13 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
 julia> let a = [42]; @varname(a[1][end][3]); end
 a[1][1][3]
 ```
+
+!!! warning
+    As you can see in the last example, `@varname` does not do any bounds checking!
+
+    Only `begin` and `end` indexing, which depend on the _runtime size_ of the array, does that!
+    Their usage _requires_ that the array over which the indexing expression is defined, in
+    order for `firstindex` and `lastindex` to work in the expanded code.
 
 !!! compat "Julia 1.5"
     Using `begin` in an indexing expression to refer to the first index requires at least
@@ -401,11 +404,11 @@ function vinds(expr, head = vsym(expr))
         
         nixs = length(ixs)
         if nixs == 1
-            # for 1D indexing, just use `lastindex(x)`
+            # for linear indexing, we use `lastindex(x)`
             ixs[1], used = _replace_ref_begin_end(ixs[1], _index_replacement_for(S))
             used_S |= used
         elseif nixs > 1
-            # otherwise, we need `lastindex(x, i)`
+            # for cartesian indexing, we need `lastindex(x, i)`
             for i in eachindex(ixs)
                 ixs[i], used = _replace_ref_begin_end(ixs[i], _index_replacement_for(S, i))
                 used_S |= used
