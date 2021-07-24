@@ -374,6 +374,9 @@ julia> x = [10 20]; eval(vinds(:(x[1, end])))
 julia> x = [[1, 2]]; eval(vinds(:(x[1][end])))
 ((1,), (2,))
 
+julia> x = ([1, 2], ); eval(vinds(:(x[1][end]))) # tuple
+((1,), (2,))
+
 julia> x = [fill([[10], [20, 30]], 2, 2, 2)]
        if VERSION < v"1.5.0-DEV.666"
             eval(vinds(:(x[1][2, end, :][2][end])))
@@ -389,7 +392,7 @@ function vinds(expr, head = vsym(expr))
     indexing = _straighten_indexing(expr)
     inds = Expr[]  # collection of result indices
     partial = head  # partial :ref expressions, used in caching
-    cached_exprs = Vector{Pair{Symbol, Expr}}()  # cache for partial expressions in a :let
+    cached_exprs = Vector{Pair{Symbol, Expr}}()  # cache for partial expressions going into a let
     
     for ixs in indexing
         # S becomes the name of the cached variable
@@ -413,9 +416,9 @@ function vinds(expr, head = vsym(expr))
             # cache that expression if we actually used it, and use the new name in the
             # partial expression
             push!(cached_exprs, S => partial)
-            partial = Expr(:ref, S, ixs...)
+            partial = Expr(:call, Base.maybeview, S, ixs...)
         else
-            partial = Expr(:ref, partial, ixs...)
+            partial = Expr(:call, Base.maybeview, partial, ixs...)
         end
         
         push!(inds, Expr(:tuple, ixs...))
