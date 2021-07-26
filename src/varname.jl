@@ -20,13 +20,13 @@ indexing expression through the [`@varname`](@ref) convenience macro.
 
 ```jldoctest
 julia> vn = VarName{:x}(((Colon(), 1), (2,)))
-x[Colon(),1][2]
+x[:,1][2]
 
 julia> vn.indexing
 ((Colon(), 1), (2,))
 
 julia> @varname x[:, 1][1+1]
-x[Colon(),1][2]
+x[:,1][2]
 ```
 """
 struct VarName{sym, T}
@@ -96,7 +96,7 @@ function Base.show(io::IO, vn::VarName{<:Any, <:Tuple})
     print(io, getsym(vn))
     for indices in getindexing(vn)
         print(io, "[")
-        join(io, indices, ",")
+        join(io, map(prettify_index, indices), ",")
         print(io, "]")
     end
 end
@@ -106,6 +106,8 @@ function Base.show(io::IO, vn::VarName{<:Any, <:Lens})
     Setfield.print_application(io, vn.indexing)
 end
 
+prettify_index(x) = string(x)
+prettify_index(::Colon) = ":"
 
 """
     Symbol(vn::VarName)
