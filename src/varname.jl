@@ -106,7 +106,9 @@ function Base.show(io::IO, vn::VarName{<:Any, <:Lens})
     Setfield.print_application(io, vn.indexing)
 end
 
+# TODO: Should this really go here?
 Setfield.print_application(io::IO, l::IndexLens) = print(io, "[", join(map(prettify_index, l.indices), ", "), "]")
+Setfield.print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
 
 prettify_index(x) = string(x)
 prettify_index(::Colon) = ":"
