@@ -267,6 +267,22 @@ end
     concretize(vn::VarName, x)
 
 Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x`.
+
+# Examples
+```jldoctest
+julia> x = (a = [1.0 2.0;], );
+
+julia> vn = @varname(x.a[1, :])
+x.a[1, :]
+
+julia> AbstractPPL.concretize(vn, x)
+x.a[1, :]
+
+julia> vn = @varname(x.a[1, end][:]);
+
+julia> AbstractPPL.concretize(vn, x)
+x.a[1, 2][:]
+```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(vn.indexing, x))
 
@@ -285,16 +301,16 @@ julia> @varname(x).indexing
 ()
 
 julia> @varname(x[1]).indexing
-((1,),)
+(@lens _[1])
 
 julia> @varname(x[:, 1]).indexing
-((Colon(), 1),)
+(@lens _[:, 1])
 
 julia> @varname(x[:, 1][2]).indexing
-((Colon(), 1), (2,))
+(@lens _[:, 1][2])
 
 julia> @varname(x[1,2][1+5][45][3]).indexing
-((1, 2), (6,), (45,), (3,))
+(@lens _[1, 2][6][45][3])
 ```
 
 !!! compat "Julia 1.5"
