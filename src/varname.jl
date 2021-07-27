@@ -1,5 +1,5 @@
 using Setfield
-import Setfield: PropertyLens, ComposedLens, IdentityLens, IndexLens
+import Setfield: PropertyLens, ComposedLens, IdentityLens, IndexLens, DynamicIndexLens
 
 """
     VarName{sym}(indexing::Tuple=())
@@ -48,7 +48,7 @@ julia> VarName(@varname(x[1][2:3]))
 x
 ```
 """
-function VarName(vn::VarName, indexing::Tuple = ())
+function VarName(vn::VarName, indexing = ())
     return VarName{getsym(vn)}(indexing)
 end
 
@@ -105,6 +105,8 @@ function Base.show(io::IO, vn::VarName{<:Any, <:Lens})
     print(io, getsym(vn))
     Setfield.print_application(io, vn.indexing)
 end
+
+Setfield.print_application(io::IO, l::IndexLens) = print(io, "[", join(map(prettify_index, l.indices), ", "), "]")
 
 prettify_index(x) = string(x)
 prettify_index(::Colon) = ":"
@@ -247,7 +249,24 @@ subsumes(t::PropertyLens, u::PropertyLens) = false
 #        (but neither did old implementation).
 subsumes(t::IndexLens, u::IndexLens) = _issubindex(t.indices, u.indices)
 
+"""
+    concretize(l::Lens, x)
 
+Return `l` instantiated on `x`, i.e. any runtime information evaluated using `x`.
+"""
+
+concretize(I::Lens, x) = I
+concretize(I::DynamicIndexLens, x) = IndexLens(I.f(x))
+function concretize(I::ComposedLens, x)
+    x_inner = get(x, I.outer)
+    return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))
+end
+"""
+    concretize(vn::VarName, x)
+
+Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x`.
+"""
+concretize(vn::VarName, x) = VarName(vn, concretize(vn.indexing, x))
 
 """
     @varname(expr)
