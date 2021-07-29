@@ -111,10 +111,6 @@ function _print_application(io::IO, l::ComposedLens)
     _print_application(io, l.outer)
     _print_application(io, l.inner)
 end
-function _print_application(io::IO, l::ComposedLens{})
-    _print_application(io, l.outer)
-    _print_application(io, l.inner)
-end
 _print_application(io::IO, l::IndexLens) = print(io, "[", join(map(prettify_index, l.indices), ","), "]")
 # This is a bit weird but whatever. We're almost always going to
 # `concretize` anyways.
