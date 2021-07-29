@@ -321,8 +321,8 @@ macro varname(expr::Union{Expr, Symbol})
     return varname(expr)
 end
 
-varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr)
+varname(sym::Symbol; concretize=true) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr; concretize=true)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         expr_new = deepcopy(expr)
         sym = vsym(expr_new)
@@ -339,7 +339,12 @@ function varname(expr::Expr)
         curexpr.args[1] = :_
         inds = Setfield.lensmacro(identity, expr_new)
 
-        return :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
+        # TODO: Can we do better, i.e. only check if we have `DynamicLens`?
+        return if concretize
+            :($(AbstractPPL.concretize)($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds), $(esc(sym))))
+        else
+            :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
+        end
     else
         error("Malformed variable name $(expr)!")
     end
