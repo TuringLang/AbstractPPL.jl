@@ -103,12 +103,22 @@ end
 
 function Base.show(io::IO, vn::VarName{<:Any, <:Lens})
     print(io, getsym(vn))
-    Setfield.print_application(io, vn.indexing)
+    _print_application(io, vn.indexing)
 end
 
-# TODO: Should this really go here?
-Setfield.print_application(io::IO, l::IndexLens) = print(io, "[", join(map(prettify_index, l.indices), ", "), "]")
-Setfield.print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
+_print_application(io::IO, l::Lens) = Setfield.print_application(io, l)
+function _print_application(io::IO, l::ComposedLens)
+    _print_application(io, l.outer)
+    _print_application(io, l.inner)
+end
+function _print_application(io::IO, l::ComposedLens{})
+    _print_application(io, l.outer)
+    _print_application(io, l.inner)
+end
+_print_application(io::IO, l::IndexLens) = print(io, "[", join(map(prettify_index, l.indices), ","), "]")
+# This is a bit weird but whatever. We're almost always going to
+# `concretize` anyways.
+_print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
 
 prettify_index(x) = string(x)
 prettify_index(::Colon) = ":"
