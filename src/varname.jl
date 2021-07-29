@@ -92,6 +92,11 @@ getindexing(vn::VarName) = vn.indexing
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getindexing(vn)), h)
 Base.:(==)(x::VarName, y::VarName) = getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
 
+# Composition rules similar to the standard one for lenses, but we need a special
+# one for the "empty" `VarName{..., Tuple{}}`.
+Base.:∘(vn::VarName{sym,Tuple{}}, lens::Lens) where {sym} = VarName{sym}(lens)
+Base.:∘(vn::VarName{sym,<:Lens}, lens::Lens) where {sym} = VarName{sym}(vn.indexing ∘ lens)
+
 function Base.show(io::IO, vn::VarName{<:Any, <:Tuple})
     print(io, getsym(vn))
     for indices in getindexing(vn)
