@@ -234,6 +234,7 @@ _issubrange(i::Colon, j::ConcreteIndex) = true
 
 # E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
 subsumes(t::Tuple{}, u::Lens) = true
+subsumes(t::Lens, u::Tuple{}) = false
 
 # Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
 # checking `subsumes` for every level. This for example means that if we are comparing
@@ -258,7 +259,7 @@ subsumes(t::PropertyLens, u::PropertyLens) = false
 # FIXME: Does not support `DynamicIndexLens`.
 # FIXME: Does not correctly handle cases such as `subsumes(x, x[:])`
 #        (but neither did old implementation).
-subsumes(t::IndexLens, u::IndexLens) = subsumes(t.indices, u.indices)
+subsumes(t::IndexLens, u::IndexLens) = _issubindex(t.indices, u.indices)
 subsumes(t::ComposedLens{<:IndexLens}, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
 subsumes(t::IndexLens, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
 subsumes(t::ComposedLens{<:IndexLens}, u::IndexLens) = subsumes_index(t, u)
