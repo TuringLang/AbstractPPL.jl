@@ -236,6 +236,9 @@ _issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
 _issubrange(i::Union{ConcreteIndex, Colon}, j::Colon) = true
 _issubrange(i::Colon, j::ConcreteIndex) = true
 
+# E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
+subsumes(t::Tuple{}, u::Lens) = true
+
 # Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
 # checking `subsumes` for every level. This for example means that if we are comparing
 # `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
@@ -259,7 +262,47 @@ subsumes(t::PropertyLens, u::PropertyLens) = false
 # FIXME: Does not support `DynamicIndexLens`.
 # FIXME: Does not correctly handle cases such as `subsumes(x, x[:])`
 #        (but neither did old implementation).
-subsumes(t::IndexLens, u::IndexLens) = _issubindex(t.indices, u.indices)
+subsumes(t::IndexLens, u::IndexLens) = subsumes(t.indices, u.indices)
+subsumes(t::ComposedLens{<:IndexLens}, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
+subsumes(t::IndexLens, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
+subsumes(t::ComposedLens{<:IndexLens}, u::IndexLens) = subsumes_index(t, u)
+
+# Since expressions such as `x[:][:][:][1]` and `x[1]` are equal,
+# the indexing behavior must be considered jointly.
+# Therefore we must recurse until we reach something that is NOT
+# indexing, and then consider the sequence of indices leading up to this.
+function subsumes_index(t, u)
+    t_indices, t_next = combine_indices(t)
+    u_indices, u_next = combine_indices(u)
+
+    # Check if the indices indicate that `t` subsumes `u`.
+    if !subsumes(t_indices, u_indices)
+        return false
+    end
+
+    if t_next === nothing
+        # Means that there's nothing left for `t` and either nothing
+        # or something left for `u`, i.e. `t` indeed `subsumes` `u`.
+        return true
+    else
+        # `t` only `subsumes` `u` if `u_next` is also nothing.
+        if u_next === nothing
+            return true
+        else
+            return false
+        end
+    end
+
+    # If neither is `nothing` we continue iterating.
+    return subsumes(t_next, u_next)
+end
+
+combine_indices(lens::Lens) = (), lens
+combine_indices(lens::IndexLens) = (lens.indices, ), nothing
+function combine_indices(lens::ComposedLens{<:IndexLens})
+    indices, next = combine_indices(lens.inner)
+    return (lens.outer.indices, indices...), next
+end
 
 """
     concretize(l::Lens, x)
