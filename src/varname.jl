@@ -1,5 +1,5 @@
 using Setfield
-import Setfield: PropertyLens, ComposedLens, IdentityLens, IndexLens, DynamicIndexLens
+using Setfield: PropertyLens, ComposedLens, IdentityLens, IndexLens, DynamicIndexLens
 
 """
     VarName{sym}(indexing::Tuple=())
