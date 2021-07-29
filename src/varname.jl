@@ -492,7 +492,7 @@ julia> @vinds x[2:3,2:3][[1,2],[1,2]]
     Julia 1.5.
 """
 macro vinds(expr::Union{Expr, Symbol})
-    return esc(vinds(expr))
+    return vinds(expr)
 end
 
 
@@ -523,7 +523,7 @@ function vinds(expr::Expr)
         else
             Base.replace_ref_begin_end!(ex)
         end
-        last = esc(Expr(:tuple, ex.args[2:end]...))
+        last = Expr(:tuple, ex.args[2:end]...)
         init = vinds(ex.args[1]).args
         return Expr(:tuple, init..., last)
     else
