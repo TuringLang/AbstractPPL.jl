@@ -336,9 +336,12 @@ x.a[1,2][:]
 concretize(vn::VarName, x) = VarName(vn, concretize(vn.indexing, x))
 
 """
-    @varname(expr)
+    @varname(expr[, concretize])
 
 A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing expression `expr`.
+
+If `concretize` is `true`, the resulting expression will be wrapped in a [`concretize`](@ref) call.
+This is useful if you for example want to ensure that no `Setfield.DynamicLens` is used.
 
 The `sym` value is taken from the actual variable name, and the index values are put appropriately
 into the constructor (and resolved at runtime).
@@ -367,7 +370,7 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
     Julia 1.5.
 """
 macro varname(expr::Union{Expr, Symbol}, concretize=false)
-    return varname(expr, concretize=concretize)
+    return varname(expr, concretize)
 end
 
 varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
