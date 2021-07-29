@@ -20,13 +20,13 @@ indexing expression through the [`@varname`](@ref) convenience macro.
 
 ```jldoctest
 julia> vn = VarName{:x}(((Colon(), 1), (2,)))
-x[:, 1][2]
+x[:,1][2]
 
 julia> vn.indexing
 ((Colon(), 1), (2,))
 
 julia> @varname x[:, 1][1+1]
-x[:, 1][2]
+x[:,1][2]
 ```
 """
 struct VarName{sym, T}
@@ -80,7 +80,7 @@ Return the indexing tuple of the Julia variable used to generate `vn`.
 
 ```jldoctest
 julia> getindexing(@varname(x[1][2:3]))
-((1,), (2:3,))
+(@lens _[1][2:3])
 
 julia> getindexing(@varname(y))
 ()
@@ -326,15 +326,15 @@ Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x
 julia> x = (a = [1.0 2.0;], );
 
 julia> vn = @varname(x.a[1, :])
-x.a[1, :]
+x.a[1,:]
 
 julia> AbstractPPL.concretize(vn, x)
-x.a[1, :]
+x.a[1,:]
 
 julia> vn = @varname(x.a[1, end][:]);
 
 julia> AbstractPPL.concretize(vn, x)
-x.a[1, 2][:]
+x.a[1,2][:]
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(vn.indexing, x))
@@ -357,10 +357,10 @@ julia> @varname(x[1]).indexing
 (@lens _[1])
 
 julia> @varname(x[:, 1]).indexing
-(@lens _[:, 1])
+(@lens _[Colon(), 1])
 
 julia> @varname(x[:, 1][2]).indexing
-(@lens _[:, 1][2])
+(@lens _[Colon(), 1][2])
 
 julia> @varname(x[1,2][1+5][45][3]).indexing
 (@lens _[1, 2][6][45][3])
