@@ -324,11 +324,12 @@ end
 varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 function varname(expr::Expr)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
-        sym = vsym(expr)
+        expr_new = deepcopy(expr)
+        sym = vsym(expr_new)
 
         # Need to recursively unwrap until we reach the outer-most variable.
         # TODO: implement as recursion?
-        curexpr = expr
+        curexpr = expr_new
         while !(curexpr.args[1] isa Symbol)
             curexpr = curexpr.args[1]
         end
@@ -336,7 +337,7 @@ function varname(expr::Expr)
         # Then we replace the variable with `_`, to get an expression we can
         # use `lensmacro` on.
         curexpr.args[1] = :_
-        inds = Setfield.lensmacro(identity, expr)
+        inds = Setfield.lensmacro(identity, expr_new)
 
         return :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
     else
