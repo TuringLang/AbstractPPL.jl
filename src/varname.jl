@@ -370,27 +370,16 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr, Symbol})
-    return varname(expr)
+macro varname(expr::Union{Expr, Symbol}, concretize=false)
+    return varname(expr; concretize=concretize)
 end
 
-varname(sym::Symbol; concretize=true) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr; concretize=true)
+varname(sym::Symbol; concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr; concretize=false)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
-        expr_new = deepcopy(expr)
-        sym = vsym(expr_new)
-
-        # Need to recursively unwrap until we reach the outer-most variable.
-        # TODO: implement as recursion?
-        curexpr = expr_new
-        while !(curexpr.args[1] isa Symbol)
-            curexpr = curexpr.args[1]
-        end
-
-        # Then we replace the variable with `_`, to get an expression we can
-        # use `lensmacro` on.
-        curexpr.args[1] = :_
-        inds = Setfield.lensmacro(identity, expr_new)
+        sym = vsym(expr)
+        # Convert `expr` into something `lensmacro` can parse.
+        inds = Setfield.lensmacro(identity, replace_basesym(expr, :_))
 
         # TODO: Can we do better, i.e. only check if we have `DynamicLens`?
         return if concretize
@@ -403,6 +392,37 @@ function varname(expr::Expr; concretize=true)
     end
 end
 
+
+"""
+    replace_basesym(expr, sub::Symbol)
+
+Return `expr` with the base symbol replaced, e.g.
+`:(x[1].a[end])` results in `:(\$(sub).[1].a[end])`
+
+# Example
+```jldoctest
+julia> AbstractPPL.replace_basesym(:(x[1].a[end][:]), :_)
+:(((_[1]).a[end])[:])
+
+julia> AbstractPPL.replace_basesym(:(x), :_)
+:x
+
+julia> AbstractPPL.replace_basesym(:(1), :_)
+1
+```
+
+"""
+replace_basesym(x, sub::Symbol) = x
+function replace_basesym(expr::Expr, sub::Symbol)
+    # Recursively replace_basesym the first argument, until the first
+    # argument is a `Symbol`, in which case we replace the first
+    # argument with `:_` and return the expression.
+    return if length(expr.args) > 0 && !(expr.args[1] isa Symbol)
+        Expr(expr.head, replace_basesym(expr.args[1], sub), expr.args[2:end]...)
+    else
+        Expr(expr.head, sub, expr.args[2:end]...)
+    end
+end
 
 """
     @vsym(expr)
