@@ -367,11 +367,11 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
     Julia 1.5.
 """
 macro varname(expr::Union{Expr, Symbol}, concretize=false)
-    return varname(expr; concretize=concretize)
+    return varname(expr, concretize=concretize)
 end
 
-varname(sym::Symbol; concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr; concretize=false)
+varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr, concretize=false)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         sym = vsym(expr)
         # Convert `expr` into something `lensmacro` can parse.
