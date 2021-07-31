@@ -18,8 +18,8 @@ indexing expression through the [`@varname`](@ref) convenience macro.
 
 # Examples
 
-```jldoctest
-julia> vn = VarName{:x}(((Colon(), 1), (2,)))
+```jldoctest; setup=:(using Setfield)
+julia> vn = VarName{:x}(Setfield.IndexLens((Colon(), 1)) ∘ Setfield.IndexLens((2, )))
 x[:,1][2]
 
 julia> vn.indexing
