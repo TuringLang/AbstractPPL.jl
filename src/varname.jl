@@ -29,10 +29,10 @@ julia> @varname x[:, 1][1+1]
 x[:,1][2]
 ```
 """
-struct VarName{sym, T}
+struct VarName{sym, T<:Lens}
     indexing::T
 
-    VarName{sym}(indexing=()) where {sym} = new{sym,typeof(indexing)}(indexing)
+    VarName{sym}(indexing=IdentityLens()) where {sym} = new{sym,typeof(indexing)}(indexing)
 end
 
 """
@@ -48,7 +48,7 @@ julia> VarName(@varname(x[1][2:3]))
 x
 ```
 """
-function VarName(vn::VarName, indexing = ())
+function VarName(vn::VarName, indexing=IdentityLens())
     return VarName{getsym(vn)}(indexing)
 end
 
@@ -94,7 +94,7 @@ Base.:(==)(x::VarName, y::VarName) = getsym(x) == getsym(y) && getindexing(x) ==
 
 # Composition rules similar to the standard one for lenses, but we need a special
 # one for the "empty" `VarName{..., Tuple{}}`.
-Base.:∘(vn::VarName{sym,Tuple{}}, lens::Lens) where {sym} = VarName{sym}(lens)
+Base.:∘(vn::VarName{sym,<:IdentityLens}, lens::Lens) where {sym} = VarName{sym}(lens)
 Base.:∘(vn::VarName{sym,<:Lens}, lens::Lens) where {sym} = VarName{sym}(vn.indexing ∘ lens)
 
 function Base.show(io::IO, vn::VarName{<:Any, <:Tuple})
@@ -217,34 +217,14 @@ function subsumes(u::VarName, v::VarName)
     return getsym(u) == getsym(v) && subsumes(u.indexing, v.indexing)
 end
 
-subsumes(::Tuple{}, ::Tuple{}) = true  # x subsumes x
-subsumes(::Tuple{}, ::Tuple) = true    # x subsumes x[1]
-subsumes(::Tuple, ::Tuple{}) = false   # x[1] does not subsume x
-function subsumes(t::Tuple, u::Tuple)  # does x[i]... subsume x[j]...?
-    return _issubindex(first(t), first(u)) && subsumes(Base.tail(t), Base.tail(u))
-end
-
-const AnyIndex = Union{Int, AbstractVector{Int}, Colon} 
-_issubindex_(::Tuple{Vararg{AnyIndex}}, ::Tuple{Vararg{AnyIndex}}) = false
-function _issubindex(t::NTuple{N, AnyIndex}, u::NTuple{N, AnyIndex}) where {N}
-    return all(_issubrange(j, i) for (i, j) in zip(t, u))
-end
-
-const ConcreteIndex = Union{Int, AbstractVector{Int}} # this include all kinds of ranges
-
-"""Determine whether indices `i` are contained in `j`, treating `:` as universal set."""
-_issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
-_issubrange(i::Union{ConcreteIndex, Colon}, j::Colon) = true
-_issubrange(i::Colon, j::ConcreteIndex) = true
-
-# E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
-subsumes(t::Tuple{}, u::Lens) = true
-subsumes(t::Lens, u::Tuple{}) = false
-
 # Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
 # checking `subsumes` for every level. This for example means that if we are comparing
 # `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
 # each other since at the same level/depth they access different properties.
+# E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
+subsumes(t::IdentityLens, u::Lens) = true
+subsumes(t::Lens, u::IdentityLens) = false
+
 subsumes(t::ComposedLens, u::ComposedLens) = subsumes(t.outer, u.outer) && subsumes(t.inner, u.inner)
 
 # If `t` is still a composed lens, then there is no way it can subsume `u` since `u` is a
@@ -273,12 +253,50 @@ subsumes(t::ComposedLens{<:IndexLens}, u::IndexLens) = subsumes_index(t, u)
 # the indexing behavior must be considered jointly.
 # Therefore we must recurse until we reach something that is NOT
 # indexing, and then consider the sequence of indices leading up to this.
-function subsumes_index(t, u)
+"""
+    subsumes_index(t::Lens, u::Lens)
+
+Return `true` if the indexing represented by `t` subsumes `u`.
+
+This is mostly useful for comparing compositions involving `IndexLens`
+e.g. `_[1][2].a[2]` and `_[1][2].a`. In such a scenario we do the following:
+1. Combine `[1][2]` into a `Tuple` of indices using [`combine_indices`](@ref).
+2. Do the same for `[1][2]`.
+3. Compare the two tuples from (1) and (2) using `subsumes_index`.
+4. Since we're still undecided, we call `subsume(@lens(_.a[2]), @lens(_.a))`
+   which then returns `false`.
+
+# Example
+```jldoctest; setup=:(using Setfield)
+julia> t = @lens(_[1].a); u = @lens(_[1]);
+
+julia> subsumes_index(t, u)
+false
+
+julia> subsumes_index(u, t)
+true
+
+julia> # `IdentityLens` subsumes all.
+       subsumes_index(@lens(_), t)
+true
+
+julia> # None subsumes `IdentityLens`.
+       subsumes_index(t, @lens(_))
+false
+
+julia> AbstractPPL.subsumes(@lens(_[1][2].a[2]), @lens(_[1][2].a))
+false
+
+julia> AbstractPPL.subsumes(@lens(_[1][2].a), @lens(_[1][2].a[2]))
+true
+```
+"""
+function subsumes_index(t::Lens, u::Lens)
     t_indices, t_next = combine_indices(t)
     u_indices, u_next = combine_indices(u)
 
-    # Check if the indices indicate that `t` subsumes `u`.
-    if !subsumes(t_indices, u_indices)
+    # If we already know that `u` is not subsumed by `t`, return early.
+    if !subsumes_index(t_indices, u_indices)
         return false
     end
 
@@ -286,25 +304,62 @@ function subsumes_index(t, u)
         # Means that there's nothing left for `t` and either nothing
         # or something left for `u`, i.e. `t` indeed `subsumes` `u`.
         return true
-    else
-        # `t` only `subsumes` `u` if `u_next` is also nothing.
-        if u_next === nothing
-            return true
-        else
-            return false
-        end
+    elseif u_next === nothing
+        # If `t_next` is not `nothing` but `u_ntext` is, then
+        # `t` does not subsume `u`.
+        return false
     end
 
-    # If neither is `nothing` we continue iterating.
+    # If neither is `nothing` we continue.
     return subsumes(t_next, u_next)
 end
 
+"""
+    combine_indices(lens)
+
+Return sequential indexing into a single `Tuple` of indices,
+e.g. `x[:][1][2]` becomes `((Colon(), ), (1, ), (2, ))`.
+
+The result is compatible with [`subsumes_index`](@ref) for `Tuple` input.
+"""
 combine_indices(lens::Lens) = (), lens
 combine_indices(lens::IndexLens) = (lens.indices, ), nothing
 function combine_indices(lens::ComposedLens{<:IndexLens})
     indices, next = combine_indices(lens.inner)
     return (lens.outer.indices, indices...), next
 end
+
+"""
+    subsumes_index(left_index::Tuple, right_index::Tuple)
+
+Return `true` if `right_index` is subsumed by `left_index`.
+
+Currently _not_ supported are: 
+- Boolean indexing, literal `CartesianIndex` (these could be added, though)
+- Linear indexing of multidimensional arrays: `x[4]` does not subsume `x[2, 2]` for a matrix `x`
+- Trailing ones: `x[2, 1]` does not subsume `x[2]` for a vector `x`
+- Dynamic indexing, e.g. `x[1]` does not subsume `x[begin]`.
+"""
+subsumes_index(::Tuple{}, ::Tuple{}) = true  # x subsumes x
+subsumes_index(::Tuple{}, ::Tuple) = true    # x subsumes x[1]
+subsumes_index(::Tuple, ::Tuple{}) = false   # x[1] does not subsume x
+function subsumes_index(t::Tuple, u::Tuple)  # does x[i]... subsume x[j]...?
+    return _issubindex(first(t), first(u)) && subsumes_index(Base.tail(t), Base.tail(u))
+end
+
+const AnyIndex = Union{Int, AbstractVector{Int}, Colon} 
+_issubindex_(::Tuple{Vararg{AnyIndex}}, ::Tuple{Vararg{AnyIndex}}) = false
+function _issubindex(t::NTuple{N, AnyIndex}, u::NTuple{N, AnyIndex}) where {N}
+    return all(_issubrange(j, i) for (i, j) in zip(t, u))
+end
+
+const ConcreteIndex = Union{Int, AbstractVector{Int}} # this include all kinds of ranges
+
+"""Determine whether indices `i` are contained in `j`, treating `:` as universal set."""
+_issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
+_issubrange(i::Colon, j::Colon) = true
+_issubrange(i::ConcreteIndex, j::Colon) = false
+_issubrange(i::Colon, j::ConcreteIndex) = true
 
 """
     concretize(l::Lens, x)
@@ -471,70 +526,3 @@ function vsym(expr::Expr)
     end
 end
 
-"""
-    @vinds(expr)
-
-Returns a tuple of tuples of the indices in `expr`.
-
-## Examples
-
-```jldoctest
-julia> @vinds x
-()
-
-julia> @vinds x[1,1][2,3]
-((1, 1), (2, 3))
-
-julia> @vinds x[:,1][2,:]
-((Colon(), 1), (2, Colon()))
-
-julia> @vinds x[2:3,1][2,1:2]
-((2:3, 1), (2, 1:2))
-
-julia> @vinds x[2:3,2:3][[1,2],[1,2]]
-((2:3, 2:3), ([1, 2], [1, 2]))
-```
-
-!!! compat "Julia 1.5"
-    Using `begin` in an indexing expression to refer to the first index requires at least
-    Julia 1.5.
-"""
-macro vinds(expr::Union{Expr, Symbol})
-    return vinds(expr)
-end
-
-
-"""
-    vinds(expr)
-
-Return the indexing part of the [`@varname`](@ref)-compatible expression `expr` as an expression
-suitable for input of the [`VarName`](@ref) constructor.
-
-## Examples
-
-```jldoctest
-julia> vinds(:(x[end]))
-:((((lastindex)(x),),))
-
-julia> vinds(:(x[1, end]))
-:(((1, (lastindex)(x, 2)),))
-```
-"""
-function vinds end
-
-vinds(expr::Symbol) = Expr(:tuple)
-function vinds(expr::Expr)
-    if Meta.isexpr(expr, :ref)
-        ex = copy(expr)
-        @static if VERSION < v"1.5.0-DEV.666"
-            Base.replace_ref_end!(ex)
-        else
-            Base.replace_ref_begin_end!(ex)
-        end
-        last = Expr(:tuple, ex.args[2:end]...)
-        init = vinds(ex.args[1]).args
-        return Expr(:tuple, init..., last)
-    else
-        error("Mis-formed variable name $(expr)!")
-    end
-end
