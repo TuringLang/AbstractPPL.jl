@@ -382,21 +382,35 @@ end
 varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 function varname(expr::Expr, concretize=false)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
-        sym = vsym(expr)
-        # Convert `expr` into something `lensmacro` can parse.
-        inds = Setfield.lensmacro(identity, replace_basesym(expr, :_))
+        # Split into object/base symbol and lens.
+        sym_escaped, lens = Setfield.parse_obj_lens(expr)
+        # Setfield.jl escapes the return symbol, so we need to unescape
+        # to call `QuoteNode` on it.
+        sym = drop_escape(sym_escaped)
 
-        # TODO: Can we do better, i.e. only check if we have `DynamicLens`?
-        return if concretize
-            :($(AbstractPPL.concretize)($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds), $(esc(sym))))
+        return if Setfield.need_dynamic_lens(expr)
+            :($(AbstractPPL.concretize)($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens), $sym_escaped))
         else
-            :($(AbstractPPL.VarName){$(QuoteNode(sym))}($inds))
+            :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
         end
     else
         error("Malformed variable name $(expr)!")
     end
 end
 
+drop_escape(x) = x
+function drop_escape(expr::Expr)
+    Meta.isexpr(expr, :escape) && return drop_escape(expr.args[1])
+    return Expr(expr.head, map(x -> drop_escape(x), expr.args)...)
+end
+
+@static if VERSION ≥ v"1.5.0-DEV.666"
+    function Setfield.need_dynamic_lens(ex)
+        return Setfield.foldtree(false, ex) do yes, x
+            yes || x === :end || x === :begin || x === :_
+        end
+    end
+end
 
 """
     replace_basesym(expr, sub::Symbol)
