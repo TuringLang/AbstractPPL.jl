@@ -405,6 +405,7 @@ function drop_escape(expr::Expr)
 end
 
 @static if VERSION ≥ v"1.5.0-DEV.666"
+    # TODO: Replace once https://github.com/jw3126/Setfield.jl/pull/155 has been merged.
     function Setfield.lower_index(collection::Symbol, index, dim)
         if Setfield.isexpr(index, :call)
             return Expr(:call, Setfield.lower_index.(collection, index.args, dim)...)
@@ -428,37 +429,6 @@ end
         return Setfield.foldtree(false, ex) do yes, x
             (yes || x === :end || x === :begin || x === :_)
         end
-    end
-end
-
-"""
-    replace_basesym(expr, sub::Symbol)
-
-Return `expr` with the base symbol replaced, e.g.
-`:(x[1].a[end])` results in `:(\$(sub).[1].a[end])`
-
-# Example
-```jldoctest
-julia> AbstractPPL.replace_basesym(:(x[1].a[end][:]), :_)
-:(((_[1]).a[end])[:])
-
-julia> AbstractPPL.replace_basesym(:(x), :_)
-:x
-
-julia> AbstractPPL.replace_basesym(:(1), :_)
-1
-```
-
-"""
-replace_basesym(x, sub::Symbol) = x
-function replace_basesym(expr::Expr, sub::Symbol)
-    # Recursively replace_basesym the first argument, until the first
-    # argument is a `Symbol`, in which case we replace the first
-    # argument with `:_` and return the expression.
-    return if length(expr.args) > 0 && !(expr.args[1] isa Symbol)
-        Expr(expr.head, replace_basesym(expr.args[1], sub), expr.args[2:end]...)
-    else
-        Expr(expr.head, sub, expr.args[2:end]...)
     end
 end
 
