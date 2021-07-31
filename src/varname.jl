@@ -405,9 +405,28 @@ function drop_escape(expr::Expr)
 end
 
 @static if VERSION ≥ v"1.5.0-DEV.666"
+    function Setfield.lower_index(collection::Symbol, index, dim)
+        if Setfield.isexpr(index, :call)
+            return Expr(:call, Setfield.lower_index.(collection, index.args, dim)...)
+        elseif (index === :end)
+            if dim === nothing
+                return :($(Base.lastindex)($collection))
+            else
+                return :($(Base.lastindex)($collection, $dim))
+            end
+        elseif index === :begin
+            if dim === nothing
+                return :($(Base.firstindex)($collection))
+            else
+                return :($(Base.firstindex)($collection, $dim))
+            end
+        end
+        return index
+    end
+
     function Setfield.need_dynamic_lens(ex)
         return Setfield.foldtree(false, ex) do yes, x
-            yes || x === :end || x === :begin || x === :_
+            (yes || x === :end || x === :begin || x === :_)
         end
     end
 end
