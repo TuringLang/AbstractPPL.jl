@@ -7,10 +7,8 @@ export VarName,
     inspace,
     subsumes,
     varname,
-    vinds,
     vsym,
     @varname,
-    @vinds,
     @vsym
 
 
