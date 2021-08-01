@@ -35,12 +35,20 @@ struct VarName{sym, T<:Lens}
     VarName{sym}(indexing=IdentityLens()) where {sym} = new{sym,typeof(indexing)}(indexing)
 end
 
+# A bit of backwards compatibility.
+# TODO: Should we deprecate this?
+VarName{sym}(indexing::Tuple) where {sym} = VarName{sym}(tuple2indexlens(indexing))
+
 """
-    VarName(vn::VarName, indexing=())
+    VarName(vn::VarName, indexing::Lens)
+    VarName(vn::VarName, indexing::Tuple)
 
 Return a copy of `vn` with a new index `indexing`.
 
-```jldoctest
+```jldoctest; setup=:(using Setfield)
+julia> VarName(@varname(x[1][2:3]), Setfield.IndexLens((2,)))
+x[2]
+
 julia> VarName(@varname(x[1][2:3]), ((2,),))
 x[2]
 
@@ -48,10 +56,15 @@ julia> VarName(@varname(x[1][2:3]))
 x
 ```
 """
-function VarName(vn::VarName, indexing=IdentityLens())
-    return VarName{getsym(vn)}(indexing)
+VarName(vn::VarName, indexing::Lens=IdentityLens()) = VarName{getsym(vn)}(indexing)
+
+function VarName(vn::VarName, indexing::Tuple)
+    return VarName{getsym(vn)}(tuple2indexlens(indexing))
 end
 
+tuple2indexlens(indexing::Tuple{}) = IdentityLens()
+tuple2indexlens(indexing::Tuple{<:Tuple}) = IndexLens(first(indexing))
+tuple2indexlens(indexing::Tuple) = IndexLens(first(indexing)) ∘ tuple2indexlens(indexing[2:end])
 
 """
     getsym(vn::VarName)
