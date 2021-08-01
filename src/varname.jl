@@ -33,8 +33,7 @@ struct VarName{sym,T<:Lens}
     indexing::T
 
     function VarName{sym}(indexing=IdentityLens()) where {sym}
-        # TODO: Should we completely disallow or just `@warn`?
-        # TODO: Does this affect performance?
+        # TODO: Should we completely disallow or just `@warn` of limited support?
         if !is_static_lens(indexing)
             error("attempted to construct `VarName` with dynamic lens of type $(nameof(typeof(indexing)))")
         end
