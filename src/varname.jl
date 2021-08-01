@@ -85,8 +85,9 @@ end
 
 tupleindex2lens(indexing::Tuple{}) = IdentityLens()
 tupleindex2lens(indexing::Tuple{<:Tuple}) = IndexLens(first(indexing))
-tupleindex2lens(indexing::Tuple) =
-    IndexLens(first(indexing)) ∘ tupleindex2lens(indexing[2:end])
+function tupleindex2lens(indexing::Tuple)
+    return IndexLens(first(indexing)) ∘ tupleindex2lens(indexing[2:end])
+end
 
 """
     getsym(vn::VarName)
@@ -143,18 +144,23 @@ end
 
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getindexing(vn)), h)
-Base.:(==)(x::VarName, y::VarName) =
-    getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
+function Base.:(==)(x::VarName, y::VarName)
+    return getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
+end
 
 # Allow compositions with lenses.
-Setfield.compose(vn::VarName{sym,<:Lens}, lens::Lens) where {sym} =
-    VarName{sym}(vn.indexing ∘ lens)
+function Base.:∘(vn::VarName{sym,<:Lens}, lens::Lens) where {sym}
+    return VarName{sym}(vn.indexing ∘ lens)
+end
 
 function Base.show(io::IO, vn::VarName{<:Any,<:Lens})
+    # No need to check `Setfield.has_atlens_support` since
+    # `VarName` does not allow dynamic lenses.
     print(io, getsym(vn))
     _print_application(io, vn.indexing)
 end
 
+# This is all just to allow to convert `Colon()` into `:`.
 _print_application(io::IO, l::Lens) = Setfield.print_application(io, l)
 function _print_application(io::IO, l::ComposedLens)
     _print_application(io, l.outer)
@@ -174,9 +180,13 @@ prettify_index(::Colon) = ":"
 
 Return a `Symbol` represenation of the variable identifier `VarName`.
 
+# Examples
 ```jldoctest
 julia> Symbol(@varname(x[1][2:3]))
 Symbol("x[1][2:3]")
+
+julia> Symbol(@varname(x[1][:]))
+Symbol("x[1][:]")
 ```
 """
 Base.Symbol(vn::VarName) = Symbol(string(vn))  # simplified symbol
