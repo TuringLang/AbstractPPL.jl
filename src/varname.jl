@@ -128,15 +128,6 @@ Base.:(==)(x::VarName, y::VarName) = getsym(x) == getsym(y) && getindexing(x) ==
 Base.:∘(vn::VarName{sym,<:IdentityLens}, lens::Lens) where {sym} = VarName{sym}(lens)
 Base.:∘(vn::VarName{sym,<:Lens}, lens::Lens) where {sym} = VarName{sym}(vn.indexing ∘ lens)
 
-function Base.show(io::IO, vn::VarName{<:Any, <:Tuple})
-    print(io, getsym(vn))
-    for indices in getindexing(vn)
-        print(io, "[")
-        join(io, map(prettify_index, indices), ",")
-        print(io, "]")
-    end
-end
-
 function Base.show(io::IO, vn::VarName{<:Any, <:Lens})
     print(io, getsym(vn))
     _print_application(io, vn.indexing)
