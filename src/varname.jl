@@ -29,10 +29,11 @@ julia> @varname x[:, 1][1+1]
 x[:,1][2]
 ```
 """
-struct VarName{sym, T<:Lens}
+struct VarName{sym,T<:Lens}
     indexing::T
 
-    VarName{sym}(indexing=IdentityLens()) where {sym} = new{sym,typeof(indexing)}(indexing)
+    VarName{sym}(indexing = IdentityLens()) where {sym} =
+        new{sym,typeof(indexing)}(indexing)
 end
 
 # A bit of backwards compatibility.
@@ -56,7 +57,7 @@ julia> VarName(@varname(x[1][2:3]))
 x
 ```
 """
-VarName(vn::VarName, indexing::Lens=IdentityLens()) = VarName{getsym(vn)}(indexing)
+VarName(vn::VarName, indexing::Lens = IdentityLens()) = VarName{getsym(vn)}(indexing)
 
 function VarName(vn::VarName, indexing::Tuple)
     return VarName{getsym(vn)}(tupleindex2lens(indexing))
@@ -64,7 +65,8 @@ end
 
 tupleindex2lens(indexing::Tuple{}) = IdentityLens()
 tupleindex2lens(indexing::Tuple{<:Tuple}) = IndexLens(first(indexing))
-tupleindex2lens(indexing::Tuple) = IndexLens(first(indexing)) ∘ tupleindex2lens(indexing[2:end])
+tupleindex2lens(indexing::Tuple) =
+    IndexLens(first(indexing)) ∘ tupleindex2lens(indexing[2:end])
 
 """
     getsym(vn::VarName)
@@ -81,7 +83,7 @@ julia> getsym(@varname(y))
 :y
 ```
 """
-getsym(vn::VarName{sym}) where sym = sym
+getsym(vn::VarName{sym}) where {sym} = sym
 
 
 """
@@ -121,14 +123,14 @@ end
 
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getindexing(vn)), h)
-Base.:(==)(x::VarName, y::VarName) = getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
+Base.:(==)(x::VarName, y::VarName) =
+    getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
 
-# Composition rules similar to the standard one for lenses, but we need a special
-# one for the "empty" `VarName{..., Tuple{}}`.
-Base.:∘(vn::VarName{sym,<:IdentityLens}, lens::Lens) where {sym} = VarName{sym}(lens)
-Base.:∘(vn::VarName{sym,<:Lens}, lens::Lens) where {sym} = VarName{sym}(vn.indexing ∘ lens)
+# Allow compositions with lenses.
+Setfield.compose(vn::VarName{sym,<:Lens}, lens::Lens) where {sym} =
+    VarName{sym}(vn.indexing ∘ lens)
 
-function Base.show(io::IO, vn::VarName{<:Any, <:Lens})
+function Base.show(io::IO, vn::VarName{<:Any,<:Lens})
     print(io, getsym(vn))
     _print_application(io, vn.indexing)
 end
@@ -138,7 +140,8 @@ function _print_application(io::IO, l::ComposedLens)
     _print_application(io, l.outer)
     _print_application(io, l.inner)
 end
-_print_application(io::IO, l::IndexLens) = print(io, "[", join(map(prettify_index, l.indices), ","), "]")
+_print_application(io::IO, l::IndexLens) =
+    print(io, "[", join(map(prettify_index, l.indices), ","), "]")
 # This is a bit weird but whatever. We're almost always going to
 # `concretize` anyways.
 _print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
@@ -247,7 +250,8 @@ end
 subsumes(t::IdentityLens, u::Lens) = true
 subsumes(t::Lens, u::IdentityLens) = false
 
-subsumes(t::ComposedLens, u::ComposedLens) = subsumes(t.outer, u.outer) && subsumes(t.inner, u.inner)
+subsumes(t::ComposedLens, u::ComposedLens) =
+    subsumes(t.outer, u.outer) && subsumes(t.inner, u.inner)
 
 # If `t` is still a composed lens, then there is no way it can subsume `u` since `u` is a
 # leaf of the "lens-tree".
@@ -345,7 +349,7 @@ e.g. `x[:][1][2]` becomes `((Colon(), ), (1, ), (2, ))`.
 The result is compatible with [`subsumes_index`](@ref) for `Tuple` input.
 """
 combine_indices(lens::Lens) = (), lens
-combine_indices(lens::IndexLens) = (lens.indices, ), nothing
+combine_indices(lens::IndexLens) = (lens.indices,), nothing
 function combine_indices(lens::ComposedLens{<:IndexLens})
     indices, next = combine_indices(lens.inner)
     return (lens.outer.indices, indices...), next
@@ -369,13 +373,13 @@ function subsumes_index(t::Tuple, u::Tuple)  # does x[i]... subsume x[j]...?
     return _issubindex(first(t), first(u)) && subsumes_index(Base.tail(t), Base.tail(u))
 end
 
-const AnyIndex = Union{Int, AbstractVector{Int}, Colon} 
+const AnyIndex = Union{Int,AbstractVector{Int},Colon}
 _issubindex_(::Tuple{Vararg{AnyIndex}}, ::Tuple{Vararg{AnyIndex}}) = false
-function _issubindex(t::NTuple{N, AnyIndex}, u::NTuple{N, AnyIndex}) where {N}
+function _issubindex(t::NTuple{N,AnyIndex}, u::NTuple{N,AnyIndex}) where {N}
     return all(_issubrange(j, i) for (i, j) in zip(t, u))
 end
 
-const ConcreteIndex = Union{Int, AbstractVector{Int}} # this include all kinds of ranges
+const ConcreteIndex = Union{Int,AbstractVector{Int}} # this include all kinds of ranges
 
 """Determine whether indices `i` are contained in `j`, treating `:` as universal set."""
 _issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
@@ -455,12 +459,13 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr, Symbol}, concretize::Bool=false)
+macro varname(expr::Union{Expr,Symbol}, concretize::Bool = false)
     return varname(expr, concretize)
 end
 
-varname(sym::Symbol, concretize::Bool=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr, concretize::Bool=false)
+varname(sym::Symbol, concretize::Bool = false) =
+    :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr, concretize::Bool = false)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         # Split into object/base symbol and lens.
         sym_escaped, lens = Setfield.parse_obj_lens(expr)
@@ -469,7 +474,10 @@ function varname(expr::Expr, concretize::Bool=false)
         sym = drop_escape(sym_escaped)
 
         return if concretize && Setfield.need_dynamic_lens(expr)
-            :($(AbstractPPL.concretize)($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens), $sym_escaped))
+            :($(AbstractPPL.concretize)(
+                $(AbstractPPL.VarName){$(QuoteNode(sym))}($lens),
+                $sym_escaped,
+            ))
         else
             :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
         end
@@ -503,7 +511,7 @@ julia> @vsym x[end]
 :x
 ```
 """
-macro vsym(expr::Union{Expr, Symbol})
+macro vsym(expr::Union{Expr,Symbol})
     return QuoteNode(vsym(expr))
 end
 
@@ -522,4 +530,3 @@ function vsym(expr::Expr)
         error("Malformed variable name $(expr)!")
     end
 end
-
