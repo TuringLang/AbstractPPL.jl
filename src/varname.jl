@@ -455,12 +455,12 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr, Symbol}, concretize=false)
+macro varname(expr::Union{Expr, Symbol}, concretize::Bool=false)
     return varname(expr, concretize)
 end
 
-varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr, concretize=false)
+varname(sym::Symbol, concretize::Bool=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr, concretize::Bool=false)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         # Split into object/base symbol and lens.
         sym_escaped, lens = Setfield.parse_obj_lens(expr)
@@ -468,7 +468,7 @@ function varname(expr::Expr, concretize=false)
         # to call `QuoteNode` on it.
         sym = drop_escape(sym_escaped)
 
-        return if Setfield.need_dynamic_lens(expr)
+        return if concretize && Setfield.need_dynamic_lens(expr)
             :($(AbstractPPL.concretize)($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens), $sym_escaped))
         else
             :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
