@@ -172,7 +172,7 @@ Base.Symbol(vn::VarName) = Symbol(string(vn))  # simplified symbol
     inspace(vn::Union{VarName, Symbol}, space::Tuple)
 
 Check whether `vn`'s variable symbol is in `space`.  The empty tuple counts as the "universal space"
-containing all variables.  Subsumption (see [`subsume`](@ref)) is respected.
+containing all variables. Subsumption (see [`subsume`](@ref)) is respected.
 
 ## Examples
 
@@ -389,11 +389,11 @@ const ConcreteIndex = Union{Int, AbstractVector{Int}} # this include all kinds o
 """Determine whether indices `i` are contained in `j`, treating `:` as universal set."""
 _issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
 _issubrange(i::Colon, j::Colon) = true
-_issubrange(i::Colon, j::ConcreteIndex) = false
+_issubrange(i::ConcreteIndex, j::Colon) = true
 # FIXME: [2021-07-31] This is wrong but we have tests in DPPL that tell
 # us that it SHOULD be correct. I'll leave it as is for now to ensure that
 # we preserve the status quo, but I'm confused.
-_issubrange(i::ConcreteIndex, j::Colon) = false
+_issubrange(i::Colon, j::ConcreteIndex) = true
 
 """
     concretize(l::Lens, x)
