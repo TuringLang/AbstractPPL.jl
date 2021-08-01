@@ -32,8 +32,28 @@ x[:,1][2]
 struct VarName{sym,T<:Lens}
     indexing::T
 
-    VarName{sym}(indexing = IdentityLens()) where {sym} =
-        new{sym,typeof(indexing)}(indexing)
+    function VarName{sym}(indexing=IdentityLens()) where {sym}
+        # TODO: Should we completely disallow or just `@warn`?
+        # TODO: Does this affect performance?
+        if !is_static_lens(indexing)
+            error("attempted to construct `VarName` with dynamic lens of type $(nameof(typeof(indexing)))")
+        end
+        return new{sym,typeof(indexing)}(indexing)
+    end
+end
+
+"""
+    is_static_lens(l::Lens)
+
+Return `true` if `l` does not require runtime information to be resolved.
+
+In particular it returns `false` for `Setfield.DynamicLens` and `Setfield.FunctionLens`.
+"""
+is_static_lens(l::Lens) = is_static_lens(typeof(l))
+is_static_lens(::Type{<:Lens}) = false
+is_static_lens(::Type{<:Union{PropertyLens, IndexLens, IdentityLens}}) = true
+function is_static_lens(::Type{ComposedLens{LO, LI}}) where {LO, LI}
+    return is_static_lens(LO) && is_static_lens(LI)
 end
 
 # A bit of backwards compatibility.
@@ -408,39 +428,52 @@ end
 Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x`.
 
 # Examples
-```jldoctest
+```jldoctest; setup=:(using Setfield)
+
 julia> x = (a = [1.0 2.0;], );
 
-julia> vn = @varname(x.a[1, :])
-x.a[1,:]
-
-julia> AbstractPPL.concretize(vn, x)
-x.a[1,:]
-
-julia> vn = @varname(x.a[1, end][:]);
-
-julia> AbstractPPL.concretize(vn, x)
+julia> AbstractPPL.concretize(@lens(_.a[1, end][:]), x)
 x.a[1,2][:]
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(vn.indexing, x))
 
 """
-    @varname(expr[, concretize])
+    @varname(expr)
 
 A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing expression `expr`.
 
 If `concretize` is `true`, the resulting expression will be wrapped in a [`concretize`](@ref) call.
-This is useful if you for example want to ensure that no `Setfield.DynamicLens` is used.
 
-The `sym` value is taken from the actual variable name, and the index values are put appropriately
-into the constructor (and resolved at runtime).
+Note that expressions involving dynamic indexing, i.e. `begin` and/or `end`, will need to be
+resolved as `VarName` only supports non-dynamic indexing as determined by
+[`is_static_index`](@ref). See examples below.
 
 ## Examples
+### Dynamic indexing
+```jldoctest
+julia> # Dynamic indexing is not allowed in `VarName`
+       @varname(x[end])
+ERROR: UndefVarError: x not defined
+[...]
+
+julia> # To be able to resolve `end` we need `x` to be available.
+       x = randn(2); @varname(x[end])
+x[2]
+
+julia> # Note that "dynamic" here refers to usage of `begin` and/or `end`,
+       # _not_ "information only available at runtime", i.e. the following works.
+       [@varname(x[i]) for i = 1:length(x)][end]
+x[2]
+```
+
+### General indexing
+
+Under the hood Setfield.jl's `Lens` are used for the indexing:
 
 ```jldoctest
 julia> @varname(x).indexing
-()
+(@lens _)
 
 julia> @varname(x[1]).indexing
 (@lens _[1])
@@ -455,17 +488,29 @@ julia> @varname(x[1,2][1+5][45][3]).indexing
 (@lens _[1, 2][6][45][3])
 ```
 
+This also means that we support property access:
+
+```jldoctest
+julia> @varname(x.a).indexing
+(@lens _.a)
+
+julia> @varname(x.a[1]).indexing
+(@lens _.a[1])
+
+julia> x = (a = [(b = rand(2), )], ); @varname(x.a[1].b[end]).indexing
+(@lens _.a[1].b[2])
+```
+
 !!! compat "Julia 1.5"
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr,Symbol}, concretize::Bool = false)
-    return varname(expr, concretize)
+macro varname(expr::Union{Expr,Symbol})
+    return varname(expr)
 end
 
-varname(sym::Symbol, concretize::Bool = false) =
-    :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr, concretize::Bool = false)
+varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         # Split into object/base symbol and lens.
         sym_escaped, lens = Setfield.parse_obj_lens(expr)
@@ -473,11 +518,12 @@ function varname(expr::Expr, concretize::Bool = false)
         # to call `QuoteNode` on it.
         sym = drop_escape(sym_escaped)
 
-        return if concretize && Setfield.need_dynamic_lens(expr)
-            :($(AbstractPPL.concretize)(
-                $(AbstractPPL.VarName){$(QuoteNode(sym))}($lens),
-                $sym_escaped,
-            ))
+        return if Setfield.need_dynamic_lens(expr)
+            :(
+                $(AbstractPPL.VarName){$(QuoteNode(sym))}(
+                    $(AbstractPPL.concretize)($lens, $sym_escaped)
+                )
+            )
         else
             :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
         end
