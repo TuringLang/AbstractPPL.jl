@@ -88,6 +88,24 @@ julia> getindexing(@varname(y))
 """
 getindexing(vn::VarName) = vn.indexing
 
+"""
+    get(obj, vn::VarName{sym})
+
+Alias for `get(obj, PropertyLens{sym}() ∘ vn.indexing)`.
+"""
+function Setfield.get(obj, vn::VarName{sym}) where {sym}
+    return Setfield.get(obj, PropertyLens{sym}() ∘ vn.indexing)
+end
+
+"""
+    set(obj, vn::VarName{sym}, value)
+
+Alias for `set(obj, PropertyLens{sym}() ∘ vn.indexing, value)`.
+"""
+function Setfield.set(obj, vn::VarName{sym}, value) where {sym}
+    return Setfield.set(obj, PropertyLens{sym}() ∘ vn.indexing, value)
+end
+
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getindexing(vn)), h)
 Base.:(==)(x::VarName, y::VarName) = getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
