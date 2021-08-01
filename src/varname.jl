@@ -37,7 +37,7 @@ end
 
 # A bit of backwards compatibility.
 # TODO: Should we deprecate this?
-VarName{sym}(indexing::Tuple) where {sym} = VarName{sym}(tuple2indexlens(indexing))
+VarName{sym}(indexing::Tuple) where {sym} = VarName{sym}(tupleindex2lens(indexing))
 
 """
     VarName(vn::VarName, indexing::Lens)
@@ -59,12 +59,12 @@ x
 VarName(vn::VarName, indexing::Lens=IdentityLens()) = VarName{getsym(vn)}(indexing)
 
 function VarName(vn::VarName, indexing::Tuple)
-    return VarName{getsym(vn)}(tuple2indexlens(indexing))
+    return VarName{getsym(vn)}(tupleindex2lens(indexing))
 end
 
-tuple2indexlens(indexing::Tuple{}) = IdentityLens()
-tuple2indexlens(indexing::Tuple{<:Tuple}) = IndexLens(first(indexing))
-tuple2indexlens(indexing::Tuple) = IndexLens(first(indexing)) ∘ tuple2indexlens(indexing[2:end])
+tupleindex2lens(indexing::Tuple{}) = IdentityLens()
+tupleindex2lens(indexing::Tuple{<:Tuple}) = IndexLens(first(indexing))
+tupleindex2lens(indexing::Tuple) = IndexLens(first(indexing)) ∘ tupleindex2lens(indexing[2:end])
 
 """
     getsym(vn::VarName)
