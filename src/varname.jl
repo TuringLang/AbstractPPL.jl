@@ -23,7 +23,7 @@ julia> vn = VarName{:x}(Setfield.IndexLens((Colon(), 1)) ∘ Setfield.IndexLens(
 x[:,1][2]
 
 julia> vn.indexing
-((Colon(), 1), (2,))
+(@lens _[Colon(), 1][2])
 
 julia> @varname x[:, 1][1+1]
 x[:,1][2]
@@ -118,7 +118,7 @@ julia> getindexing(@varname(x[1][2:3]))
 (@lens _[1][2:3])
 
 julia> getindexing(@varname(y))
-()
+(@lens _)
 ```
 """
 getindexing(vn::VarName) = vn.indexing
@@ -322,7 +322,7 @@ e.g. `_[1][2].a[2]` and `_[1][2].a`. In such a scenario we do the following:
    which then returns `false`.
 
 # Example
-```jldoctest; setup=:(using Setfield)
+```jldoctest; setup=:(using Setfield; using AbstractPPL: subsumes_index)
 julia> t = @lens(_[1].a); u = @lens(_[1]);
 
 julia> subsumes_index(t, u)
@@ -438,10 +438,9 @@ Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x
 
 # Examples
 ```jldoctest; setup=:(using Setfield)
-
 julia> x = (a = [1.0 2.0;], );
 
-julia> AbstractPPL.concretize(@lens(_.a[1, end][:]), x)
+julia> AbstractPPL.concretize(@varname(x.a[1, end][:]), x)
 x.a[1,2][:]
 ```
 """
