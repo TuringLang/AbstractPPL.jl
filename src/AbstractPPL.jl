@@ -1,24 +1,11 @@
 module AbstractPPL
 
 # VarName
-export VarName,
-    getsym,
-    getindexing,
-    inspace,
-    subsumes,
-    varname,
-    vinds,
-    vsym,
-    @varname,
-    @vinds,
-    @vsym
+export VarName, getsym, getindexing, inspace, subsumes, varname, vsym, @varname, @vsym
 
 
 # Abstract model functions
-export AbstractProbabilisticProgram,
-    condition,
-    decondition,
-    logdensity
+export AbstractProbabilisticProgram, condition, decondition, logdensity
 
 
 # Abstract traces
