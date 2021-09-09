@@ -2,19 +2,18 @@ using Setfield
 using Setfield: PropertyLens, ComposedLens, IdentityLens, IndexLens, DynamicIndexLens
 
 """
-    VarName{sym}(indexing::Tuple=())
+    VarName{sym}(lens::Lens=IdentityLens())
 
-A variable identifier for a symbol `sym` and indices `indexing` in the format
-returned by [`@vinds`](@ref).
+A variable identifier for a symbol `sym` and lens `lens`.
 
 The Julia variable in the model corresponding to `sym` can refer to a single value or to a
-hierarchical array structure of univariate, multivariate or matrix variables. The field `indexing`
+hierarchical array structure of univariate, multivariate or matrix variables. The field `lens`
 stores the indices requires to access the random variable from the Julia variable indicated by `sym`
-as a tuple of tuples. Each element of the tuple thereby contains the indices of one indexing
+as a tuple of tuples. Each element of the tuple thereby contains the indices of one lens
 operation.
 
-`VarName`s can be manually constructed using the `VarName{sym}(indexing)` constructor, or from an
-indexing expression through the [`@varname`](@ref) convenience macro.
+`VarName`s can be manually constructed using the `VarName{sym}(lens)` constructor, or from an
+lens expression through the [`@varname`](@ref) convenience macro.
 
 # Examples
 
@@ -22,7 +21,7 @@ indexing expression through the [`@varname`](@ref) convenience macro.
 julia> vn = VarName{:x}(Setfield.IndexLens((Colon(), 1)) ∘ Setfield.IndexLens((2, )))
 x[:,1][2]
 
-julia> vn.indexing
+julia> getlens(vn)
 (@lens _[Colon(), 1][2])
 
 julia> @varname x[:, 1][1+1]
@@ -30,14 +29,14 @@ x[:,1][2]
 ```
 """
 struct VarName{sym,T<:Lens}
-    indexing::T
+    lens::T
 
-    function VarName{sym}(indexing=IdentityLens()) where {sym}
+    function VarName{sym}(lens=IdentityLens()) where {sym}
         # TODO: Should we completely disallow or just `@warn` of limited support?
-        if !is_static_lens(indexing)
-            error("attempted to construct `VarName` with dynamic lens of type $(nameof(typeof(indexing)))")
+        if !is_static_lens(lens)
+            error("attempted to construct `VarName` with dynamic lens of type $(nameof(typeof(lens)))")
         end
-        return new{sym,typeof(indexing)}(indexing)
+        return new{sym,typeof(lens)}(lens)
     end
 end
 
@@ -56,14 +55,13 @@ function is_static_lens(::Type{ComposedLens{LO, LI}}) where {LO, LI}
 end
 
 # A bit of backwards compatibility.
-# TODO: Should we deprecate this?
 VarName{sym}(indexing::Tuple) where {sym} = VarName{sym}(tupleindex2lens(indexing))
 
 """
-    VarName(vn::VarName, indexing::Lens)
+    VarName(vn::VarName, lens::Lens)
     VarName(vn::VarName, indexing::Tuple)
 
-Return a copy of `vn` with a new index `indexing`.
+Return a copy of `vn` with a new index `lens`/`indexing`.
 
 ```jldoctest; setup=:(using Setfield)
 julia> VarName(@varname(x[1][2:3]), Setfield.IndexLens((2,)))
@@ -76,7 +74,7 @@ julia> VarName(@varname(x[1][2:3]))
 x
 ```
 """
-VarName(vn::VarName, indexing::Lens = IdentityLens()) = VarName{getsym(vn)}(indexing)
+VarName(vn::VarName, lens::Lens = IdentityLens()) = VarName{getsym(vn)}(lens)
 
 function VarName(vn::VarName, indexing::Tuple)
     return VarName{getsym(vn)}(tupleindex2lens(indexing))
@@ -105,58 +103,59 @@ julia> getsym(@varname(y))
 """
 getsym(vn::VarName{sym}) where {sym} = sym
 
-
 """
-    getindexing(vn::VarName)
+    getlens(vn::VarName)
 
-Return the indexing tuple of the Julia variable used to generate `vn`.
+Return the lens of the Julia variable used to generate `vn`.
 
 ## Examples
 
 ```jldoctest
-julia> getindexing(@varname(x[1][2:3]))
+julia> getlens(@varname(x[1][2:3]))
 (@lens _[1][2:3])
 
-julia> getindexing(@varname(y))
+julia> getlens(@varname(y))
 (@lens _)
 ```
 """
-getindexing(vn::VarName) = vn.indexing
+getlens(vn::VarName) = vn.lens
+
+@deprecate getindexing(vn::VarName) getlens(vn)
 
 """
     get(obj, vn::VarName{sym})
 
-Alias for `get(obj, PropertyLens{sym}() ∘ vn.indexing)`.
+Alias for `get(obj, PropertyLens{sym}() ∘ getlens(vn))`.
 """
 function Setfield.get(obj, vn::VarName{sym}) where {sym}
-    return Setfield.get(obj, PropertyLens{sym}() ∘ vn.indexing)
+    return Setfield.get(obj, PropertyLens{sym}() ∘ getlens(vn))
 end
 
 """
     set(obj, vn::VarName{sym}, value)
 
-Alias for `set(obj, PropertyLens{sym}() ∘ vn.indexing, value)`.
+Alias for `set(obj, PropertyLens{sym}() ∘ getlens(vn), value)`.
 """
 function Setfield.set(obj, vn::VarName{sym}, value) where {sym}
-    return Setfield.set(obj, PropertyLens{sym}() ∘ vn.indexing, value)
+    return Setfield.set(obj, PropertyLens{sym}() ∘ getlens(vn), value)
 end
 
 
-Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getindexing(vn)), h)
+Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getlens(vn)), h)
 function Base.:(==)(x::VarName, y::VarName)
-    return getsym(x) == getsym(y) && getindexing(x) == getindexing(y)
+    return getsym(x) == getsym(y) && getlens(x) == getlens(y)
 end
 
 # Allow compositions with lenses.
 function Base.:∘(vn::VarName{sym,<:Lens}, lens::Lens) where {sym}
-    return VarName{sym}(vn.indexing ∘ lens)
+    return VarName{sym}(getlens(vn) ∘ lens)
 end
 
 function Base.show(io::IO, vn::VarName{<:Any,<:Lens})
     # No need to check `Setfield.has_atlens_support` since
     # `VarName` does not allow dynamic lenses.
     print(io, getsym(vn))
-    _print_application(io, vn.indexing)
+    _print_application(io, getlens(vn))
 end
 
 # This is all just to allow to convert `Colon()` into `:`.
@@ -268,7 +267,7 @@ Currently _not_ supported are:
   - Trailing ones: `x[2, 1]` does not subsume `x[2]` for a vector `x`
 """
 function subsumes(u::VarName, v::VarName)
-    return getsym(u) == getsym(v) && subsumes(u.indexing, v.indexing)
+    return getsym(u) == getsym(v) && subsumes(u.lens, v.lens)
 end
 
 # Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
@@ -443,7 +442,7 @@ julia> AbstractPPL.concretize(@varname(x.a[1, end][:]), x)
 x.a[1,2][:]
 ```
 """
-concretize(vn::VarName, x) = VarName(vn, concretize(vn.indexing, x))
+concretize(vn::VarName, x) = VarName(vn, concretize(getlens(vn), x))
 
 """
     @varname(expr)
@@ -479,32 +478,32 @@ x[2]
 Under the hood Setfield.jl's `Lens` are used for the indexing:
 
 ```jldoctest
-julia> @varname(x).indexing
+julia> getlens(@varname(x))
 (@lens _)
 
-julia> @varname(x[1]).indexing
+julia> getlens(@varname(x[1]))
 (@lens _[1])
 
-julia> @varname(x[:, 1]).indexing
+julia> getlens(@varname(x[:, 1]))
 (@lens _[Colon(), 1])
 
-julia> @varname(x[:, 1][2]).indexing
+julia> getlens(@varname(x[:, 1][2]))
 (@lens _[Colon(), 1][2])
 
-julia> @varname(x[1,2][1+5][45][3]).indexing
+julia> getlens(@varname(x[1,2][1+5][45][3]))
 (@lens _[1, 2][6][45][3])
 ```
 
 This also means that we support property access:
 
 ```jldoctest
-julia> @varname(x.a).indexing
+julia> getlens(@varname(x.a))
 (@lens _.a)
 
-julia> @varname(x.a[1]).indexing
+julia> getlens(@varname(x.a[1]))
 (@lens _.a[1])
 
-julia> x = (a = [(b = rand(2), )], ); @varname(x.a[1].b[end]).indexing
+julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end]))
 (@lens _.a[1].b[2])
 ```
 
