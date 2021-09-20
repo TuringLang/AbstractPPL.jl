@@ -5,7 +5,7 @@ operations should just work.  There are two things that make them more special, 
 
 1. “Fancy indexing”: since `VarName`s are structured themselves, the VarInfo should be have a bit
    like a trie, in the sense that all prefixes of stored keys should be retrievable.  Also,
-   subsumption of `VarName`s should be respected:
+   subsumption of `VarName`s should be respected (see end of this document):
 
     ```julia
     vi[@varname(x.a)] = [1,2,3]
@@ -14,7 +14,8 @@ operations should just work.  There are two things that make them more special, 
     vi[@varname(x)] == (; a = [1,2,3], b = [4,5,6])
     ```
       
-    Generalizations that go beyond simple cases (those that you can imagine by storing individual `setfield!`s in a tree) need not be implemented in the beginning; e.g.,
+    Generalizations that go beyond simple cases (those that you can imagine by storing individual
+    `setfield!`s in a tree) need not be implemented in the beginning; e.g.,
 
     ```julia
     vi[@varname(x[1])] = 1
@@ -25,7 +26,10 @@ operations should just work.  There are two things that make them more special, 
     keys(vi) == [x]
     ```
     
-2. (This is to be discussed.)  Information other than the sampled values, such as flags, orders, variable likelihoods, etc., can in principle be stored in multiple of these “VarInfo dicts” with parallel structure.  For efficiency, it is thinkable to devise a design such that multiple fields can be stored under the same indexing structure.
+2. (This is to be discussed.)  Information other than the sampled values, such as flags, orders,
+   variable likelihoods, etc., can in principle be stored in multiple of these “VarInfo dicts” with
+   parallel structure.  For efficiency, it is thinkable to devise a design such that multiple fields
+   can be stored under the same indexing structure.
 
     ```julia
     vi[@varname(x[1])] == 1
@@ -34,9 +38,12 @@ operations should just work.  There are two things that make them more special, 
     
     or something in that direction.
     
-    (This is logically equivalent to a dictionary with named tuple values.)
+    (This is logically equivalent to a dictionary with named tuple values.  Maybe we can do what
+    [`DictTable`](https://github.com/JuliaData/TypedTables.jl/blob/main/src/DictTable.jl) does?)
     
-    The old `order` field, indicating at which position in the evaluator function a variable has been added (essentially a count of `push!`es) could be left out completely if the dictionary is specified to be ordered by insertion.
+    The old `order` field, indicating at which position in the evaluator function a variable has
+    been added (essentially a count of `push!`es) could be left out completely if the dictionary is
+    specified to be ordered by insertion.
     
 The required dictionary functions are about these:
 
@@ -50,15 +57,19 @@ The required dictionary functions are about these:
 - Mutating functions:
   - `push!!`, `merge!!` to add and join elements (TODO: think about `merge`)
   - `setindex!!`
-  - `empty!!`, `delete!!` (_Are these really used anywhere? Not having them makes persistent implementations much easier!_)
+  - `empty!!`, `delete!!` (_Are these really used anywhere? Not having them makes persistent
+    implementations much easier!_)
 
 Other functions, like `enumerate`, should follow from these.
 
-`length` gets weird, though – but it should definitely be consistent with the iterator.  For this and other purposes, there should be a separate leaf iterator.
+`length` gets weird, though – but it should definitely be consistent with the iterator.  For this
+and other purposes, there should be a separate leaf iterator.
   
-It would be really cool if `merge` supported the combination of distinct types of implementations, e.g., a dynamic and a tuple-based part.
+It would be really cool if `merge` supported the combination of distinct types of implementations,
+e.g., a dynamic and a tuple-based part.
 
-To support both mutable and immutable/persistent implementations, let’s require consistent BangBang style mutators throughout.
+To support both mutable and immutable/persistent implementations, let’s require consistent BangBang
+style mutators throughout.
   
 ## Transformations/Bijectors
 
@@ -78,8 +89,11 @@ There are multiple possible approaches to handle this:
 2. `copy!(vals_array, vi)`.
 3. As a catamorphism: `mapreduce(flatten, append!, vi, init=Float64[])`
 
+---
 
 # `VarName`-based axioms
+
+What follows is mostly an attempt to formalize subsumption.
 
 First, remember that in Turing.jl we can always work with _concretized_ `VarName`s: `begin`/`end`,
 `:`, and boolean indexing are all turned into some form of concrete cartesian or array indexing
