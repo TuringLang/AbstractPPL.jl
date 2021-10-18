@@ -1,6 +1,6 @@
 # VarInfo interface proposal
 
-The basic idea is for all VarInfos to behave like dictionaries with `VarName` keys – all common
+The basic idea is for all `VarInfos` to behave like dictionaries with `VarName` keys – all common
 operations should just work.  There are two things that make them more special, though:
 
 1. “Fancy indexing”: since `VarName`s are structured themselves, the VarInfo should be have a bit
