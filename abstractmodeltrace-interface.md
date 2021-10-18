@@ -1,4 +1,4 @@
-# `AbstractModelType` interface proposal
+# `AbstractModelTrace`/`VarInfo` interface proposal
 
 ## Background
 
