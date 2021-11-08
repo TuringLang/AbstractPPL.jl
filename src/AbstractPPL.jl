@@ -5,7 +5,7 @@ export VarName, getsym, getindexing, getlens, inspace, subsumes, varname, vsym, 
 
 
 # Abstract model functions
-export AbstractProbabilisticProgram, condition, decondition, logdensityof
+export AbstractProbabilisticProgram, condition, decondition, logdensityof, densityof
 
 
 # Abstract traces
