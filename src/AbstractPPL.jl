@@ -11,9 +11,10 @@ export AbstractProbabilisticProgram, condition, decondition, logdensityof, densi
 # Abstract traces
 export AbstractModelTrace
 
+
 include("varname.jl")
-include("abstractprobprog.jl")
 include("abstractmodeltrace.jl")
+include("abstractprobprog.jl")
 include("deprecations.jl")
 
 end # module

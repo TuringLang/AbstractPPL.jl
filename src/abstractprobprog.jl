@@ -23,7 +23,7 @@ in `model`, at specific values for the random variables given through `trace`.
 `logdensityof` should interact with conditioning and deconditioning in the way required by
 probability theory.
 """
-DensityInterface.logdensityof
+DensityInterface.logdensityof(::AbstractProbabilisticProgram, ::AbstractModelTrace)
 
 
 """

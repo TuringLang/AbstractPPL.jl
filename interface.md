@@ -30,7 +30,7 @@ functions
 - `condition(::Model, ::Trace) -> ConditionedModel`
 - `decondition(::ConditionedModel) -> GenerativeModel`
 - `sample(::Model, ::Sampler = Exact(), [Int])` (from `AbstractMCMC.sample`)
-- `logdensityof(::Model, ::Trace)` and `density(::Model, ::Trace)` (from
+- `logdensityof(::Model, ::Trace)` and `densityof(::Model, ::Trace)` (from
   [DensityInterface.jl](https://github.com/JuliaMath/DensityInterface.jl))
 
 
@@ -215,10 +215,11 @@ the concrete model instance.
 
 ```
 DensityInterface.densityof(d, x) = exp(logdensityof(d, x))
-DensityInterface.logdensity(d) = Base.Fix1(logdensity, d)
+DensityInterface.logdensityof(d) = Base.Fix1(logdensityof, d)
+DensityInterface.densityof(d) = Base.Fix1(densityof, d)
 ```
 
-are provided automatically. 
+are provided automatically (repeated here for clarity). 
 
 Note that `logdensityof` strictly generalizes `logpdf`, since the posterior density will of course
 in general be unnormalized and hence not a probability density.
