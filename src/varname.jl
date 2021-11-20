@@ -438,10 +438,10 @@ Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x
 
 # Examples
 ```jldoctest; setup=:(using Setfield)
-julia> x = (a = [1.0 2.0;], );
+julia> x = (a = [1.0 2.0; 3.0 4.0], );
 
-julia> AbstractPPL.concretize(@varname(x.a[1, end][:]), x)
-x.a[1,2][:]
+julia> AbstractPPL.concretize(@varname(x.a[1:end, end][:]), x)
+x.a[1:2,2][Base.Slice(Base.OneTo(2))]
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(getlens(vn), x))
