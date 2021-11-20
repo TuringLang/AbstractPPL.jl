@@ -210,8 +210,8 @@ therefore adapt the interface of
 `logdensityof` should suffice for variants, with the distinction being made by the capabilities of
 the concrete model instance.
 
- DensityInterface.jl also requires the trait function `hasdensity`, which is set to `true` for the
-`AbstractProbabilisticProgram` type.  Additional functions
+ DensityInterface.jl also requires the trait function `DensityKind`, which is set to `HasDensity()`
+for the `AbstractProbabilisticProgram` type.  Additional functions
 
 ```
 DensityInterface.densityof(d, x) = exp(logdensityof(d, x))

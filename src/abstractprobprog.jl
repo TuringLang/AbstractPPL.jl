@@ -9,7 +9,7 @@ Common base type for models expressed as probabilistic programs.
 """
 abstract type AbstractProbabilisticProgram <: AbstractMCMC.AbstractModel end
 
-DensityInterface.hasdensity(::AbstractProbabilisticProgram) = true
+DensityInterface.DensityKind(::AbstractProbabilisticProgram) = HasDensity()
 
 
 """
