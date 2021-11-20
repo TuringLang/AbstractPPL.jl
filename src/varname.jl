@@ -424,11 +424,13 @@ _issubrange(i::Colon, j::ConcreteIndex) = true
 Return `l` instantiated on `x`, i.e. any runtime information evaluated using `x`.
 """
 concretize(I::Lens, x) = I
+concretize(I::IndexLens, x) = IndexLens(Base.to_indices(x, I.indices))
 concretize(I::DynamicIndexLens, x) = IndexLens(I.f(x))
 function concretize(I::ComposedLens, x)
     x_inner = get(x, I.outer)
     return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))
 end
+
 """
     concretize(vn::VarName, x)
 
