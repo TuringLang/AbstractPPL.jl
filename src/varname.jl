@@ -418,14 +418,18 @@ _issubrange(i::ConcreteIndex, j::Colon) = true
 # we preserve the status quo, but I'm confused.
 _issubrange(i::Colon, j::ConcreteIndex) = true
 
+"""Turn any `AbstractRange` into an equivalent `UnitRange` or `StepRange`."""
+_normalizerange(r::AbstractRange) = (:)(r...)
+_normalizerange(x) = x
+
 """
     concretize(l::Lens, x)
 
 Return `l` instantiated on `x`, i.e. any runtime information evaluated using `x`.
 """
 concretize(I::Lens, x) = I
-concretize(I::IndexLens, x) = IndexLens(Base.to_indices(x, I.indices))
-concretize(I::DynamicIndexLens, x) = IndexLens(I.f(x))
+concretize(I::IndexLens, x) = IndexLens(_normalizerange.(Base.to_indices(x, I.indices)))
+concretize(I::DynamicIndexLens, x) = IndexLens(_normalizerange.(I.f(x)))
 function concretize(I::ComposedLens, x)
     x_inner = get(x, I.outer)
     return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))
@@ -441,7 +445,7 @@ Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x
 julia> x = (a = [1.0 2.0; 3.0 4.0], );
 
 julia> AbstractPPL.concretize(@varname(x.a[1:end, end][:]), x)
-x.a[1:2,2][Base.Slice(Base.OneTo(2))]
+x.a[1:2,2][1:2]
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(getlens(vn), x))
