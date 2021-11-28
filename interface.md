@@ -24,12 +24,14 @@ There are three interrelating aspects that this interface intends to standardize
 - Sampling
 - “Conversions” between different conditionings of models
 
-Therefore, the interface consists of:
+Therefore, the interface consists of an `AbstractProbabilisticProgram` supertype, together with
+functions
 
 - `condition(::Model, ::Trace) -> ConditionedModel`
 - `decondition(::ConditionedModel) -> GenerativeModel`
 - `sample(::Model, ::Sampler = Exact(), [Int])` (from `AbstractMCMC.sample`)
-- `logdensity(::Model, ::Trace)`
+- `logdensityof(::Model, ::Trace)` and `densityof(::Model, ::Trace)` (from
+  [DensityInterface.jl](https://github.com/JuliaMath/DensityInterface.jl))
 
 
 ### Traces & probability expressions
@@ -198,32 +200,46 @@ Not all variants need to be supported – for example, a posterior model might n
 model.
 
 
-### Density Calculation
+### Density Evaluation
 
 Since the different “versions” of how a model is to be understood as generative or conditioned are
 to be expressed in the type or dispatch they support, there should be no need for separate functions
-`logjoint`, `loglikelihood`, etc., which force these semantic distinctions on the implementor; one
-`logdensity` should suffice for all, with the distinction being made by the capabilities of the
-concrete model instance.
+`logjoint`, `loglikelihood`, etc., which force these semantic distinctions on the implementor; we
+therefore adapt the interface of
+[DensityInterface.jl](https://github.com/JuliaMath/DensityInterface.jl).  Its main function
+`logdensityof` should suffice for variants, with the distinction being made by the capabilities of
+the concrete model instance.
 
-Note that this generalizes `logpdf`, too, since the posterior density will of course in general be
-unnormalized and hence not a probability density.
+ DensityInterface.jl also requires the trait function `DensityKind`, which is set to `HasDensity()`
+for the `AbstractProbabilisticProgram` type.  Additional functions
 
-The evaluation will usually work with the internal, concrete trace type, like `VarInfo` in Turing.jl:
+```
+DensityInterface.densityof(d, x) = exp(logdensityof(d, x))
+DensityInterface.logdensityof(d) = Base.Fix1(logdensityof, d)
+DensityInterface.densityof(d) = Base.Fix1(densityof, d)
+```
+
+are provided automatically (repeated here for clarity). 
+
+Note that `logdensityof` strictly generalizes `logpdf`, since the posterior density will of course
+in general be unnormalized and hence not a probability density.
+
+The evaluation will usually work with the internal, concrete trace type, like `VarInfo` in
+Turing.jl:
 
 ```julia
-logdensity(m, vi)
+logdensityof(m, vi)
 ```
 
 But the user will more likely work on the interface using probability expressions:
 
 ```julia
-logdensity(m, @T(X = ...))
+logdensityof(m, @T(X = …))
 ```
 
 (Note that this would replace the current `prob` string macro in Turing.jl.)
 
-Densities need not be normalized.
+Densities need (and usually, will) not be normalized.
 
 
 #### Implementation notes 
@@ -232,7 +248,7 @@ It should be able to make this fall back on the internal method with the right d
 implementation of `maketrace`:
 
 ```julia
-logdensity(m, t::ProbabilityExpression) = logdensity(m, maketrace(m, t))
+logdensityof(m, t::ProbabilityExpression) = logdensityof(m, maketrace(m, t))
 ```
 
 There is one open question – should normalized and unnormalized densities be able to be
@@ -240,7 +256,7 @@ distinguished?  This could be done by dispatch as well, e.g., if the caller want
 normalization:
 
 ```
-logdensity(g, @T(X = ..., Y = ..., Z = ...); normalized=Val{true})
+logdensityof(g, @T(X = …, Y = …, Z = …); normalized=Val{true})
 ```
 
 Although there is proably a better way through traits; maybe like for arrays, with

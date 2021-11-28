@@ -120,7 +120,6 @@ julia> getlens(@varname(y))
 """
 getlens(vn::VarName) = vn.lens
 
-@deprecate getindexing(vn::VarName) getlens(vn)
 
 """
     get(obj, vn::VarName{sym})
