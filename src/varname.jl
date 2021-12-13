@@ -172,6 +172,7 @@ _print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
 
 prettify_index(x) = string(x)
 prettify_index(::Colon) = ":"
+prettify_index(::Base.Slice) = ":"
 
 """
     Symbol(vn::VarName)
@@ -418,18 +419,35 @@ _issubrange(i::ConcreteIndex, j::Colon) = true
 # we preserve the status quo, but I'm confused.
 _issubrange(i::Colon, j::ConcreteIndex) = true
 
-"""Turn any `AbstractRange` into an equivalent `UnitRange` or `StepRange`."""
-_normalizerange(r::AbstractRange) = (:)(r...)
-_normalizerange(x) = x
+_concretize(x, inds) = _concretize_indices(inds, Base.to_indices(x, inds))
+@generated function _concretize_indices(
+    orig_inds::TO,
+    conv_inds::TC
+) where {N, TO<:Tuple{Vararg{Any, N}}, TC<:Tuple{Vararg{Any, N}}}
+    converted = map(1:N, TO.parameters, TC.parameters) do n, Ti, Tj
+        if Ti <: Colon
+            :(Base.Slice(UnitRange(conv_inds[$n].indices)))
+        else
+            :(conv_inds[$n])
+        end
+    end
+
+    return Expr(:tuple, converted...)
+end
 
 """
     concretize(l::Lens, x)
 
-Return `l` instantiated on `x`, i.e. any runtime information evaluated using `x`.
+Return `l` instantiated on `x`, i.e. any information related to the runtime shape of `x` is
+evaluated.  This concerns `begin`, `end`, and `:` slices.
+
+Basically, every index is converted to a concrete value using `Base.to_index` on `x`.  However, `:`
+slices are only converted to `UnitRange`s (`a:b`) wrapped in `Base.Slice` (as opposed to
+`Base.OneTo`), to keep the result close to the original indexing.
 """
 concretize(I::Lens, x) = I
-concretize(I::IndexLens, x) = IndexLens(_normalizerange.(Base.to_indices(x, I.indices)))
-concretize(I::DynamicIndexLens, x) = IndexLens(_normalizerange.(I.f(x)))
+concretize(I::DynamicIndexLens, x) = IndexLens(I.f(x))
+concretize(I::IndexLens, x) = IndexLens(_concretize(x, I.indices))
 function concretize(I::ComposedLens, x)
     x_inner = get(x, I.outer)
     return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))
@@ -438,45 +456,57 @@ end
 """
     concretize(vn::VarName, x)
 
-Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x`.
+Return `vn` concretized on `x`, i.e. any information related to the runtime shape of `x` is
+evaluated. This concerns `begin`, `end`, and `:` slices.
 
 # Examples
 ```jldoctest; setup=:(using Setfield)
-julia> x = (a = [1.0 2.0; 3.0 4.0], );
+julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
-julia> AbstractPPL.concretize(@varname(x.a[1:end, end][:]), x)
-x.a[1:2,2][1:2]
+julia> getlens(@varname(x.a[1:end, end][:], true)) # concrete=true required for @varname
+(@lens _.a[1:3, 2][Base.Slice(1:3)])
+
+julia> y = zeros(10, 10);
+
+julia> @varname(y[:], true)
+y[:]
+
+julia> AbstractPPL.getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices
+(Base.Slice(1:100),)
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(getlens(vn), x))
 
 """
-    @varname(expr)
+    @varname(expr, concretize=false)
 
 A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing expression `expr`.
 
 If `concretize` is `true`, the resulting expression will be wrapped in a [`concretize`](@ref) call.
 
-Note that expressions involving dynamic indexing, i.e. `begin` and/or `end`, will need to be
-resolved as `VarName` only supports non-dynamic indexing as determined by
+Note that expressions involving dynamic indexing, i.e. `begin` and/or `end`, will always need to be
+concretized as `VarName` only supports non-dynamic indexing as determined by
 [`is_static_index`](@ref). See examples below.
 
 ## Examples
 ### Dynamic indexing
 ```jldoctest
-julia> # Dynamic indexing is not allowed in `VarName`
-       @varname(x[end])
-ERROR: UndefVarError: x not defined
+julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
+
+julia> @varname(x.a[1:end, end][:], true)
+x.a[1:3,2][:]
+
+julia> @varname(x.a[end])
+ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
 [...]
 
-julia> # To be able to resolve `end` we need `x` to be available.
-       x = randn(2); @varname(x[end])
-x[2]
+julia> @varname(x.a[end], true)
+x.a[6]
 
 julia> # Note that "dynamic" here refers to usage of `begin` and/or `end`,
        # _not_ "information only available at runtime", i.e. the following works.
-       [@varname(x[i]) for i = 1:length(x)][end]
-x[2]
+       [@varname(x.a[i]) for i = 1:length(x.a)][end]
+x.a[6]
 ```
 
 ### General indexing
@@ -509,7 +539,7 @@ julia> getlens(@varname(x.a))
 julia> getlens(@varname(x.a[1]))
 (@lens _.a[1])
 
-julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end]))
+julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end], true))
 (@lens _.a[1].b[2])
 ```
 
@@ -517,12 +547,12 @@ julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end]))
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr,Symbol})
-    return varname(expr)
+macro varname(expr::Union{Expr,Symbol}, concretize::Bool=false)
+    return varname(expr, concretize)
 end
 
-varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr)
+varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr, concretize=false)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         # Split into object/base symbol and lens.
         sym_escaped, lens = Setfield.parse_obj_lens(expr)
@@ -530,17 +560,19 @@ function varname(expr::Expr)
         # to call `QuoteNode` on it.
         sym = drop_escape(sym_escaped)
 
-        return if Setfield.need_dynamic_lens(expr)
-            :(
+        if concretize
+            return :(
                 $(AbstractPPL.VarName){$(QuoteNode(sym))}(
                     $(AbstractPPL.concretize)($lens, $sym_escaped)
                 )
             )
+        elseif !concretize && Setfield.need_dynamic_lens(expr)
+            error("Variable name `$(expr)` is dynamic and requires concretization!")
         else
             :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
         end
     else
-        error("Malformed variable name $(expr)!")
+        error("Malformed variable name `$(expr)`!")
     end
 end
 
@@ -577,7 +609,8 @@ end
     vsym(expr)
 
 Return name part of the [`@varname`](@ref)-compatible expression `expr` as a symbol for input of the
-[`VarName`](@ref) constructor."""
+[`VarName`](@ref) constructor.
+"""
 function vsym end
 
 vsym(expr::Symbol) = expr
@@ -585,6 +618,6 @@ function vsym(expr::Expr)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         return vsym(expr.args[1])
     else
-        error("Malformed variable name $(expr)!")
+        error("Malformed variable name `$(expr)`!")
     end
 end
