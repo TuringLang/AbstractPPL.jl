@@ -172,7 +172,6 @@ _print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
 
 prettify_index(x) = string(x)
 prettify_index(::Colon) = ":"
-prettify_index(::Base.Slice) = ":"
 
 """
     Symbol(vn::VarName)
@@ -426,7 +425,7 @@ _concretize(x, inds) = _concretize_indices(inds, Base.to_indices(x, inds))
 ) where {N, TO<:Tuple{Vararg{Any, N}}, TC<:Tuple{Vararg{Any, N}}}
     converted = map(1:N, TO.parameters, TC.parameters) do n, Ti, Tj
         if Ti <: Colon
-            :(Base.Slice(UnitRange(conv_inds[$n].indices)))
+            :(UnitRange(conv_inds[$n].indices))
         else
             :(conv_inds[$n])
         end
@@ -442,8 +441,8 @@ Return `l` instantiated on `x`, i.e. any information related to the runtime shap
 evaluated.  This concerns `begin`, `end`, and `:` slices.
 
 Basically, every index is converted to a concrete value using `Base.to_index` on `x`.  However, `:`
-slices are only converted to `UnitRange`s (`a:b`) wrapped in `Base.Slice` (as opposed to
-`Base.OneTo`), to keep the result close to the original indexing.
+slices are only converted to `UnitRange`s (`a:b`) (as opposed to `Base.Slice{Base.OneTo}`), to keep
+the result close to the original indexing.
 """
 concretize(I::Lens, x) = I
 concretize(I::DynamicIndexLens, x) = IndexLens(I.f(x))
@@ -464,15 +463,15 @@ evaluated. This concerns `begin`, `end`, and `:` slices.
 julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
 julia> getlens(@varname(x.a[1:end, end][:], true)) # concrete=true required for @varname
-(@lens _.a[1:3, 2][Base.Slice(1:3)])
+(@lens _.a[1:3, 2][1:3])
 
 julia> y = zeros(10, 10);
 
 julia> @varname(y[:], true)
-y[:]
+y[1:100]
 
 julia> AbstractPPL.getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices
-(Base.Slice(1:100),)
+(1:100,)
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(getlens(vn), x))
@@ -494,7 +493,7 @@ concretized as `VarName` only supports non-dynamic indexing as determined by
 julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
 julia> @varname(x.a[1:end, end][:], true)
-x.a[1:3,2][:]
+x.a[1:3,2][1:3]
 
 julia> @varname(x.a[end])
 ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
