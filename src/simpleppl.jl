@@ -31,12 +31,13 @@ the topologically ordered vertex list.
 """
 struct DAG
     A::SparseMatrixCSC
-    sorted_vertex_list::Vector{Int64}
+    sorted_vertex_list::Tuple
     
     function DAG(in::NamedTuple) 
+        inputs = keys(in)
         A = adjacency_matrix(in) 
         v_list = topological_sort_by_dfs(A)
-        new(A, v_list)
+        new(A, inputs[v_list])
     end
 end
 
@@ -74,6 +75,18 @@ end
     m = [:(NamedTuple{T}(($(values[:,i]...), ))) for i in 1:4]
     return :(Model(($(m...),)...))
 end
+
+nodes(m::Model) = m.DAG.sorted_vertex_list
+
+function Base.show(io::IO, m::Model)
+    print(io, "Nodes: \n")
+    for node in nodes(m)
+        print(io, "$node = ", m[VarName{node}()], "\n")
+    end
+    print(io, "DAG: \n") 
+    display(m.DAG.A)
+end
+
 
 """
     adjacency_matrix(inputs::NamedTuple)
