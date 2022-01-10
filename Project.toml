@@ -8,8 +8,8 @@ version = "0.4.0"
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 AbstractMCMC = "2, 3"

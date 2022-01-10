@@ -7,6 +7,9 @@ export VarName, getsym, getlens, inspace, subsumes, varname, vsym, @varname, @vs
 # Abstract model functions
 export AbstractProbabilisticProgram, condition, decondition, logdensityof, densityof
 
+# SimplePPL
+
+export Model
 
 # Abstract traces
 export AbstractModelTrace
@@ -16,5 +19,5 @@ include("varname.jl")
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("deprecations.jl")
-
+include("simpleppl.jl")
 end # module
