@@ -1,21 +1,17 @@
 using AbstractPPL
-using Distributions # just added for testing
 import Base.getindex
 using SparseArrays
 using Setfield
 using Setfield: PropertyLens, get
 
-mutable struct Model
-    value
-    input
-    eval
-    kind
-    dag
-
-    Model(value, input, eval, kind) = new(value, input, eval, kind, DAG(input))
+struct Data{T}
+    value::NamedTuple{T}
+    input::NamedTuple{T}
+    eval::NamedTuple{T}
+    kind::NamedTuple{T}
 end
 
-mutable struct DAG
+struct DAG
     A::SparseMatrixCSC
     sorted_vertex_list::Vector{Int64}
     
@@ -26,40 +22,49 @@ mutable struct DAG
     end
 end
 
-function adjacency_matrix(inputs::NamedTuple)
-    N = length(inputs)
-    nodes = keys(inputs)
-    A = spzeros(N,N)
-    for (i, node) in enumerate(nodes)
-        if inputs[node] != ()
-            inputs = inputs[node]
-            for inp in inputs
-                ind = findall(x -> x == inp, nodes)[1]
-                A[i, ind] = 1
-            end
-        end
-    end
-    A
-end
+struct Model
+    Data::Data
+    DAG::DAG
 
-adjacency_matrix(m::Model) = adjacency_matrix(m.input)
+    Model(value, input, eval, kind) = new(Data(value, input, eval, kind), DAG(input))
+end
 
 function Model(nt::T) where T <: NamedTuple
     ks = keys(nt)
     vals = [nt[k][i] for k in ks, i in 1:4] # create matrix of tuple values
     m = [(; zip(ks, vals[:,i])...) for i in 1:4] # zip each colum of vals with keys
-    Model(m[1], m[2], m[3], m[4])
+    Model(m...)
+end # look into generated functions
+
+@generated function Base.getindex(m::Data, vn::VarName{p}) where {p}
+        fns = fieldnames(Data)
+        name_lens = Setfield.PropertyLens{p}()
+        field_lenses = [Setfield.PropertyLens{f}() for f in fns]
+        values = [:(get(m, Setfield.compose($l, $name_lens, getlens(vn)))) for l in field_lenses]
+        return :(NamedTuple{$(fns)}(($(values...),)))
+
 end
 
-function Base.getindex(m::Model, vn::VarName)
-    fns = fieldnames(typeof(m))[1:end-1]
-    vals = [get_property(m, i, vn) for i in fns]
-    (;zip(fns, vals)...)
-end
+t = eval(:(NamedTuple{(:a, )}(1.0)))
 
-function get_property(m::Model, field::Symbol, vn::VarName)
-    get(m, PropertyLens{field}() ∘ PropertyLens{getsym(vn)}())
-end
+## Functions needed for type constructors
+function adjacency_matrix(inputs::NamedTuple)
+    N = length(inputs)
+    nodes = keys(inputs)
+    A = spzeros(N,N)
+    for (i, node) in enumerate(nodes)
+        v_inputs = inputs[node] # try as vector 
+       if v_inputs != () 
+            for inp in v_inputs
+                ind = findall(x -> x == inp, nodes)
+                A[i, ind[1]] = 1
+            end
+        end
+    end
+    A
+end 
+
+adjacency_matrix(m::Model) = adjacency_matrix(m.Data.input)
 
 
 function outneighbors(A::SparseMatrixCSC, u::T) where T <: Int
@@ -68,6 +73,7 @@ function outneighbors(A::SparseMatrixCSC, u::T) where T <: Int
 end
 
 function topological_sort_by_dfs(A)
+    # lifted from Graphs.jl
     n_verts = size(A)[1]
     vcolor = zeros(UInt8, n_verts)
     verts = Vector{Int64}()
@@ -99,53 +105,71 @@ function topological_sort_by_dfs(A)
     return reverse(verts)
 end
 
-function evalf(m::Model, f::Function)
-    nodes = m.dag.sorted_vertex_list
-    symlist = keys(m.input)
-    vals = (;)
-    for (i, n) in enumerate(nodes)
-        node = symlist[n]
-        input_nodes = m.input[node]
-        if m.kind[node] == :Stochastic
-            if length(input_nodes) == 0
-                vals = merge(vals, [node=>f(m.eval[node]())])                
-            elseif length(input_nodes) > 0 
-                inputs = [vals[n] for n in input_nodes]
-                vals = merge(vals, [node=>f(m.eval[node](inputs...))])
-            end
-        else
-            vals = merge(vals, [node=>m.eval[node]()])
-        end
-    end
-    vals
+
+## indexing functions using Setfield
+@generated function Base.getindex(m::Data, vn::VarName{p}) where {p}
+    fns = fieldnames(Data)
+    name_lens = Setfield.PropertyLens{p}()
+    field_lenses = [Setfield.PropertyLens{f}() for f in fns]
+    values = [:(get(m, Setfield.compose($l, $name_lens, getlens(vn)))) for l in field_lenses]
+    return :(NamedTuple{$(fns)}(($(values...),)))
 end
 
+function Base.getindex(m::Model, vn::VarName)
+    getindex(m.Data, vn)
+end
+
+using Distributions
+## Example
 test = (
-    a = ([0,1], (), () -> MvNormal(zeros(2), 1), :Stochastic), # should this explictly call rand(Normal())?
+    a = ([0,1], (), () -> MvNormal(zeros(2), 1), :Stochastic), 
     b = (0, (), () -> 42, :Logical), 
-    c = (0, (:a, :b), (a, b) -> MvNormal(a, 2sqrt(b)), :Stochastic)
+    c = (0, (:a, :b), (a, b) -> MvNormal(a, 2sqrt(b)), :Stochastic) # consider a :Data type/kind? 
 )
+
+# Make example GLM
+# add :Data type to support condition/decondition
+
+# test = (
+#     a1 = ([0,1], (), 1), :HyperParameter), 
+#     a = ([], (), (a1) -> MvNormal(zeros(2), a1), :Stochastic), 
+#     b = (0, (), () -> 42, :Logical), 
+#     c = (0, (:a, :b), (a, b) -> MvNormal(a, 2sqrt(b)), :Stochastic) # consider a :Data type/kind? 
+# )
+
+ks = keys(test)
+vals = [test[k][i] for k in ks, i in 1:4] # create matrix of tuple values
+m = [(; zip(ks, vals[:,i])...) for i in 1:4] # zip each colum of vals with keys
+
+@code_warntype Model(m...)
+@code_warntype Model(test)
 
 m = Model(test)
 
-m.value == (a = [0, 1], b = 0, c = 0)
-m.input == (a = (), b = (), c = (:a, :b))
-#m.eval == (a = () -> D(), b = () -> 42, c = (a, b) -> Normal(a, 2sqrt(b)))
-m.kind == (a = :Stochastic, b = :Logical, c = :Stochastic)
-
+m.Data.value == (a = [0, 1], b = 0, c = 0)
+m.Data.input == (a = (), b = (), c = (:a, :b))
+m.Data.kind == (a = :Stochastic, b = :Logical, c = :Stochastic)
 
 m[@varname(a)]
 
-evalf(m, rand)
-
-#m[@varname(a)] == (value = [0, 1], input = (), eval = ..., kind = Stochastic)
-# @varname(a)::VarName{:a, IdentityLens}
-
-# @generated function gi(m::NamedTuple{fns}, vn::VarName{p}) where {fns, p}
-#     name_lens = Setfield.PropertyLens{p}()
-#     field_lenses = [Setfield.PropertyLens{f}() for f in fns]
-#     values = [:(get(m, Setfield.compose($l, $name_lens, getlens(vn)))) for l in field_lenses]
-#     return :(NamedTuple{fns}(($(values...),)))
+# # General eval function
+# function evalf(f::Function, m::Model)
+#     nodes = m.DAG.sorted_vertex_list
+#     symlist = keys(m.Data.input)
+#     vals = (;)
+#     for (i, n) in enumerate(nodes)
+#         node = symlist[n]
+#         input_nodes = m.Data.input[node]
+#         if m.Data.kind[node] == :Stochastic
+#             if length(input_nodes) == 0
+#                 vals = merge(vals, [node=>f(m.Data.eval[node]())])                
+#             elseif length(input_nodes) > 0 
+#                 inputs = [vals[n] for n in input_nodes]
+#                 vals = merge(vals, [node=>f(m.Data.eval[node](inputs...))])
+#             end
+#         else
+#             vals = merge(vals, [node=>m.Data.eval[node]()])
+#         end
+#     end
+#     vals
 # end
-
-# gi(m.value, @varname(a))
