@@ -91,7 +91,7 @@ end
 """
     adjacency_matrix(inputs::NamedTuple)
 
-For a NamedTuple{T} with edges `T` paired with tuples of input nodes,
+For a NamedTuple{T} with vertices `T` paired with tuples of input nodes,
 `adjacency_matrix` constructs the adjacency matrix using the order 
 of variables given by `T`. 
 
