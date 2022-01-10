@@ -156,7 +156,7 @@ end
 Index a Model with a `VarName{p}` lens. Retrieves the `value``, `input`,
 `eval` and `kind` for node `p`.
 
-# Examples
+# Examples
 
 julia> m[@varname y]
 (value = 0.0, input = (:μ, :s2), eval = var"#35#38"(), kind = :Stochastic)
