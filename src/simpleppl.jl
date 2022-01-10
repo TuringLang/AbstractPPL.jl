@@ -29,12 +29,12 @@ struct Model
     Model(value, input, eval, kind) = new(Data(value, input, eval, kind), DAG(input))
 end
 
-function Model(nt::T) where T <: NamedTuple
-    ks = keys(nt)
-    vals = [nt[k][i] for k in ks, i in 1:4] # create matrix of tuple values
-    m = [(; zip(ks, vals[:,i])...) for i in 1:4] # zip each colum of vals with keys
-    Model(m...)
-end # look into generated functions
+@generated function Model(nt::NamedTuple{T}) where T
+    values = [:(nt[$i][$j]) for j in 1:4, i in 1:length(T)]
+    m = [:(NamedTuple{T}(($(values[i,:]...), ))) for i in 1:4]
+    return :(Model(($(m...),)...))
+end
+
 
 @generated function Base.getindex(m::Data, vn::VarName{p}) where {p}
         fns = fieldnames(Data)
