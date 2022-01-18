@@ -24,7 +24,7 @@ struct ModelState{T}
 end
 
 """
-    DAG(inputs::NamedTuple{T})
+    DAG(inputs)
 
 Struct containing the adjacency matrix for a particular model and 
 the topologically ordered vertex list.
@@ -32,13 +32,14 @@ the topologically ordered vertex list.
 struct DAG
     A::SparseMatrixCSC
     sorted_vertex_list::Tuple
-    
-    function DAG(in::NamedTuple) 
-        inputs = keys(in)
-        A = adjacency_matrix(in) 
-        v_list = topological_sort_by_dfs(A)
-        new(A, inputs[v_list])
-    end
+end
+
+function DAG(inputs) 
+    input_names = keys(inputs)
+    A = adjacency_matrix(inputs) 
+    sorted_vertices = topological_sort_by_dfs(A)
+    sorted_A = permute(A, collect(1:length(inputs)), sorted_vertices)
+    DAG(sorted_A, input_names[sorted_vertices])
 end
 
 """
@@ -89,7 +90,7 @@ end
 
 
 """
-    adjacency_matrix(inputs::NamedTuple)
+    adjacency_matrix(inputs)
 
 For a NamedTuple{T} with vertices `T` paired with tuples of input nodes,
 `adjacency_matrix` constructs the adjacency matrix using the order 
