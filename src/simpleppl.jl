@@ -77,7 +77,7 @@ end
     return :(Model(($(m...),)...))
 end
 
-nodes(m::Model) = m.DAG.sorted_vertex_list
+nodes(m::Model) = m.DAG.sorted_vertices
 
 function Base.show(io::IO, m::Model)
     print(io, "Nodes: \n")
@@ -112,10 +112,10 @@ function adjacency_matrix(inputs)
     nodes = keys(inputs)
     A = spzeros(Bool, N, N)
     for (i, node) in enumerate(nodes)
-        v_inputs = inputs[node] # try as vector 
+        v_inputs = inputs[node]
         for inp in v_inputs
             ind = findfirst(==(inp), nodes)
-            A[i, ind[1]] = true
+            A[i, ind] = true
         end
     end
     A
@@ -125,12 +125,13 @@ adjacency_matrix(m::Model) = adjacency_matrix(m.ModelState.input)
 
 function outneighbors(A::SparseMatrixCSC, u::T) where T <: Int
     #adapted from Graph.jl
-    a = Array(A[:,u])
-    findall(x->x==1, a)
+    inds, _ = findnz(A[:, u])
+    inds
 end
 
 function topological_sort_by_dfs(A)
     # lifted from Graphs.jl
+    # Depth first search implementation optimized from http://www.cs.nott.ac.uk/~psznza/G5BADS03/graphs2.pdf
     n_verts = size(A)[1]
     vcolor = zeros(UInt8, n_verts)
     verts = Vector{Int64}()
