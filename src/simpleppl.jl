@@ -106,21 +106,19 @@ julia> AbstractPPL.adjacency_matrix(inputs)
   ⋅    ⋅    ⋅ 
  1.0  1.0   ⋅ 
 """
-function adjacency_matrix(inputs::NamedTuple)
+function adjacency_matrix(inputs)
     N = length(inputs)
     nodes = keys(inputs)
-    A = spzeros(N,N)
+    A = spzeros(Bool, N, N)
     for (i, node) in enumerate(nodes)
         v_inputs = inputs[node] # try as vector 
-       if v_inputs != () 
-            for inp in v_inputs
-                ind = findall(x -> x == inp, nodes)
-                A[i, ind[1]] = 1
-            end
+        for inp in v_inputs
+            ind = findfirst(==(inp), nodes)
+            A[i, ind[1]] = true
         end
     end
     A
-end
+  end
 
 adjacency_matrix(m::Model) = adjacency_matrix(m.ModelState.input)
 
