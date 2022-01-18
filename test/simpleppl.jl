@@ -23,7 +23,7 @@ model = (
 m = Model(model)
 @test typeof(m) == Model
 
-dag = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 1 1 0 0 0; 0 0 1 1 0])
+dag = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test m.DAG.A == dag
 
 for key in keys(model)

@@ -31,7 +31,7 @@ the topologically ordered vertex list.
 """
 struct DAG
     A::SparseMatrixCSC
-    sorted_vertex_list::Tuple
+    sorted_vertices::Vector{Symbol}
 end
 
 function DAG(inputs) 
@@ -39,7 +39,7 @@ function DAG(inputs)
     A = adjacency_matrix(inputs) 
     sorted_vertices = topological_sort_by_dfs(A)
     sorted_A = permute(A, collect(1:length(inputs)), sorted_vertices)
-    DAG(sorted_A, input_names[sorted_vertices])
+    DAG(sorted_A, collect(input_names[sorted_vertices]))
 end
 
 """
