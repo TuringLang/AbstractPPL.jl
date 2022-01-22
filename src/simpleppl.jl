@@ -77,8 +77,6 @@ end
     return :(Model(($(m...),)...))
 end
 
-nodes(m::Model) = m.DAG.sorted_vertices
-
 function Base.show(io::IO, m::Model)
     print(io, "Nodes: \n")
     for node in nodes(m)
@@ -187,6 +185,36 @@ function Base.getindex(m::Model, vn::VarName)
     getindex(m.ModelState, vn)
 end
 
+function Base.iterate(m::Model, state=1)
+    state > length(nodes(m)) ? nothing : (m[VarName{m.DAG.sorted_vertices[state]}()], state+1)
+end
+
+Base.eltype(m::Model) = NamedTuple{fieldnames(ModelState)}
+Base.IteratorEltype(m::Model) = HasEltype()
+
+function Base.keys(m::Model)
+    vns = Vector{VarName}()
+    for n in nodes(m)
+        push!(vns, VarName{n}())
+    end
+    vns
+end
+
+"""
+    nodes(m::Model)
+
+Returns a `Vector{Symbol}` containing the sorted vertices 
+of the DAG. 
+"""
+nodes(m::Model) = m.DAG.sorted_vertices
+
+
+# next = iterate(iter)
+# while next !== nothing
+#     (i, state) = next
+#     # body
+#     next = iterate(iter, state)
+# end
 # add docs 
 # complete compat with abstractPPL api
 
