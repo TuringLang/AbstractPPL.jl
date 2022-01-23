@@ -200,6 +200,22 @@ function Base.keys(m::Model)
     vns
 end
 
+function Base.values(m::Model)
+    vals = Vector{NamedTuple{fieldnames(ModelState)}}()
+    for node in m
+        push!(vals, node)
+    end
+    vals
+end
+
+function Base.pairs(m::Model)
+    ps = Vector{Pair{VarName, NamedTuple{fieldnames(ModelState)}}}()
+    for key in keys(m)
+        push!(ps, Pair(key, m[key]))
+    end
+    ps
+end
+
 """
     nodes(m::Model)
 
