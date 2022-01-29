@@ -117,15 +117,25 @@ function adjacency_matrix(inputs)
     N = length(inputs)
     nodes = keys(inputs)
     A = spzeros(Bool, N, N)
-    for (i, node) in enumerate(nodes)
+    for (row_n, node) in enumerate(nodes)
         v_inputs = inputs[node]
-        for inp in v_inputs
-            ind = findfirst(==(inp), nodes)
-            A[i, ind] = true
-        end
+        setinput!(A, row_n, nodes, v_inputs)
     end
     A
-  end
+end
+
+function setinput!(A::SparseMatrixCSC{Bool, Int64}, row_n, nodes, v_inputs::Symbol)
+    ind = findfirst(==(v_inputs), nodes)
+    A[i, ind] = true
+end
+
+function setinput!(A::SparseMatrixCSC{Bool, Int64}, row_n, nodes, v_inputs)
+    for inp in v_inputs
+        ind = findfirst(==(inp), nodes)
+        A[row_n, ind] = true
+    end
+    A
+end
 
 adjacency_matrix(m::Model) = adjacency_matrix(m.ModelState.input)
 
