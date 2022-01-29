@@ -50,7 +50,7 @@ Model type and constructor that stores the `ModelState` and
 a named tuple of nodes and their value, input, eval and kind. 
 
 # Examples
-
+```jl-doctest
 julia> nt = (
                s2 = (0.0, (), () -> InverseGamma(2.0,3.0), :Stochastic), 
                μ = (1.0, (), () -> 1.0, :Logical), 
@@ -63,6 +63,7 @@ Model(AbstractPPL.ModelState{(:s2, :μ, :y)}((s2 = 0.0, μ = 1.0, y = 0.0), (s2 
   ⋅    ⋅    ⋅ 
   ⋅    ⋅    ⋅ 
  1.0  1.0   ⋅ , [2, 1, 3]))
+```
 """
 struct Model
     ModelState::ModelState
@@ -95,7 +96,7 @@ For a NamedTuple{T} with vertices `T` paired with tuples of input nodes,
 of variables given by `T`. 
 
 # Examples
-
+```jl-doctest
 julia> inputs = (a = (), b = (), c = (:a, :b))
 (a = (), b = (), c = (:a, :b))
 
@@ -103,7 +104,8 @@ julia> AbstractPPL.adjacency_matrix(inputs)
 3×3 SparseMatrixCSC{Float64, Int64} with 2 stored entries:
   ⋅    ⋅    ⋅ 
   ⋅    ⋅    ⋅ 
- 1.0  1.0   ⋅ 
+ 1.0  1.0   ⋅
+``` 
 """
 function adjacency_matrix(inputs)
     N = length(inputs)
@@ -169,9 +171,13 @@ Index a Model with a `VarName{p}` lens. Retrieves the `value``, `input`,
 
 # Examples
 
+```jl-doctest 
+# add a model 
+
 julia> m[@varname y]
 (value = 0.0, input = (:μ, :s2), eval = var"#35#38"(), kind = :Stochastic)
 
+```
 """
 @generated function Base.getindex(m::ModelState, vn::VarName{p}) where {p}
     fns = fieldnames(ModelState)
@@ -192,30 +198,18 @@ end
 Base.eltype(m::Model) = NamedTuple{fieldnames(ModelState)}
 Base.IteratorEltype(m::Model) = HasEltype()
 
-function Base.keys(m::Model)
-    vns = Vector{VarName}()
-    for n in nodes(m)
-        push!(vns, VarName{n}())
-    end
-    vns
-end
+Base.keys(m::Model) = (VarName{n}() for n in m.DAG.sorted_vertices)
+Base.values(m::Model) = Base.Generator(identity, m)
+Base.length(m::Model) = length(nodes(m))
+Base.keytype(m::Model) = eltype(keys(m))
+Base.valtype(m::Model) = eltype(m)
 
-function Base.values(m::Model)
-    vals = Vector{NamedTuple{fieldnames(ModelState)}}()
-    for node in m
-        push!(vals, node)
-    end
-    vals
-end
+"""
+    dag(m::Model)
 
-function Base.pairs(m::Model)
-    ps = Vector{Pair{VarName, NamedTuple{fieldnames(ModelState)}}}()
-    for key in keys(m)
-        push!(ps, Pair(key, m[key]))
-    end
-    ps
-end
-
+Returns the adjacency matrix of the model as a SparseArray.
+"""
+dag(m::Model) = m.DAG.A
 """
     nodes(m::Model)
 
@@ -223,16 +217,6 @@ Returns a `Vector{Symbol}` containing the sorted vertices
 of the DAG. 
 """
 nodes(m::Model) = m.DAG.sorted_vertices
-
-
-# next = iterate(iter)
-# while next !== nothing
-#     (i, state) = next
-#     # body
-#     next = iterate(iter, state)
-# end
-# add docs 
-# complete compat with abstractPPL api
 
 # # General eval function
 # function evalf(f::Function, m::Model)
