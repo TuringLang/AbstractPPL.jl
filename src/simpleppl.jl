@@ -51,18 +51,20 @@ a named tuple of nodes and their value, input, eval and kind.
 
 # Examples
 ```jl-doctest
-julia> nt = (
+julia> Model(
                s2 = (0.0, (), () -> InverseGamma(2.0,3.0), :Stochastic), 
                μ = (1.0, (), () -> 1.0, :Logical), 
                y = (0.0, (:μ, :s2), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
            )
-(s2 = (0.0, (), var"#33#36"(), :Stochastic), μ = (1.0, (), var"#34#37"(), :Logical), y = (0.0, (:μ, :s2), var"#35#38"(), :Stochastic))
-
-julia> Model(nt)
-Model(AbstractPPL.ModelState{(:s2, :μ, :y)}((s2 = 0.0, μ = 1.0, y = 0.0), (s2 = (), μ = (), y = (:μ, :s2)), (s2 = var"#33#36"(), μ = var"#34#37"(), y = var"#35#38"()), (s2 = :Stochastic, μ = :Logical, y = :Stochastic)), AbstractPPL.DAG(
-  ⋅    ⋅    ⋅ 
-  ⋅    ⋅    ⋅ 
- 1.0  1.0   ⋅ , [2, 1, 3]))
+Nodes: 
+μ = (value = 1.0, input = (), eval = var"#241#244"(), kind = :Logical)
+s2 = (value = 0.0, input = (), eval = var"#240#243"(), kind = :Stochastic)
+y = (value = 0.0, input = (:μ, :s2), eval = var"#242#245"(), kind = :Stochastic)
+DAG: 
+3×3 SparseArrays.SparseMatrixCSC{Bool, Int64} with 2 stored entries:
+⋅  ⋅  ⋅
+⋅  ⋅  ⋅
+1  1  ⋅
 ```
 """
 struct Model
@@ -76,6 +78,10 @@ end
     values = [:(nt[$i][$j]) for i in 1:length(T), j in 1:4]
     m = [:(NamedTuple{T}(($(values[:,i]...), ))) for i in 1:4]
     return :(Model(($(m...),)...))
+end
+
+function Model(;kwargs...)
+    Model(values(kwargs))
 end
 
 function Base.show(io::IO, m::Model)

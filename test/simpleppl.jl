@@ -17,9 +17,6 @@ model = (
     y = (zeros(5), (:μ, :s2), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
 
-# add :Data type to support condition/decondition
-# condition(model::Model, params::NamedTuple)
-
 m = Model(model)
 @test typeof(m) == Model
 
