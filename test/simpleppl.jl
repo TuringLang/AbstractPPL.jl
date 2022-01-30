@@ -17,17 +17,18 @@ model = (
     y = (zeros(5), (:μ, :s2), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
 
-# m1 = Model(
-#     #β = (zeros(2), (), () -> MvNormal(2, sqrt(1000)), :Stochastic),
-#     μ = (zeros(5), (), () -> 3, :Logical), 
-#     y = (zeros(5), (:μ), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
-# )
+m3 = Model(
+    μ = (zeros(5), (), () -> 3, :Logical), 
+    y = (zeros(5), (:μ), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
+)
 
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
-m1 = Model(model)  # uses Model(nt::NamedTuple) constructor
+m2 = Model(model)  # uses Model(nt::NamedTuple) constructor
 
 @test typeof(m) == Model
-@test typeof(m1) == Model
+@test typeof(m2) == Model
+@test typeof(m3) == Model
+
 
 dag = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test m.DAG.A == dag

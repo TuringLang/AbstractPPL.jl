@@ -113,26 +113,26 @@ julia> AbstractPPL.adjacency_matrix(inputs)
  1.0  1.0   ⋅
 ``` 
 """
-function adjacency_matrix(inputs)
+function adjacency_matrix(inputs::NamedTuple{nodes}) where {nodes}
     N = length(inputs)
-    nodes = keys(inputs)
+    col_inds = NamedTuple{nodes}(ntuple(identity, N))
     A = spzeros(Bool, N, N)
-    for (row_n, node) in enumerate(nodes)
+    for (row, node) in enumerate(nodes)
         v_inputs = inputs[node]
-        setinput!(A, row_n, nodes, v_inputs)
+        setinput!(A, row, col_inds, v_inputs)
     end
-    A
+    return A
 end
 
-function setinput!(A::SparseMatrixCSC{Bool, Int64}, row_n, nodes, v_inputs::Symbol)
-    ind = findfirst(==(v_inputs), nodes)
-    A[row_n, ind] = true
+function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, v_input::Symbol)
+    col = col_inds[v_input]
+    A[row, col] = true
 end
 
-function setinput!(A::SparseMatrixCSC{Bool, Int64}, row_n, nodes, v_inputs)
-    for inp in v_inputs
-        ind = findfirst(==(inp), nodes)
-        A[row_n, ind] = true
+function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, v_inputs)
+    for input in v_inputs
+        col = col_inds[input]
+        A[row, col] = true
     end
     A
 end
