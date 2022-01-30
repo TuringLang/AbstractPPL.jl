@@ -8,7 +8,6 @@ export VarName, getsym, getlens, inspace, subsumes, varname, vsym, @varname, @vs
 export AbstractProbabilisticProgram, condition, decondition, logdensityof, densityof
 
 # SimplePPL
-
 export Model
 
 # Abstract traces

@@ -126,7 +126,7 @@ end
 
 function setinput!(A::SparseMatrixCSC{Bool, Int64}, row_n, nodes, v_inputs::Symbol)
     ind = findfirst(==(v_inputs), nodes)
-    A[i, ind] = true
+    A[row_n, ind] = true
 end
 
 function setinput!(A::SparseMatrixCSC{Bool, Int64}, row_n, nodes, v_inputs)
@@ -226,6 +226,7 @@ Base.valtype(m::Model) = eltype(m)
 Returns the adjacency matrix of the model as a SparseArray.
 """
 dag(m::Model) = m.DAG.A
+
 """
     nodes(m::Model)
 
