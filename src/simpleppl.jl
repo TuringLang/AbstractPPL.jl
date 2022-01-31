@@ -82,7 +82,9 @@ end
 
 function Model(;kwargs...)
     Model(values(kwargs))
-end
+end 
+# add thing here to extract inputs from anon functions then change into different NamedTuple
+# add docstring because it will behave differently 
 
 function Base.show(io::IO, m::Model)
     print(io, "Nodes: \n")
@@ -118,29 +120,15 @@ function adjacency_matrix(inputs::NamedTuple{nodes}) where {nodes}
     col_inds = NamedTuple{nodes}(ntuple(identity, N))
     A = spzeros(Bool, N, N)
     for (row, node) in enumerate(nodes)
-        v_inputs = inputs[node]
-        setinput!(A, row, col_inds, nodes, v_inputs)
+        for input in inputs[node]
+            if input ∉ nodes
+                error("Parent node of $(input) not found in node set: $(nodes)")
+            end
+            col = col_inds[input]
+            A[row, col] = true
+        end
     end
     return A
-end
-
-function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, nodes, v_input::Symbol)
-    if v_input ∉ nodes
-        error("Parent node of $(v_input) not found in node set: $(nodes)")
-    end
-    col = col_inds[v_input]
-    A[row, col] = true
-end
-
-function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, nodes, v_inputs)
-    for input in v_inputs
-        if input ∉ nodes
-            error("Parent node of $(input) not found in node set: $(nodes)")
-        end
-        col = col_inds[input]
-        A[row, col] = true
-    end
-    A
 end
 
 adjacency_matrix(m::Model) = adjacency_matrix(m.ModelState.input)
@@ -226,6 +214,7 @@ Base.length(m::Model) = length(nodes(m))
 Base.keytype(m::Model) = eltype(keys(m))
 Base.valtype(m::Model) = eltype(m)
 
+
 """
     dag(m::Model)
 
@@ -240,25 +229,3 @@ Returns a `Vector{Symbol}` containing the sorted vertices
 of the DAG. 
 """
 nodes(m::Model) = m.DAG.sorted_vertices
-
-# # General eval function
-# function evalf(f::Function, m::Model)
-#     nodes = m.DAG.sorted_vertex_list
-#     symlist = keys(m.ModelState.input)
-#     vals = (;)
-#     for (i, n) in enumerate(nodes)
-#         node = symlist[n]
-#         input_nodes = m.ModelState.input[node]
-#         if m.ModelState.kind[node] == :Stochastic
-#             if length(input_nodes) == 0
-#                 vals = merge(vals, [node=>f(m.ModelState.eval[node]())])                
-#             elseif length(input_nodes) > 0 
-#                 inputs = [vals[n] for n in input_nodes]
-#                 vals = merge(vals, [node=>f(m.ModelState.eval[node](inputs...))])
-#             end
-#         else
-#             vals = merge(vals, [node=>m.ModelState.eval[node]()])
-#         end
-#     end
-#     vals
-# end

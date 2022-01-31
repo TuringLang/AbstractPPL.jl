@@ -17,18 +17,19 @@ model = (
     y = (zeros(5), (:μ, :s2), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
 
+
 # test Model constructor for model with single parent node
 @test typeof(
         Model(
-        μ = (zeros(5), (), () -> 3, :Logical), 
-        y = (zeros(5), (:μ), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
+        μ = (1.0, (), () -> 3, :Logical), 
+        y = (1.0, (:μ,), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
         )
     ) == Model
 
 # test ErrorException for parent node not being found
 @test_throws ErrorException Model( 
-    μ = (zeros(5), (:β), () -> 3, :Logical), 
-    y = (zeros(5), (:μ), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
+    μ = (zeros(5), (:β,), () -> 3, :Logical), 
+    y = (zeros(5), (:μ,), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
 )
 
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
