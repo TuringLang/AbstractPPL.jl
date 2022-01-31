@@ -140,13 +140,13 @@ end
 adjacency_matrix(m::Model) = adjacency_matrix(m.ModelState.input)
 
 function outneighbors(A::SparseMatrixCSC, u::T) where T <: Int
-    #adapted from Graph.jl
+    #adapted from Graph.jl https://github.com/JuliaGraphs/Graphs.jl/blob/06669054ed470bcfe4b2ad90ed974f2e65c84bb6/src/interface.jl#L302
     inds, _ = findnz(A[:, u])
     inds
 end
 
 function topological_sort_by_dfs(A)
-    # lifted from Graphs.jl
+    # lifted from Graphs.jl https://github.com/JuliaGraphs/Graphs.jl/blob/06669054ed470bcfe4b2ad90ed974f2e65c84bb6/src/traversals/dfs.jl#L44
     # Depth first search implementation optimized from http://www.cs.nott.ac.uk/~psznza/G5BADS03/graphs2.pdf
     n_verts = size(A)[1]
     vcolor = zeros(UInt8, n_verts)
