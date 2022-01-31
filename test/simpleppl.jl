@@ -1,7 +1,7 @@
 using AbstractPPL
 using SparseArrays
 
-## Example
+## Example taken from Mamba
 line = Dict{Symbol, Any}(
   :x => [1, 2, 3, 4, 5],
   :y => [1, 3, 3, 3, 5]

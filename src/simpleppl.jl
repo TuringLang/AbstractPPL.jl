@@ -134,7 +134,7 @@ end
 
 function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, nodes, v_inputs)
     for input in v_inputs
-        if inptu ∉ nodes
+        if input ∉ nodes
             error("Parent node of $(input) not found in node set: $(nodes)")
         end
         col = col_inds[input]
