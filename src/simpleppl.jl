@@ -119,18 +119,24 @@ function adjacency_matrix(inputs::NamedTuple{nodes}) where {nodes}
     A = spzeros(Bool, N, N)
     for (row, node) in enumerate(nodes)
         v_inputs = inputs[node]
-        setinput!(A, row, col_inds, v_inputs)
+        setinput!(A, row, col_inds, nodes, v_inputs)
     end
     return A
 end
 
-function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, v_input::Symbol)
+function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, nodes, v_input::Symbol)
+    if v_input ∉ nodes
+        error("Parent node of $(v_input) not found in node set: $(nodes)")
+    end
     col = col_inds[v_input]
     A[row, col] = true
 end
 
-function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, v_inputs)
+function setinput!(A::SparseMatrixCSC{Bool, Int64}, row, col_inds, nodes, v_inputs)
     for input in v_inputs
+        if inptu ∉ nodes
+            error("Parent node of $(input) not found in node set: $(nodes)")
+        end
         col = col_inds[input]
         A[row, col] = true
     end

@@ -17,8 +17,17 @@ model = (
     y = (zeros(5), (:μ, :s2), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
 
-m3 = Model(
-    μ = (zeros(5), (), () -> 3, :Logical), 
+# test Model constructor for model with single parent node
+@test typeof(
+        Model(
+        μ = (zeros(5), (), () -> 3, :Logical), 
+        y = (zeros(5), (:μ), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
+        )
+    ) == Model
+
+# test ErrorException for parent node not being found
+@test_throws ErrorException Model( 
+    μ = (zeros(5), (:β), () -> 3, :Logical), 
     y = (zeros(5), (:μ), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
 )
 
@@ -27,8 +36,6 @@ m2 = Model(model)  # uses Model(nt::NamedTuple) constructor
 
 @test typeof(m) == Model
 @test typeof(m2) == Model
-@test typeof(m3) == Model
-
 
 dag = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test m.DAG.A == dag
