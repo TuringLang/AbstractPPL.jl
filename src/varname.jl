@@ -422,8 +422,8 @@ The only purpose of this are special cases like `:`, which we want to avoid beco
 `UnitRange` based on the `lowered_index`, just what you'd get with an explicit `begin:end`
 """
 reconcretize_index(original_index, lowered_index) = lowered_index
-reconcretize_index(original_index::Colon, lowered_index::Base.Slice{<:Base.OneTo}) =
-    UnitRange(lowered_index.indices)
+reconcretize_index(original_index::Colon, lowered_index::Base.Slice) =
+    UnitRange(lowered_index)
 
 """
     concretize(l::Lens, x)
