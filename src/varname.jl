@@ -274,8 +274,9 @@ end
 # `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
 # each other since at the same level/depth they access different properties.
 # E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
-subsumes(t::IdentityLens, u::Lens) = true
-subsumes(t::Lens, u::IdentityLens) = false
+subsumes(::IdentityLens, ::IdentityLens) = true
+subsumes(::IdentityLens, ::Lens) = true
+subsumes(::Lens, ::IdentityLens) = false
 
 subsumes(t::ComposedLens, u::ComposedLens) =
     subsumes(t.outer, u.outer) && subsumes(t.inner, u.inner)
@@ -297,10 +298,18 @@ subsumes(t::PropertyLens, u::PropertyLens) = false
 # FIXME: Does not support `DynamicIndexLens`.
 # FIXME: Does not correctly handle cases such as `subsumes(x, x[:])`
 #        (but neither did old implementation).
-subsumes(t::IndexLens, u::IndexLens) = _issubindex(t.indices, u.indices)
-subsumes(t::ComposedLens{<:IndexLens}, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
-subsumes(t::IndexLens, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
-subsumes(t::ComposedLens{<:IndexLens}, u::IndexLens) = subsumes_index(t, u)
+subsumes(
+    t::Union{IndexLens,ComposedLens{<:IndexLens}},
+    u::Union{IndexLens,ComposedLens{<:IndexLens}}
+) = subsumes_index(t, u)
+
+
+const subsumedby = (t, u) -> subsumes(u, t)
+const ⊒ = subsumes
+const ⊑ = subsumedby
+const ⋣ = !subsumes
+const ⋢ = !subsumedby
+const ≍ = (t, u) -> t ⋢ u && u ⋢ t
 
 # Since expressions such as `x[:][:][:][1]` and `x[1]` are equal,
 # the indexing behavior must be considered jointly.
@@ -396,42 +405,25 @@ Currently _not_ supported are:
 subsumes_index(::Tuple{}, ::Tuple{}) = true  # x subsumes x
 subsumes_index(::Tuple{}, ::Tuple) = true    # x subsumes x[1]
 subsumes_index(::Tuple, ::Tuple{}) = false   # x[1] does not subsume x
-function subsumes_index(t::Tuple, u::Tuple)  # does x[i]... subsume x[j]...?
-    return _issubindex(first(t), first(u)) && subsumes_index(Base.tail(t), Base.tail(u))
+function subsumes_index(t1::Tuple, t2::Tuple)  # does x[i]... subsume x[j]...?
+    first_subsumed = all(issubset(j, i) || checkindex(Bool, j, i) for (i, j) in zip(t1, t2))
+    return first_subsumed && subsumes_index(Base.tail(t1), Base.tail(t2))
 end
 
-const AnyIndex = Union{Int,AbstractVector{Int},Colon}
-_issubindex_(::Tuple{Vararg{AnyIndex}}, ::Tuple{Vararg{AnyIndex}}) = false
-function _issubindex(t::NTuple{N,AnyIndex}, u::NTuple{N,AnyIndex}) where {N}
-    return all(_issubrange(j, i) for (i, j) in zip(t, u))
-end
 
-const ConcreteIndex = Union{Int,AbstractVector{Int}} # this include all kinds of ranges
+"""
+    concretize_index(original_index, lowered_index)
 
-"""Determine whether indices `i` are contained in `j`, treating `:` as universal set."""
-_issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
-_issubrange(i::Colon, j::Colon) = true
-_issubrange(i::ConcreteIndex, j::Colon) = true
-# FIXME: [2021-07-31] This is wrong but we have tests in DPPL that tell
-# us that it SHOULD be correct. I'll leave it as is for now to ensure that
-# we preserve the status quo, but I'm confused.
-_issubrange(i::Colon, j::ConcreteIndex) = true
+Create the index to be emitted in `concretize`.  `original_index` is the original, unconcretized
+index, and `lowered_index` the respective position of the result of `to_indices`.
 
-_concretize(x, inds) = _concretize_indices(inds, Base.to_indices(x, inds))
-@generated function _concretize_indices(
-    orig_inds::TO,
-    conv_inds::TC
-) where {N, TO<:Tuple{Vararg{Any, N}}, TC<:Tuple{Vararg{Any, N}}}
-    converted = map(1:N, TO.parameters, TC.parameters) do n, Ti, Tj
-        if Ti <: Colon
-            :(UnitRange(conv_inds[$n].indices))
-        else
-            :(conv_inds[$n])
-        end
-    end
-
-    return Expr(:tuple, converted...)
-end
+The only purpose of this are special cases like `:`, which we want to avoid becoming a
+`Base.Slice(OneTo(...))` -- it would confuse people when printed.  Instead, we concretize to a
+`UnitRange` based on the `lowered_index`, just what you'd get with an explicit `begin:end`
+"""
+reconcretize_index(original_index, lowered_index) = lowered_index
+reconcretize_index(original_index::Colon, lowered_index::Base.Slice{<:Base.OneTo}) =
+    UnitRange(lowered_index.indices)
 
 """
     concretize(l::Lens, x)
@@ -444,8 +436,8 @@ slices are only converted to `UnitRange`s (`a:b`) (as opposed to `Base.Slice{Bas
 the result close to the original indexing.
 """
 concretize(I::Lens, x) = I
-concretize(I::DynamicIndexLens, x) = IndexLens(I.f(x))
-concretize(I::IndexLens, x) = IndexLens(_concretize(x, I.indices))
+concretize(I::DynamicIndexLens, x) = concretize(IndexLens(I.f(x)), x)
+concretize(I::IndexLens, x) = IndexLens(map(reconcretize_index, I.indices, to_indices(x, I.indices)))
 function concretize(I::ComposedLens, x)
     x_inner = get(x, I.outer)
     return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))

@@ -12,7 +12,8 @@ using Test
 
 @testset "AbstractPPL.jl" begin
     include("deprecations.jl")
-
+    include("varname.jl")
+    
     @testset "doctests" begin
         DocMeta.setdocmeta!(
             AbstractPPL,
