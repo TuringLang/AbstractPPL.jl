@@ -505,6 +505,10 @@ julia> # Note that "dynamic" here refers to usage of `begin` and/or `end`,
        # _not_ "information only available at runtime", i.e. the following works.
        [@varname(x.a[i]) for i = 1:length(x.a)][end]
 x.a[6]
+
+julia> # Potentially surprising behaviour, but this is equivalent to what Base does:
+       @varname(x[2:2:5]), 2:2:5
+(x[2:2:4], 2:2:4)
 ```
 
 ### General indexing
