@@ -61,7 +61,19 @@ end
         @test_strict_subsumption x[1] x[1:10]
         @test_strict_subsumption x[1:5] x[1:10]
         @test_strict_subsumption x[4:6] x[1:10]
-        @test_strict_subsumption x[iseven.(1:10)] x[1:10]
+        
+        @test_strict_subsumption x[[2,3,5]] x[[7,6,5,4,3,2,1]]
+
+        # boolean indexing works as long as it is concretized
+        A = rand(10, 10)
+        @test @varname(A[iseven.(1:10), 1], true) ⊑ @varname(A[1:10, 1])
+        @test @varname(A[iseven.(1:10), 1], true) ⋣ @varname(A[1:10, 1])
+
+        # we can reasonably allow colons on the right side ("universal set")
+        @test @varname(x[1]) ⊑ @varname(x[:])
+        @test @varname(x[1:10, 1]) ⊑ @varname(x[:, 1:10])
+        @test_throws ErrorException (@varname(x[:]) ⊑ @varname(x[1]))
+        @test_throws ErrorException (@varname(x[:]) ⊑ @varname(x[:]))
     end
 
     @testset "non-standard indexing" begin

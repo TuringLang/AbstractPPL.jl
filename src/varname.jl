@@ -406,7 +406,15 @@ subsumes_index(::Tuple{}, ::Tuple{}) = true  # x subsumes x
 subsumes_index(::Tuple{}, ::Tuple) = true    # x subsumes x[1]
 subsumes_index(::Tuple, ::Tuple{}) = false   # x[1] does not subsume x
 function subsumes_index(t1::Tuple, t2::Tuple)  # does x[i]... subsume x[j]...?
-    first_subsumed = all(issubset(j, i) || checkindex(Bool, j, i) for (i, j) in zip(t1, t2))
+    first_subsumed = all(zip(first(t1), first(t2))) do (i, j)
+        if j isa Colon
+            error("Colons cannot be subsumed")
+        elseif i isa Colon
+            return true
+        else
+            return issubset(j, i)
+        end
+    end
     return first_subsumed && subsumes_index(Base.tail(t1), Base.tail(t2))
 end
 
@@ -422,8 +430,7 @@ The only purpose of this are special cases like `:`, which we want to avoid beco
 `UnitRange` based on the `lowered_index`, just what you'd get with an explicit `begin:end`
 """
 reconcretize_index(original_index, lowered_index) = lowered_index
-reconcretize_index(original_index::Colon, lowered_index::Base.Slice) =
-    UnitRange(lowered_index)
+reconcretize_index(original_index::Colon, lowered_index::Base.Slice) = (UnitRange(lowered_index))
 
 """
     concretize(l::Lens, x)
@@ -439,7 +446,7 @@ concretize(I::Lens, x) = I
 concretize(I::DynamicIndexLens, x) = concretize(IndexLens(I.f(x)), x)
 concretize(I::IndexLens, x) = IndexLens(map(reconcretize_index, I.indices, to_indices(x, I.indices)))
 function concretize(I::ComposedLens, x)
-    x_inner = get(x, I.outer)
+    x_inner = get(x, I.outer) # TODO: get view here
     return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))
 end
 
