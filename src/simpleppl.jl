@@ -5,7 +5,7 @@ using Setfield
 using Setfield: PropertyLens, get
 
 """
-    ModelState(value::NamedTuple{T}, input::NamedTuple{T}, eval::NamedTuple{T}, kind::NamedTuple{T})
+    GraphInfo
 
 Record the state of the model as a struct of NamedTuples, all
 sharing the same key values, namely, those of the model parameters.
@@ -14,70 +14,19 @@ sharing the same key values, namely, those of the model parameters.
 anonymous functions associated with each node. These might typically
 be either deterministic values or some distribution, but could an 
 arbitrary julia program. `kind` is a tuple of symbols indicating
-whether the node is a logical or stochastic node.
+whether the node is a logical or stochastic node. Additionally, the 
+adjacency matrix and topologically ordered vertex list and stored.
+
+GraphInfo is instantiated using the `Model` constctor. 
 """
-struct ModelState{T}
+
+struct GraphInfo{T} <: AbstractModelTrace
     value::NamedTuple{T}
     input::NamedTuple{T}
     eval::NamedTuple{T}
     kind::NamedTuple{T}
-end
-
-"""
-    DAG(inputs)
-
-Struct containing the adjacency matrix for a particular model and 
-the topologically ordered vertex list.
-"""
-struct DAG
     A::SparseMatrixCSC
     sorted_vertices::Vector{Symbol}
-end
-
-function DAG(inputs) 
-    input_names = keys(inputs)
-    A = adjacency_matrix(inputs) 
-    sorted_vertices = topological_sort_by_dfs(A)
-    sorted_A = permute(A, collect(1:length(inputs)), sorted_vertices)
-    DAG(sorted_A, collect(input_names[sorted_vertices]))
-end
-
-"""
-    Model(nt::NamedTuple{T})
-
-Model type and constructor that stores the `ModelState` and
-`DAG` of the instantiated model. The constructor takes as an input
-a named tuple of nodes and their value, input, eval and kind. 
-
-# Examples
-```jl-doctest
-julia> Model(
-               s2 = (0.0, (), () -> InverseGamma(2.0,3.0), :Stochastic), 
-               μ = (1.0, (), () -> 1.0, :Logical), 
-               y = (0.0, (:μ, :s2), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
-           )
-Nodes: 
-μ = (value = 1.0, input = (), eval = var"#241#244"(), kind = :Logical)
-s2 = (value = 0.0, input = (), eval = var"#240#243"(), kind = :Stochastic)
-y = (value = 0.0, input = (:μ, :s2), eval = var"#242#245"(), kind = :Stochastic)
-DAG: 
-3×3 SparseArrays.SparseMatrixCSC{Bool, Int64} with 2 stored entries:
-⋅  ⋅  ⋅
-⋅  ⋅  ⋅
-1  1  ⋅
-```
-"""
-struct Model
-    ModelState::ModelState
-    DAG::DAG
-
-    Model(value, input, eval, kind) = new(ModelState(value, input, eval, kind), DAG(input))
-end
-
-@generated function Model(nt::NamedTuple{T}) where T
-    values = [:(nt[$i][$j]) for i in 1:length(T), j in 1:4]
-    m = [:(NamedTuple{T}(($(values[:,i]...), ))) for i in 1:4]
-    return :(Model(($(m...),)...))
 end
 
 """
@@ -87,46 +36,68 @@ end
 nodes and returns a `Model`. Nodes are pairs of variable names
 and tuples containing default value, an eval function 
 and node type. The inputs of each node are inferred from 
-their anonymous functions. 
+their anonymous functions. The returned object has a type 
+GraphInfo{(sorted_vertices...)}.
+
 # Examples
 ```jl-doctest
+julia> using AbstractPPL
+
 julia> Model(
                s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
                μ = (1.0, () -> 1.0, :Logical), 
                y = (0.0, (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
            )
 Nodes: 
-μ = (value = 1.0, input = (), eval = var"#241#244"(), kind = :Logical)
-s2 = (value = 0.0, input = (), eval = var"#240#243"(), kind = :Stochastic)
-y = (value = 0.0, input = (:μ, :s2), eval = var"#242#245"(), kind = :Stochastic)
-DAG: 
-3×3 SparseArrays.SparseMatrixCSC{Bool, Int64} with 2 stored entries:
-⋅  ⋅  ⋅
-⋅  ⋅  ⋅
-1  1  ⋅
+μ = (value = 1.0, input = (), eval = var"#6#9"(), kind = :Logical)
+s2 = (value = 0.0, input = (), eval = var"#5#8"(), kind = :Stochastic)
+y = (value = 0.0, input = (:μ, :s2), eval = var"#7#10"(), kind = :Stochastic)
 ```
 """
 function Model(;kwargs...)
-    functions = [kwargs[i][2] for i in 1:length(kwargs)]
-    args = [argnames(f) for f in functions]
-    values = [kwargs[i][j] for i in 1:length(kwargs), j in 1:3]
-    modelinputs = NamedTuple{keys(kwargs)}.([values[:,1], Tuple.(args), values[:,2], values[:,3]])
-    Model(modelinputs...)
-end 
-
-argnames(f) = Base.method_argnames(first(methods(f)))[2:end]
-# add thing here to extract inputs from anon functions then change into different NamedTuple
-# add docstring because it will behave differently
-
-function Base.show(io::IO, m::Model)
-    print(io, "Nodes: \n")
-    for node in nodes(m)
-        print(io, "$node = ", m[VarName{node}()], "\n")
-    end
-    print(io, "DAG: \n") 
-    display(m.DAG.A)
+    vals = getvals(NamedTuple(kwargs))
+    args = [argnames(f) for f in vals[2]]
+    A, sorted_vertices = DAG(NamedTuple{keys(kwargs)}(args))    
+    modelinputs = NamedTuple{Tuple(sorted_vertices)}.([vals[1], Tuple.(args), vals[2], vals[3]])
+    GraphInfo(modelinputs..., A, sorted_vertices)
 end
 
+
+"""
+    DAG(inputs)
+
+Function taking in a NamedTuple containing the inputs to each node 
+and returns the implied adjacency matrix and topologically ordered 
+vertex list.
+"""
+function DAG(inputs)
+    input_names = Symbol[keys(inputs)...]
+    println(inputs)
+    A = adjacency_matrix(inputs) 
+    sorted_vertices = topological_sort_by_dfs(A)
+    sorted_A = permute(A, collect(1:length(inputs)), sorted_vertices)
+    sorted_A, input_names[sorted_vertices]
+end
+
+"""
+    getvals(nt::NamedTuple{T})
+
+Takes in the arguments to Model(;kwargs...) as a NamedTuple and 
+reorders into a tuple of tuples each containing either of value, 
+input, eval and kind, as required by the GraphInfo type. 
+"""
+@generated function getvals(nt::NamedTuple{T}) where T
+    values = [:(nt[$i][$j]) for i in 1:length(T), j in 1:3]
+    m = [:($(values[:,i]...), ) for i in 1:3]
+    return :($(m...),)
+end
+
+"""
+    argnames(f::Function)
+
+Returns a Vector{Symbol} of the inputs to an anonymous function `f`.
+"""
+argnames(f::Function) = Base.method_argnames(first(methods(f)))[2:end]
 
 """
     adjacency_matrix(inputs)
@@ -163,7 +134,7 @@ function adjacency_matrix(inputs::NamedTuple{nodes}) where {nodes}
     return A
 end
 
-adjacency_matrix(m::Model) = adjacency_matrix(m.ModelState.input)
+adjacency_matrix(m::GraphInfo) = adjacency_matrix(m.input)
 
 function outneighbors(A::SparseMatrixCSC, u::T) where T <: Int
     #adapted from Graph.jl https://github.com/JuliaGraphs/Graphs.jl/blob/06669054ed470bcfe4b2ad90ed974f2e65c84bb6/src/interface.jl#L302
@@ -221,30 +192,34 @@ julia> m[@varname y]
 
 ```
 """
-@generated function Base.getindex(m::ModelState, vn::VarName{p}) where {p}
-    fns = fieldnames(ModelState)
+@generated function Base.getindex(m::GraphInfo, vn::VarName{p}) where {p}
+    fns = fieldnames(GraphInfo)[1:4]
     name_lens = Setfield.PropertyLens{p}()
     field_lenses = [Setfield.PropertyLens{f}() for f in fns]
     values = [:(get(m, Setfield.compose($l, $name_lens, getlens(vn)))) for l in field_lenses]
     return :(NamedTuple{$(fns)}(($(values...),)))
 end
 
-function Base.getindex(m::Model, vn::VarName)
-    getindex(m.ModelState, vn)
+function Base.show(io::IO, m::GraphInfo)
+    print(io, "Nodes: \n")
+    for node in nodes(m)
+        print(io, "$node = ", m[VarName{node}()], "\n")
+    end
 end
 
-function Base.iterate(m::Model, state=1)
-    state > length(nodes(m)) ? nothing : (m[VarName{m.DAG.sorted_vertices[state]}()], state+1)
+
+function Base.iterate(m::GraphInfo, state=1)
+    state > length(nodes(m)) ? nothing : (m[VarName{m.sorted_vertices[state]}()], state+1)
 end
 
-Base.eltype(m::Model) = NamedTuple{fieldnames(ModelState)}
-Base.IteratorEltype(m::Model) = HasEltype()
+Base.eltype(m::GraphInfo) = NamedTuple{fieldnames(GraphInfo)[1:4]}
+Base.IteratorEltype(m::GraphInfo) = HasEltype()
 
-Base.keys(m::Model) = (VarName{n}() for n in m.DAG.sorted_vertices)
-Base.values(m::Model) = Base.Generator(identity, m)
-Base.length(m::Model) = length(nodes(m))
-Base.keytype(m::Model) = eltype(keys(m))
-Base.valtype(m::Model) = eltype(m)
+Base.keys(m::GraphInfo) = (VarName{n}() for n in m.sorted_vertices)
+Base.values(m::GraphInfo) = Base.Generator(identity, m)
+Base.length(m::GraphInfo) = length(nodes(m))
+Base.keytype(m::GraphInfo) = eltype(keys(m))
+Base.valtype(m::GraphInfo) = eltype(m)
 
 
 """
@@ -252,7 +227,7 @@ Base.valtype(m::Model) = eltype(m)
 
 Returns the adjacency matrix of the model as a SparseArray.
 """
-dag(m::Model) = m.DAG.A
+dag(m::GraphInfo) = m.A
 
 """
     nodes(m::Model)
@@ -260,4 +235,4 @@ dag(m::Model) = m.DAG.A
 Returns a `Vector{Symbol}` containing the sorted vertices 
 of the DAG. 
 """
-nodes(m::Model) = m.DAG.sorted_vertices
+nodes(m::GraphInfo) = m.sorted_vertices
