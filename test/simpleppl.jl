@@ -9,7 +9,7 @@ line = Dict{Symbol, Any}(
 
 line[:xmat] = [ones(5) line[:x]]
 
-model = (
+modelwithargs = (
     β = (zeros(2), (), () -> MvNormal(2, sqrt(1000)), :Stochastic),
     xmat = (line[:xmat], (), () -> line[:xmat], :Logical), 
     s2 = (0.0, (), () -> InverseGamma(2.0,3.0), :Stochastic), 
@@ -17,44 +17,48 @@ model = (
     y = (zeros(5), (:μ, :s2), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
 
+modelwithoutargs = (
+    β = (zeros(2), () -> MvNormal(2, sqrt(1000)), :Stochastic),
+    xmat = (line[:xmat], () -> line[:xmat], :Logical), 
+    s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+    μ = (zeros(5), (xmat, β) -> xmat * β, :Logical), 
+    y = (zeros(5), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
+)
+
+m1 = Model(; zip(keys(modelwithoutargs), values(modelwithoutargs))...) # uses Model(; kwargs...) constructor
+m2 = Model(modelwithargs)  # uses Model(nt::NamedTuple) constructor
+
+@test typeof(m1) == Model
+@test typeof(m2) == Model
+
+for (i, j) in zip(keys(m1), keys(m2))
+    @test i == j
+    v1 = values(m1[i])
+    v2 = values(m2[j])
+    @test v1[[1, 2, 4]] == v2[[1, 2, 4]]
+end
+
+A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
+@test dag(m1) == A == dag(m2)
+
+@test length(m1) == length(modelwithargs) == 5
+@test eltype(m1) == valtype(m1)
+
+# test keys are VarNames
+for key in keys(m1)
+    @test typeof(key) <: VarName
+end
 
 # test Model constructor for model with single parent node
 @test typeof(
         Model(
-        μ = (1.0, (), () -> 3, :Logical), 
-        y = (1.0, (:μ,), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
+        μ = (1.0, () -> 3, :Logical), 
+        y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
         )
     ) == Model
 
 # test ErrorException for parent node not being found
-@test_throws ErrorException Model( 
+@test_throws ErrorException Model((
     μ = (zeros(5), (:β,), () -> 3, :Logical), 
     y = (zeros(5), (:μ,), (μ) -> MvNormal(μ, sqrt(1)), :Stochastic)
-)
-
-m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
-m2 = Model(model)  # uses Model(nt::NamedTuple) constructor
-
-@test typeof(m) == Model
-@test typeof(m2) == Model
-
-dag = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
-@test m.DAG.A == dag
-
-@test length(m) == length(model) == 5
-@test eltype(m) == valtype(m)
-
-ks = keys(model)[[3, 2, 1, 4, 5]] # reorder model keys to match topologically ordered Model
-
-for (key, vs) in zip(ks, values(m))
-    @test m[VarName{key}()] == vs
-    @test values(m[VarName{key}()]) == model[key] == values(vs)
-end
-
-for key in keys(m)
-    @test typeof(key) <: VarName
-end
-
-for (i, node) in enumerate(m)
-    @test values(node) == values(model[ks[i]])
-end
+))

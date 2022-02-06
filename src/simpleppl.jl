@@ -80,11 +80,43 @@ end
     return :(Model(($(m...),)...))
 end
 
+"""
+    Model(;kwargs...)
+
+`Model` type constructor that takes in named arguments for 
+nodes and returns a `Model`. Nodes are pairs of variable names
+and tuples containing default value, an eval function 
+and node type. The inputs of each node are inferred from 
+their anonymous functions. 
+# Examples
+```jl-doctest
+julia> Model(
+               s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+               μ = (1.0, () -> 1.0, :Logical), 
+               y = (0.0, (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
+           )
+Nodes: 
+μ = (value = 1.0, input = (), eval = var"#241#244"(), kind = :Logical)
+s2 = (value = 0.0, input = (), eval = var"#240#243"(), kind = :Stochastic)
+y = (value = 0.0, input = (:μ, :s2), eval = var"#242#245"(), kind = :Stochastic)
+DAG: 
+3×3 SparseArrays.SparseMatrixCSC{Bool, Int64} with 2 stored entries:
+⋅  ⋅  ⋅
+⋅  ⋅  ⋅
+1  1  ⋅
+```
+"""
 function Model(;kwargs...)
-    Model(values(kwargs))
+    functions = [kwargs[i][2] for i in 1:length(kwargs)]
+    args = [argnames(f) for f in functions]
+    values = [kwargs[i][j] for i in 1:length(kwargs), j in 1:3]
+    modelinputs = NamedTuple{keys(kwargs)}.([values[:,1], Tuple.(args), values[:,2], values[:,3]])
+    Model(modelinputs...)
 end 
+
+argnames(f) = Base.method_argnames(first(methods(f)))[2:end]
 # add thing here to extract inputs from anon functions then change into different NamedTuple
-# add docstring because it will behave differently 
+# add docstring because it will behave differently
 
 function Base.show(io::IO, m::Model)
     print(io, "Nodes: \n")
