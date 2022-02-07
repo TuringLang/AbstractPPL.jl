@@ -301,7 +301,7 @@ subsumes(t::PropertyLens, u::PropertyLens) = false
 subsumes(
     t::Union{IndexLens,ComposedLens{<:IndexLens}},
     u::Union{IndexLens,ComposedLens{<:IndexLens}}
-) = subsumes_index(t, u)
+) = subsumes_indices(t, u)
 
 
 subsumedby(t, u) = subsumes(u, t)
@@ -317,7 +317,7 @@ const ≍ = uncomparable
 # Therefore we must recurse until we reach something that is NOT
 # indexing, and then consider the sequence of indices leading up to this.
 """
-    subsumes_index(t::Lens, u::Lens)
+    subsumes_indices(t::Lens, u::Lens)
 
 Return `true` if the indexing represented by `t` subsumes `u`.
 
@@ -325,26 +325,26 @@ This is mostly useful for comparing compositions involving `IndexLens`
 e.g. `_[1][2].a[2]` and `_[1][2].a`. In such a scenario we do the following:
 1. Combine `[1][2]` into a `Tuple` of indices using [`combine_indices`](@ref).
 2. Do the same for `[1][2]`.
-3. Compare the two tuples from (1) and (2) using `subsumes_index`.
+3. Compare the two tuples from (1) and (2) using `subsumes_indices`.
 4. Since we're still undecided, we call `subsume(@lens(_.a[2]), @lens(_.a))`
    which then returns `false`.
 
 # Example
-```jldoctest; setup=:(using Setfield; using AbstractPPL: subsumes_index)
+```jldoctest; setup=:(using Setfield; using AbstractPPL: subsumes_indices)
 julia> t = @lens(_[1].a); u = @lens(_[1]);
 
-julia> subsumes_index(t, u)
+julia> subsumes_indices(t, u)
 false
 
-julia> subsumes_index(u, t)
+julia> subsumes_indices(u, t)
 true
 
 julia> # `IdentityLens` subsumes all.
-       subsumes_index(@lens(_), t)
+       subsumes_indices(@lens(_), t)
 true
 
 julia> # None subsumes `IdentityLens`.
-       subsumes_index(t, @lens(_))
+       subsumes_indices(t, @lens(_))
 false
 
 julia> AbstractPPL.subsumes(@lens(_[1][2].a[2]), @lens(_[1][2].a))
@@ -354,7 +354,7 @@ julia> AbstractPPL.subsumes(@lens(_[1][2].a), @lens(_[1][2].a[2]))
 true
 ```
 """
-function subsumes_index(t::Lens, u::Lens)
+function subsumes_indices(t::Lens, u::Lens)
     t_indices, t_next = combine_indices(t)
     u_indices, u_next = combine_indices(u)
 
@@ -383,7 +383,7 @@ end
 Return sequential indexing into a single `Tuple` of indices,
 e.g. `x[:][1][2]` becomes `((Colon(), ), (1, ), (2, ))`.
 
-The result is compatible with [`subsumes_index`](@ref) for `Tuple` input.
+The result is compatible with [`subsumes_indices`](@ref) for `Tuple` input.
 """
 combine_indices(lens::Lens) = (), lens
 combine_indices(lens::IndexLens) = (lens.indices,), nothing
@@ -415,7 +415,7 @@ end
 subsumes_index(i::Colon, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(i, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(i::Colon, j) = true
-subsumes_index(i::AbstractArray, j) = issubset(j, i)
+subsumes_index(i::AbstractVector, j) = issubset(j, i)
 subsumes_index(i, j) = i == j
 
 
