@@ -2,6 +2,8 @@ using InvertedIndices
 using OffsetArrays
 using Setfield
 
+using AbstractPPL: ⊑, ⊒, ⋢, ⋣, ≍
+
 
 macro test_strict_subsumption(x, y)
     quote
@@ -30,7 +32,8 @@ end
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
         @test @varname(y[:], true) ==  @varname(y[1:100])
         @test @varname(y[:, begin], true) == @varname(y[1:10, 1])
-        @test getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices === (1:100,)
+        @test getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
+            AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
         @test @varname(x.a[1:end, end][:], true) == @varname(x.a[1:3,2][1:3])
     end
     
@@ -64,6 +67,8 @@ end
         
         @test_strict_subsumption x[[2,3,5]] x[[7,6,5,4,3,2,1]]
 
+        @test_strict_subsumption x[:a][1] x[:a]
+        
         # boolean indexing works as long as it is concretized
         A = rand(10, 10)
         @test @varname(A[iseven.(1:10), 1], true) ⊑ @varname(A[1:10, 1])
@@ -82,5 +87,6 @@ end
         
         B = OffsetArray(A, -5, -5) # indices -4:5×-4:5
         @test @varname(B[1, :], true) == @varname(B[1, -4:5])
+
     end
 end

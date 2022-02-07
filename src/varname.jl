@@ -304,12 +304,13 @@ subsumes(
 ) = subsumes_index(t, u)
 
 
-const subsumedby = (t, u) -> subsumes(u, t)
+subsumedby(t, u) = subsumes(u, t)
+uncomparable(t, u) = t ⋢ u && u ⋢ t
 const ⊒ = subsumes
 const ⊑ = subsumedby
 const ⋣ = !subsumes
 const ⋢ = !subsumedby
-const ≍ = (t, u) -> t ⋢ u && u ⋢ t
+const ≍ = uncomparable
 
 # Since expressions such as `x[:][:][:][1]` and `x[1]` are equal,
 # the indexing behavior must be considered jointly.
@@ -358,7 +359,7 @@ function subsumes_index(t::Lens, u::Lens)
     u_indices, u_next = combine_indices(u)
 
     # If we already know that `u` is not subsumed by `t`, return early.
-    if !subsumes_index(t_indices, u_indices)
+    if !subsumes_indices(t_indices, u_indices)
         return false
     end
 
@@ -392,35 +393,54 @@ function combine_indices(lens::ComposedLens{<:IndexLens})
 end
 
 """
-    subsumes_index(left_index::Tuple, right_index::Tuple)
+    subsumes_indices(left_indices::Tuple, right_indices::Tuple)
 
-Return `true` if `right_index` is subsumed by `left_index`.
+Return `true` if `right_indices` is subsumed by `left_indices`.  `left_indices` is assumed to be 
+concretized and consist of either `Int`s or `AbstractArray`s of scalar indices that are supported 
+by array A.
 
 Currently _not_ supported are: 
 - Boolean indexing, literal `CartesianIndex` (these could be added, though)
 - Linear indexing of multidimensional arrays: `x[4]` does not subsume `x[2, 2]` for a matrix `x`
 - Trailing ones: `x[2, 1]` does not subsume `x[2]` for a vector `x`
-- Dynamic indexing, e.g. `x[1]` does not subsume `x[begin]`.
 """
-subsumes_index(::Tuple{}, ::Tuple{}) = true  # x subsumes x
-subsumes_index(::Tuple{}, ::Tuple) = true    # x subsumes x[1]
-subsumes_index(::Tuple, ::Tuple{}) = false   # x[1] does not subsume x
-function subsumes_index(t1::Tuple, t2::Tuple)  # does x[i]... subsume x[j]...?
-    first_subsumed = all(zip(first(t1), first(t2))) do (i, j)
-        if j isa Colon
-            error("Colons cannot be subsumed")
-        elseif i isa Colon
-            return true
-        else
-            return issubset(j, i)
-        end
-    end
-    return first_subsumed && subsumes_index(Base.tail(t1), Base.tail(t2))
+subsumes_indices(::Tuple{}, ::Tuple{}) = true  # x subsumes x
+subsumes_indices(::Tuple{}, ::Tuple) = true    # x subsumes x...
+subsumes_indices(::Tuple, ::Tuple{}) = false   # x... does not subsume x
+function subsumes_indices(t1::Tuple, t2::Tuple)  # does x[i]... subsume x[j]...?
+    first_subsumed = all(Base.splat(subsumes_index), zip(first(t1), first(t2)))
+    return first_subsumed && subsumes_indices(Base.tail(t1), Base.tail(t2))
 end
 
+subsumes_index(i::Colon, ::Colon) = error("Colons cannot be subsumed")
+subsumes_index(i, ::Colon) = error("Colons cannot be subsumed")
+subsumes_index(i::Colon, j) = true
+subsumes_index(i::AbstractArray, j) = issubset(j, i)
+subsumes_index(i, j) = i == j
+
+
+struct ConcretizedSlice{T, R} <: AbstractVector{T}
+    range::R
+end
+
+ConcretizedSlice(s::Base.Slice{R}) where {R} = ConcretizedSlice{eltype(s.indices), R}(s.indices)
+Base.show(io::IO, s::ConcretizedSlice) = print(io, ":")
+Base.show(io::IO, ::MIME"text/plain", s::ConcretizedSlice) = print(io, "ConcretizedSlice($(s.range))")
+Base.IteratorEltype(::Type{<:ConcretizedSlice}) = Base.HasEltype()
+Base.eltype(s::ConcretizedSlice{T}) where {T} = T
+Base.IteratorSize(::Type{<:ConcretizedSlice}) = Base.HasLength()
+Base.length(s::ConcretizedSlice) = length(s.range)
+Base.size(s::ConcretizedSlice) = size(s.range)
+Base.iterate(s::ConcretizedSlice, state...) = Base.iterate(s.range, state...)
+Base.collect(s::ConcretizedSlice) = collect(s.range)
+Base.hasfastin(::Type{<:ConcretizedSlice}) = true
+Base.in(i, s::ConcretizedSlice) = i in s.range
+
+# and this is the reason why we are doing this:
+Base.to_index(A, s::ConcretizedSlice) = Base.Slice(s.range)
 
 """
-    concretize_index(original_index, lowered_index)
+    reconcretize_index(original_index, lowered_index)
 
 Create the index to be emitted in `concretize`.  `original_index` is the original, unconcretized
 index, and `lowered_index` the respective position of the result of `to_indices`.
@@ -430,13 +450,15 @@ The only purpose of this are special cases like `:`, which we want to avoid beco
 `UnitRange` based on the `lowered_index`, just what you'd get with an explicit `begin:end`
 """
 reconcretize_index(original_index, lowered_index) = lowered_index
-reconcretize_index(original_index::Colon, lowered_index::Base.Slice) = (UnitRange(lowered_index))
+reconcretize_index(original_index::Colon, lowered_index::Base.Slice) =
+    ConcretizedSlice(lowered_index)
+
 
 """
     concretize(l::Lens, x)
 
 Return `l` instantiated on `x`, i.e. any information related to the runtime shape of `x` is
-evaluated.  This concerns `begin`, `end`, and `:` slices.
+evaluated. This concerns `begin`, `end`, and `:` slices.
 
 Basically, every index is converted to a concrete value using `Base.to_index` on `x`.  However, `:`
 slices are only converted to `UnitRange`s (`a:b`) (as opposed to `Base.Slice{Base.OneTo}`), to keep
@@ -444,7 +466,7 @@ the result close to the original indexing.
 """
 concretize(I::Lens, x) = I
 concretize(I::DynamicIndexLens, x) = concretize(IndexLens(I.f(x)), x)
-concretize(I::IndexLens, x) = IndexLens(map(reconcretize_index, I.indices, to_indices(x, I.indices)))
+concretize(I::IndexLens, x) = IndexLens(reconcretize_index.(I.indices, to_indices(x, I.indices)))
 function concretize(I::ComposedLens, x)
     x_inner = get(x, I.outer) # TODO: get view here
     return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))
@@ -461,15 +483,16 @@ evaluated. This concerns `begin`, `end`, and `:` slices.
 julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
 julia> getlens(@varname(x.a[1:end, end][:], true)) # concrete=true required for @varname
-(@lens _.a[1:3, 2][1:3])
+(@lens _.a[1:3, 2][:])
 
 julia> y = zeros(10, 10);
 
 julia> @varname(y[:], true)
-y[1:100]
+y[:]
 
-julia> AbstractPPL.getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices
-(1:100,)
+julia> # The underlying value is conretized, though:
+       AbstractPPL.getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices[1]
+ConcretizedSlice(Base.OneTo(100))
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(getlens(vn), x))
@@ -491,7 +514,7 @@ concretized as `VarName` only supports non-dynamic indexing as determined by
 julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
 julia> @varname(x.a[1:end, end][:], true)
-x.a[1:3,2][1:3]
+x.a[1:3,2][:]
 
 julia> @varname(x.a[end])
 ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
@@ -567,7 +590,7 @@ function varname(expr::Expr, concretize=false)
                     $(AbstractPPL.concretize)($lens, $sym_escaped)
                 )
             )
-        elseif !concretize && Setfield.need_dynamic_lens(expr)
+        elseif Setfield.need_dynamic_lens(expr)
             error("Variable name `$(expr)` is dynamic and requires concretization!")
         else
             :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
