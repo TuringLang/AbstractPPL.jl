@@ -21,8 +21,8 @@ GraphInfo is instantiated using the `Model` constctor.
 """
 
 struct GraphInfo{T} <: AbstractModelTrace
-    value::NamedTuple{T}
     input::NamedTuple{T}
+    value::NamedTuple{T}
     eval::NamedTuple{T}
     kind::NamedTuple{T}
     A::SparseMatrixCSC
@@ -55,29 +55,30 @@ y = (value = 0.0, input = (:μ, :s2), eval = var"#7#10"(), kind = :Stochastic)
 ```
 """
 
-struct Model{T}
+struct Model{T} <: AbstractProbabilisticProgram
     g::GraphInfo{T}
 end
 
 function Model(;kwargs...)
+    for (i, node) in enumerate(values(kwargs))
+        @assert typeof(node) <: Tuple{Union{Array{Float64}, Float64}, Function, Symbol} "Check input order for node $(i) matches Tuple(value, function, kind)"
+    end
     vals = getvals(NamedTuple(kwargs))
     args = [argnames(f) for f in vals[2]]
-    A, sorted_vertices = DAG(NamedTuple{keys(kwargs)}(args))    
-    modelinputs = NamedTuple{Tuple(sorted_vertices)}.([vals[1], Tuple.(args), vals[2], vals[3]])
+    A, sorted_vertices = dag(NamedTuple{keys(kwargs)}(args))    
+    modelinputs = NamedTuple{Tuple(sorted_vertices)}.([Tuple.(args), vals...])
     Model(GraphInfo(modelinputs..., A, sorted_vertices))
 end
 
-
 """
-    DAG(inputs)
+    dag(inputs)
 
 Function taking in a NamedTuple containing the inputs to each node 
 and returns the implied adjacency matrix and topologically ordered 
 vertex list.
 """
-function DAG(inputs)
+function dag(inputs)
     input_names = Symbol[keys(inputs)...]
-    println(inputs)
     A = adjacency_matrix(inputs) 
     sorted_vertices = topological_sort_by_dfs(A)
     sorted_A = permute(A, collect(1:length(inputs)), sorted_vertices)
@@ -94,7 +95,7 @@ input, eval and kind, as required by the GraphInfo type.
 @generated function getvals(nt::NamedTuple{T}) where T
     values = [:(nt[$i][$j]) for i in 1:length(T), j in 1:3]
     m = [:($(values[:,i]...), ) for i in 1:3]
-    return :($(m...),)
+    return Expr(:tuple, m...) # :($(m...),)
 end
 
 """
@@ -243,7 +244,7 @@ Base.valtype(m::Model) = eltype(m)
 
 Returns the adjacency matrix of the model as a SparseArray.
 """
-dag(m::Model) = m.g.A
+get_dag(m::Model) = m.g.A
 
 """
     nodes(m::Model)

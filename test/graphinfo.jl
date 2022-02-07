@@ -1,6 +1,7 @@
-using AbstractPPL.GraphPPL
+using AbstractPPL
+import AbstractPPL.GraphPPL: GraphInfo, Model, get_dag
 using SparseArrays
-
+using Test
 ## Example taken from Mamba
 line = Dict{Symbol, Any}(
   :x => [1, 2, 3, 4, 5],
@@ -19,7 +20,7 @@ model = (
 
 # construct the model!
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
-typeof(m)
+
 # test the type of the model is correct
 @test typeof(m) <: Model
 @test typeof(m) == Model{(:s2, :xmat, :β, :μ, :y)}
@@ -28,7 +29,7 @@ typeof(m)
 
 # test the dag is correct
 A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
-@test dag(m) == A
+@test get_dag(m) == A
 
 @test length(m) == 5
 @test eltype(m) == valtype(m)
@@ -58,3 +59,6 @@ single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNorma
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
+
+# test AssertionError thrown for kwargs with the wrong order of inputs
+@test_throws AssertionError Model( μ = ((β) -> 3, 1.0, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))

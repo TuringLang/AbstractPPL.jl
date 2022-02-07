@@ -19,7 +19,6 @@ include("deprecations.jl")
 # GraphInfo
 module GraphPPL
     include("graphinfo.jl")    
-    export GraphInfo, Model, dag, nodes
 end
 
 end # module
