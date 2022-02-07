@@ -21,8 +21,9 @@ model = (
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
 
 # test the type of the model is correct
-@test typeof(m) <: GraphInfo <: AbstractModelTrace
-@test typeof(m) == GraphInfo{(:s2, :xmat, :β, :μ, :y)}
+@test typeof(m) == Model
+@test typeof(m.g) <: GraphInfo <: AbstractModelTrace
+@test typeof(m.g) == GraphInfo{(:s2, :xmat, :β, :μ, :y)}
 
 # test the dag is correct
 A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
@@ -34,11 +35,11 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 # check the values from the NamedTuple match the values in the fields of GraphInfo
 vals = AbstractPPL.getvals(model)
 for (i, field) in enumerate([:value, :eval, :kind])
-    @test eval( :(values(m.$field) == vals[$i]) )
+    @test eval( :(values(m.g.$field) == vals[$i]) )
 end
 
 # test the right inputs have been inferred 
-@test m.input == (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
+@test m.g.input == (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
 
 # test keys are VarNames
 for key in keys(m)
@@ -47,9 +48,9 @@ end
 
 
 # test Model constructor for model with single parent node
-@test typeof(
-        Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
-    ) == GraphInfo{(:μ, :y)}
+single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
+@test typeof(single_parent_m) == Model
+@test typeof(single_parent_m.g) == GraphInfo{(:μ, :y)}
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))

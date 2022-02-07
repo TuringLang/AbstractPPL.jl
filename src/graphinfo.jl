@@ -54,12 +54,17 @@ s2 = (value = 0.0, input = (), eval = var"#5#8"(), kind = :Stochastic)
 y = (value = 0.0, input = (:μ, :s2), eval = var"#7#10"(), kind = :Stochastic)
 ```
 """
+
+struct Model
+    g::GraphInfo
+end
+
 function Model(;kwargs...)
     vals = getvals(NamedTuple(kwargs))
     args = [argnames(f) for f in vals[2]]
     A, sorted_vertices = DAG(NamedTuple{keys(kwargs)}(args))    
     modelinputs = NamedTuple{Tuple(sorted_vertices)}.([vals[1], Tuple.(args), vals[2], vals[3]])
-    GraphInfo(modelinputs..., A, sorted_vertices)
+    Model(GraphInfo(modelinputs..., A, sorted_vertices))
 end
 
 
@@ -134,8 +139,6 @@ function adjacency_matrix(inputs::NamedTuple{nodes}) where {nodes}
     return A
 end
 
-adjacency_matrix(m::GraphInfo) = adjacency_matrix(m.input)
-
 function outneighbors(A::SparseMatrixCSC, u::T) where T <: Int
     #adapted from Graph.jl https://github.com/JuliaGraphs/Graphs.jl/blob/06669054ed470bcfe4b2ad90ed974f2e65c84bb6/src/interface.jl#L302
     inds, _ = findnz(A[:, u])
@@ -185,22 +188,35 @@ Index a Model with a `VarName{p}` lens. Retrieves the `value``, `input`,
 # Examples
 
 ```jl-doctest 
-# add a model 
+julia> using AbstractPPL
+
+julia> m = Model( s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+                   μ = (1.0, () -> 1.0, :Logical), 
+                   y = (0.0, (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic))
+(s2 = Symbol[], μ = Symbol[], y = [:μ, :s2])
+Nodes: 
+μ = (value = 0.0, input = (), eval = var"#43#46"(), kind = :Stochastic)
+s2 = (value = 1.0, input = (), eval = var"#44#47"(), kind = :Logical)
+y = (value = 0.0, input = (:μ, :s2), eval = var"#45#48"(), kind = :Stochastic)
+
 
 julia> m[@varname y]
-(value = 0.0, input = (:μ, :s2), eval = var"#35#38"(), kind = :Stochastic)
-
+(value = 0.0, input = (:μ, :s2), eval = var"#45#48"(), kind = :Stochastic)
 ```
 """
-@generated function Base.getindex(m::GraphInfo, vn::VarName{p}) where {p}
+@generated function Base.getindex(g::GraphInfo, vn::VarName{p}) where {p}
     fns = fieldnames(GraphInfo)[1:4]
     name_lens = Setfield.PropertyLens{p}()
     field_lenses = [Setfield.PropertyLens{f}() for f in fns]
-    values = [:(get(m, Setfield.compose($l, $name_lens, getlens(vn)))) for l in field_lenses]
+    values = [:(get(g, Setfield.compose($l, $name_lens, getlens(vn)))) for l in field_lenses]
     return :(NamedTuple{$(fns)}(($(values...),)))
 end
 
-function Base.show(io::IO, m::GraphInfo)
+function Base.getindex(m::Model, vn::VarName)
+    return m.g[vn]
+end
+
+function Base.show(io::IO, m::Model)
     print(io, "Nodes: \n")
     for node in nodes(m)
         print(io, "$node = ", m[VarName{node}()], "\n")
@@ -208,18 +224,18 @@ function Base.show(io::IO, m::GraphInfo)
 end
 
 
-function Base.iterate(m::GraphInfo, state=1)
-    state > length(nodes(m)) ? nothing : (m[VarName{m.sorted_vertices[state]}()], state+1)
+function Base.iterate(m::Model, state=1)
+    state > length(nodes(m)) ? nothing : (m[VarName{m.g.sorted_vertices[state]}()], state+1)
 end
 
-Base.eltype(m::GraphInfo) = NamedTuple{fieldnames(GraphInfo)[1:4]}
-Base.IteratorEltype(m::GraphInfo) = HasEltype()
+Base.eltype(m::Model) = NamedTuple{fieldnames(GraphInfo)[1:4]}
+Base.IteratorEltype(m::Model) = HasEltype()
 
-Base.keys(m::GraphInfo) = (VarName{n}() for n in m.sorted_vertices)
-Base.values(m::GraphInfo) = Base.Generator(identity, m)
-Base.length(m::GraphInfo) = length(nodes(m))
-Base.keytype(m::GraphInfo) = eltype(keys(m))
-Base.valtype(m::GraphInfo) = eltype(m)
+Base.keys(m::Model) = (VarName{n}() for n in m.g.sorted_vertices)
+Base.values(m::Model) = Base.Generator(identity, m)
+Base.length(m::Model) = length(nodes(m))
+Base.keytype(m::Model) = eltype(keys(m))
+Base.valtype(m::Model) = eltype(m)
 
 
 """
@@ -227,7 +243,7 @@ Base.valtype(m::GraphInfo) = eltype(m)
 
 Returns the adjacency matrix of the model as a SparseArray.
 """
-dag(m::GraphInfo) = m.A
+dag(m::Model) = m.g.A
 
 """
     nodes(m::Model)
@@ -235,4 +251,4 @@ dag(m::GraphInfo) = m.A
 Returns a `Vector{Symbol}` containing the sorted vertices 
 of the DAG. 
 """
-nodes(m::GraphInfo) = m.sorted_vertices
+nodes(m::Model) = m.g.sorted_vertices
