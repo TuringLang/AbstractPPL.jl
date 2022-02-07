@@ -1,4 +1,4 @@
-using AbstractPPL
+using AbstractPPL.GraphPPL
 using SparseArrays
 
 ## Example taken from Mamba
@@ -19,9 +19,10 @@ model = (
 
 # construct the model!
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
-
+typeof(m)
 # test the type of the model is correct
-@test typeof(m) == Model
+@test typeof(m) <: Model
+@test typeof(m) == Model{(:s2, :xmat, :β, :μ, :y)}
 @test typeof(m.g) <: GraphInfo <: AbstractModelTrace
 @test typeof(m.g) == GraphInfo{(:s2, :xmat, :β, :μ, :y)}
 
@@ -33,7 +34,7 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test eltype(m) == valtype(m)
 
 # check the values from the NamedTuple match the values in the fields of GraphInfo
-vals = AbstractPPL.getvals(model)
+vals = AbstractPPL.GraphPPL.getvals(model)
 for (i, field) in enumerate([:value, :eval, :kind])
     @test eval( :( values(m.g.$field) == vals[$i] ) )
 end
@@ -52,7 +53,7 @@ end
 
 # test Model constructor for model with single parent node
 single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
-@test typeof(single_parent_m) == Model
+@test typeof(single_parent_m) == Model{(:μ, :y)}
 @test typeof(single_parent_m.g) == GraphInfo{(:μ, :y)}
 
 # test ErrorException for parent node not found
