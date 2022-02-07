@@ -55,8 +55,8 @@ y = (value = 0.0, input = (:μ, :s2), eval = var"#7#10"(), kind = :Stochastic)
 ```
 """
 
-struct Model
-    g::GraphInfo
+struct Model{T}
+    g::GraphInfo{T}
 end
 
 function Model(;kwargs...)

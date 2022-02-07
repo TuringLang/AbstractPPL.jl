@@ -35,7 +35,11 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 # check the values from the NamedTuple match the values in the fields of GraphInfo
 vals = AbstractPPL.getvals(model)
 for (i, field) in enumerate([:value, :eval, :kind])
-    @test eval( :(values(m.g.$field) == vals[$i]) )
+    @test eval( :( values(m.g.$field) == vals[$i] ) )
+end
+
+for node in m 
+    @test typeof(node) <: NamedTuple{fieldnames(GraphInfo)[1:4]}
 end
 
 # test the right inputs have been inferred 
@@ -45,7 +49,6 @@ end
 for key in keys(m)
     @test typeof(key) <: VarName
 end
-
 
 # test Model constructor for model with single parent node
 single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
