@@ -425,14 +425,12 @@ end
 
 ConcretizedSlice(s::Base.Slice{R}) where {R} = ConcretizedSlice{eltype(s.indices), R}(s.indices)
 Base.show(io::IO, s::ConcretizedSlice) = print(io, ":")
-Base.show(io::IO, ::MIME"text/plain", s::ConcretizedSlice) = print(io, "ConcretizedSlice($(s.range))")
-Base.IteratorEltype(::Type{<:ConcretizedSlice}) = Base.HasEltype()
-Base.eltype(s::ConcretizedSlice{T}) where {T} = T
-Base.IteratorSize(::Type{<:ConcretizedSlice}) = Base.HasLength()
-Base.length(s::ConcretizedSlice) = length(s.range)
+Base.show(io::IO, ::MIME"text/plain", s::ConcretizedSlice) =
+    print(io, "ConcretizedSlice(", s.range, ")")
 Base.size(s::ConcretizedSlice) = size(s.range)
 Base.iterate(s::ConcretizedSlice, state...) = Base.iterate(s.range, state...)
 Base.collect(s::ConcretizedSlice) = collect(s.range)
+Base.getindex(s::ConcretizedSlice, i) = s.range[i]
 Base.hasfastin(::Type{<:ConcretizedSlice}) = true
 Base.in(i, s::ConcretizedSlice) = i in s.range
 
