@@ -169,7 +169,7 @@ _print_application(io::IO, l::IndexLens) =
 # `concretize` anyways.
 _print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
 
-prettify_index(x) = string(x)
+prettify_index(x) = repr(x)
 prettify_index(::Colon) = ":"
 
 """
