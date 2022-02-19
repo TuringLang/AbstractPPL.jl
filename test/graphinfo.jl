@@ -1,7 +1,7 @@
 using AbstractPPL
 import AbstractPPL.GraphPPL: GraphInfo, Model, get_dag
 using SparseArrays
-using Test
+
 ## Example taken from Mamba
 line = Dict{Symbol, Any}(
   :x => [1, 2, 3, 4, 5],
@@ -36,8 +36,11 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 
 # check the values from the NamedTuple match the values in the fields of GraphInfo
 vals = AbstractPPL.GraphPPL.getvals(model)
-for (i, field) in enumerate([:value, :eval, :kind])
-    @test eval( :( values(m.g.$field) == vals[$i] ) )
+for (i, v) in enumerate(vals[1])
+    @test values(m.g.value[i])[] == Ref(v)[]
+end
+for (i, field) in enumerate([:eval, :kind])
+    @test eval( :( values(m.g.$field) == vals[$i + 1] ) )
 end
 
 for node in m 
