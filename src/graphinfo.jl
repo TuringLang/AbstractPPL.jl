@@ -63,7 +63,8 @@ function Model(;kwargs...)
     for (i, node) in enumerate(values(kwargs))
         @assert typeof(node) <: Tuple{Union{Array{Float64}, Float64}, Function, Symbol} "Check input order for node $(i) matches Tuple(value, function, kind)"
     end
-    vals = getvals(NamedTuple(kwargs))
+    vals = [getvals(NamedTuple(kwargs))...]
+    vals[1] = Tuple([Ref(Tuple(val)) for val in vals[1]])
     args = [argnames(f) for f in vals[2]]
     A, sorted_vertices = dag(NamedTuple{keys(kwargs)}(args))    
     modelinputs = NamedTuple{Tuple(sorted_vertices)}.([Tuple.(args), vals...])
@@ -215,6 +216,11 @@ end
 
 function Base.getindex(m::Model, vn::VarName)
     return m.g[vn]
+end
+
+function Base.setindex!(m::Model, val::T, ind::VarName) where T
+    @assert typeof(m[ind].value[]) == T
+    m[ind].value[] = val
 end
 
 function Base.show(io::IO, m::Model)
