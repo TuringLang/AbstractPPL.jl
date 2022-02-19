@@ -37,7 +37,7 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 # check the values from the NamedTuple match the values in the fields of GraphInfo
 vals = AbstractPPL.GraphPPL.getvals(model)
 for (i, v) in enumerate(vals[1])
-    @test values(m.g.value[i])[] == Ref(v)[]
+    @test values(m.g.value[i])[] == Tuple(Ref(v)[])
 end
 for (i, field) in enumerate([:eval, :kind])
     @test eval( :( values(m.g.$field) == vals[$i + 1] ) )
@@ -59,6 +59,12 @@ end
 single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
 @test typeof(single_parent_m) == Model{(:μ, :y)}
 @test typeof(single_parent_m.g) == GraphInfo{(:μ, :y)}
+
+# test setindex
+@test_throws AssertionError m[@varname s2] = 0.0
+@test_throws AssertionError m[@varname s2] = (1.0)
+m[@varname s2] = (1.0, 1.0)
+@test m[@varname s2].value[] == (1.0,1.0)
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
