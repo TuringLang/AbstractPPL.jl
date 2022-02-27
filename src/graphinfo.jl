@@ -64,7 +64,7 @@ function Model(;kwargs...)
         @assert typeof(node) <: Tuple{Union{Array{Float64}, Float64}, Function, Symbol} "Check input order for node $(i) matches Tuple(value, function, kind)"
     end
     vals = [getvals(NamedTuple(kwargs))...]
-    vals[1] = Tuple([Ref(Tuple(val)) for val in vals[1]])
+    vals[1] = Tuple([Ref(val) for val in vals[1]])
     args = [argnames(f) for f in vals[2]]
     A, sorted_vertices = dag(NamedTuple{keys(kwargs)}(args))    
     modelinputs = NamedTuple{Tuple(sorted_vertices)}.([Tuple.(args), vals...])
