@@ -1,3 +1,9 @@
+""" 
+    AbstractContext
+
+Common base type for evaluation contexts.
+"""
+abstract type AbstractContext end
 
 """ 
 evaluate!!
