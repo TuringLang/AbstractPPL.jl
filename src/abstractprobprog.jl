@@ -67,12 +67,3 @@ function condition end
 Common base type for evaluation contexts.
 """
 abstract type AbstractContext end
-
-
-""" 
-    evaluate!!
-
-Sample from the `model` using the `sampler` with random number generator `rng` and the
-`context`, and store the sample and log joint probability in `varinfo`.
-"""
-function evaluate!! end
