@@ -218,9 +218,9 @@ function Base.getindex(m::Model, vn::VarName)
     return m.g[vn]
 end
 
-function Base.setindex!(m::Model, val::T, ind::VarName) where T
+function setvalue!(m::Model, ind::VarName, value::T) where T
     @assert typeof(m[ind].value[]) == T
-    m[ind].value[] = val
+    m[ind].value[] = value
 end
 
 function Base.show(io::IO, m::Model)
