@@ -60,10 +60,3 @@ m = decondition(condition(m, obs))
 should hold for generative models `m` and arbitrary `obs`.
 """
 function condition end
-
-""" 
-    AbstractContext
-
-Common base type for evaluation contexts.
-"""
-abstract type AbstractContext end
