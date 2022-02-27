@@ -64,7 +64,7 @@ function condition end
 """ 
     AbstractContext
 
-Common base type for Contexts used for dispatching.
+Common base type for evaluation contexts.
 """
 abstract type AbstractContext end
 
