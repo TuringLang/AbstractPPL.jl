@@ -61,7 +61,7 @@ end
 
 function Model(;kwargs...)
     for (i, node) in enumerate(values(kwargs))
-        @assert typeof(node) <: Tuple{Union{Array{Float64}, Float64}, Function, Symbol} "Check input order for node $(i) matches Tuple(value, function, kind)"
+        @assert node isa Tuple{Union{Array{Float64}, Float64}, Function, Symbol} "Check input order for node $(i) matches Tuple(value, function, kind)"
     end
     vals = [getvals(NamedTuple(kwargs))...]
     vals[1] = Tuple([Ref(val) for val in vals[1]])

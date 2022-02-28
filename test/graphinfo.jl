@@ -17,7 +17,6 @@ model = (
     μ = (zeros(5), (xmat, β) -> xmat * β, :Logical), 
     y = (zeros(5), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
-
 # construct the model!
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
 
