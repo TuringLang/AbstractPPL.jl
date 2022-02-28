@@ -14,6 +14,7 @@ export AbstractModelTrace
 include("varname.jl")
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
+include("evaluate.jl")
 include("deprecations.jl")
 
 # GraphInfo
