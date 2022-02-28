@@ -40,7 +40,7 @@ for (i, v) in enumerate(vals[1])
     @test values(m.g.value[i])[] == Ref(v)[]
 end
 for (i, field) in enumerate([:eval, :kind])
-    @test eval( :( values(m.g.$field) == vals[$i + 1] ) )
+    @test values(getproperty(m.g, field)) == vals[i + 1] 
 end
 
 for node in m 
