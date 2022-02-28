@@ -63,7 +63,7 @@ single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNorma
 # test setindex
 
 @test_throws AssertionError setvalue!(m, @varname(s2), 0.0)
-@test_throws AssertionError setvalue!(m, @varname(s2), (1.0))
+@test_throws AssertionError setvalue!(m, @varname(s2), (1.0,))
 setvalue!(m, @varname(s2), [1.0, 1.0])
 @test m[@varname s2].value[] == [1.0,1.0]
 
