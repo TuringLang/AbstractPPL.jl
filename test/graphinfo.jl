@@ -34,7 +34,8 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test eltype(m) == valtype(m)
 
 # check the values from the NamedTuple match the values in the fields of GraphInfo
-vals = AbstractPPL.GraphPPL.getvals(model)
+vals = AbstractPPL.GraphPPL.getvals(model[(:s2, :xmat, :β, :μ, :y)])
+
 for (i, v) in enumerate(vals[1])
     @test values(m.g.value[i])[] == Ref(v)[]
 end
@@ -61,10 +62,10 @@ single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNorma
 
 # test setindex
 
-@test_throws AssertionError setvalue!(m, @varname(s2), 0.0)
+@test_throws AssertionError setvalue!(m, @varname(s2), [0.0])
 @test_throws AssertionError setvalue!(m, @varname(s2), (1.0,))
-setvalue!(m, @varname(s2), [1.0, 1.0])
-@test m[@varname s2].value[] == [1.0,1.0]
+setvalue!(m, @varname(s2), 1.0)
+@test m[@varname s2].value[] == 1.0
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))

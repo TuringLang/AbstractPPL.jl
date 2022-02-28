@@ -63,12 +63,15 @@ function Model(;kwargs...)
     for (i, node) in enumerate(values(kwargs))
         @assert node isa Tuple{Union{Array{Float64}, Float64}, Function, Symbol} "Check input order for node $(i) matches Tuple(value, function, kind)"
     end
+    node_keys = keys(kwargs)
     vals = [getvals(NamedTuple(kwargs))...]
     vals[1] = Tuple([Ref(val) for val in vals[1]])
     args = [argnames(f) for f in vals[2]]
-    A, sorted_vertices = dag(NamedTuple{keys(kwargs)}(args))    
-    modelinputs = NamedTuple{Tuple(sorted_vertices)}.([Tuple.(args), vals...])
-    Model(GraphInfo(modelinputs..., A, sorted_vertices))
+    A, sorted_inds = dag(NamedTuple{node_keys}(args))    
+    sorted_vertices = node_keys[sorted_inds]
+    model_inputs = NamedTuple{node_keys}.([Tuple.(args), vals...])
+    sorted_model_inputs = [m[sorted_vertices] for m in model_inputs]
+    Model(GraphInfo(sorted_model_inputs..., A, [sorted_vertices...]))
 end
 
 """
@@ -83,7 +86,7 @@ function dag(inputs)
     A = adjacency_matrix(inputs) 
     sorted_vertices = topological_sort_by_dfs(A)
     sorted_A = permute(A, collect(1:length(inputs)), sorted_vertices)
-    sorted_A, input_names[sorted_vertices]
+    sorted_A, sorted_vertices
 end
 
 """
