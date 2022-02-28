@@ -1,5 +1,5 @@
 using AbstractPPL
-import AbstractPPL.GraphPPL: GraphInfo, Model, get_dag, setvalue!
+import AbstractPPL.GraphPPL: GraphInfo, Model, get_dag, setvalue!, getvalue
 using SparseArrays
 
 ## Example taken from Mamba
@@ -65,7 +65,7 @@ single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNorma
 @test_throws AssertionError setvalue!(m, @varname(s2), [0.0])
 @test_throws AssertionError setvalue!(m, @varname(s2), (1.0,))
 setvalue!(m, @varname(s2), 1.0)
-@test m[@varname s2].value[] == 1.0
+@test getvalue(m, @varname s2) == 1.0
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))

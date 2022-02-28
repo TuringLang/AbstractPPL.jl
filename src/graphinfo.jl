@@ -226,6 +226,10 @@ function setvalue!(m::Model, ind::VarName, value::T) where T
     m[ind].value[] = value
 end
 
+function getvalue(m::Model, ind::VarName)
+    m[ind].value[]
+end
+
 function Base.show(io::IO, m::Model)
     print(io, "Nodes: \n")
     for node in nodes(m)
