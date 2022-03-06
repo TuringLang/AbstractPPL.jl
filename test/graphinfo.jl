@@ -41,6 +41,7 @@ vals, evals, kinds = AbstractPPL.GraphPPL.getvals(model[Tuple(sorted_vertices)])
 inputs = (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
 
 for (i, vn) in enumerate(keys(m))
+    @test vn isa VarName
     @test get_node_value(m, vn) == vals[i]
     @test get_node_eval(m, vn) == evals[i]
     @test get_node_kind(m, vn) == kinds[i]
@@ -49,11 +50,6 @@ end
 
 for node in m 
     @test typeof(node) <: NamedTuple{fieldnames(GraphInfo)[1:4]}
-end
-
-# test keys are VarNames
-for key in keys(m)
-    @test typeof(key) <: VarName
 end
 
 # test Model constructor for model with single parent node
