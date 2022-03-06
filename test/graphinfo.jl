@@ -1,5 +1,7 @@
 using AbstractPPL
-import AbstractPPL.GraphPPL: GraphInfo, Model, get_dag, setvalue!, getvalue
+import AbstractPPL.GraphPPL:GraphInfo, Model, get_dag, set_node_value!, 
+                            get_node_value, get_sorted_vertices, get_node_eval,
+                            get_node_kind, get_node_input
 using SparseArrays
 
 ## Example taken from Mamba
@@ -22,9 +24,10 @@ m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constr
 
 # test the type of the model is correct
 @test typeof(m) <: Model
-@test typeof(m) == Model{(:s2, :xmat, :β, :μ, :y)}
+sorted_vertices = get_sorted_vertices(m)
+@test typeof(m) == Model{Tuple(sorted_vertices)}
 @test typeof(m.g) <: GraphInfo <: AbstractModelTrace
-@test typeof(m.g) == GraphInfo{(:s2, :xmat, :β, :μ, :y)}
+@test typeof(m.g) == GraphInfo{Tuple(sorted_vertices)}
 
 # test the dag is correct
 A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
@@ -34,21 +37,19 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test eltype(m) == valtype(m)
 
 # check the values from the NamedTuple match the values in the fields of GraphInfo
-vals = AbstractPPL.GraphPPL.getvals(model[(:s2, :xmat, :β, :μ, :y)])
+vals, evals, kinds = AbstractPPL.GraphPPL.getvals(model[Tuple(sorted_vertices)])
+inputs = (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
 
-for (i, v) in enumerate(vals[1])
-    @test values(m.g.value[i])[] == Ref(v)[]
-end
-for (i, field) in enumerate([:eval, :kind])
-    @test values(getproperty(m.g, field)) == vals[i + 1] 
+for (i, vn) in enumerate(keys(m))
+    @test get_node_value(m, vn) == vals[i]
+    @test get_node_eval(m, vn) == evals[i]
+    @test get_node_kind(m, vn) == kinds[i]
+    @test get_node_input(m, vn) == inputs[i]
 end
 
 for node in m 
     @test typeof(node) <: NamedTuple{fieldnames(GraphInfo)[1:4]}
 end
-
-# test the right inputs have been inferred 
-@test m.g.input == (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
 
 # test keys are VarNames
 for key in keys(m)
@@ -62,10 +63,10 @@ single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNorma
 
 # test setindex
 
-@test_throws AssertionError setvalue!(m, @varname(s2), [0.0])
-@test_throws AssertionError setvalue!(m, @varname(s2), (1.0,))
-setvalue!(m, @varname(s2), 1.0)
-@test getvalue(m, @varname s2) == 1.0
+@test_throws AssertionError set_node_value!(m, @varname(s2), [0.0])
+@test_throws AssertionError set_node_value!(m, @varname(s2), (1.0,))
+set_node_value!(m, @varname(s2), 1.0)
+@test get_node_value(m, @varname s2) == 1.0
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))

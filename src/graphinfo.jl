@@ -184,6 +184,7 @@ function topological_sort_by_dfs(A)
     return reverse(verts)
 end
 
+# getters and setters
 """
     Base.getindex(m::Model, vn::VarName{p})
 
@@ -221,39 +222,23 @@ function Base.getindex(m::Model, vn::VarName)
     return m.g[vn]
 end
 
-function setvalue!(m::Model, ind::VarName, value::T) where T
+function set_node_value!(m::Model, ind::VarName, value::T) where T
     @assert typeof(m[ind].value[]) == T
     m[ind].value[] = value
 end
 
-function getvalue(m::Model, ind::VarName)
-    m[ind].value[]
+function get_node_value(m::Model, ind::VarName) 
+    v = getproperty(m[ind], :value)
+    v[]
 end
+#Base.get(m::Model, ind::VarName, field::Symbol) = field==:value ? getvalue(m, ind) : getproperty(m[ind],field)
 
-function Base.show(io::IO, m::Model)
-    print(io, "Nodes: \n")
-    for node in nodes(m)
-        print(io, "$node = ", m[VarName{node}()], "\n")
-    end
-end
-
-
-function Base.iterate(m::Model, state=1)
-    state > length(nodes(m)) ? nothing : (m[VarName{m.g.sorted_vertices[state]}()], state+1)
-end
-
-Base.eltype(m::Model) = NamedTuple{fieldnames(GraphInfo)[1:4]}
-Base.IteratorEltype(m::Model) = HasEltype()
-
-Base.keys(m::Model) = (VarName{n}() for n in m.g.sorted_vertices)
-Base.values(m::Model) = Base.Generator(identity, m)
-Base.length(m::Model) = length(nodes(m))
-Base.keytype(m::Model) = eltype(keys(m))
-Base.valtype(m::Model) = eltype(m)
-
+get_node_input(m::Model, ind::VarName) = getproperty(m[ind], :input)
+get_node_eval(m::Model, ind::VarName) = getproperty(m[ind], :eval)
+get_node_kind(m::Model, ind::VarName) = getproperty(m[ind], :kind)
 
 """
-    dag(m::Model)
+    get_dag(m::Model)
 
 Returns the adjacency matrix of the model as a SparseArray.
 """
@@ -265,4 +250,27 @@ get_dag(m::Model) = m.g.A
 Returns a `Vector{Symbol}` containing the sorted vertices 
 of the DAG. 
 """
-nodes(m::Model) = m.g.sorted_vertices
+get_sorted_vertices(m::Model) = getproperty(m.g, :sorted_vertices)
+
+# iterators
+
+function Base.iterate(m::Model, state=1)
+    state > length(get_sorted_vertices(m)) ? nothing : (m[VarName{m.g.sorted_vertices[state]}()], state+1)
+end
+
+Base.eltype(m::Model) = NamedTuple{fieldnames(GraphInfo)[1:4]}
+Base.IteratorEltype(m::Model) = HasEltype()
+
+Base.keys(m::Model) = (VarName{n}() for n in m.g.sorted_vertices)
+Base.values(m::Model) = Base.Generator(identity, m)
+Base.length(m::Model) = length(get_sorted_vertices(m))
+Base.keytype(m::Model) = eltype(keys(m))
+Base.valtype(m::Model) = eltype(m)
+
+# show methods
+function Base.show(io::IO, m::Model)
+    print(io, "Nodes: \n")
+    for node in get_sorted_vertices(m)
+        print(io, "$node = ", m[VarName{node}()], "\n")
+    end
+end
