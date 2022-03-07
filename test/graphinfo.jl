@@ -1,7 +1,7 @@
 using AbstractPPL
 import AbstractPPL.GraphPPL:GraphInfo, Model, get_dag, set_node_value!, 
                             get_node_value, get_sorted_vertices, get_node_eval,
-                            get_node_kind, get_node_input
+                            get_nodekind, get_node_input
 using SparseArrays
 
 ## Example taken from Mamba
