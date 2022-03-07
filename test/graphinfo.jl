@@ -19,6 +19,7 @@ model = (
     μ = (zeros(5), (xmat, β) -> xmat * β, :Logical), 
     y = (zeros(5), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
+
 # construct the model!
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
 
@@ -44,7 +45,7 @@ for (i, vn) in enumerate(keys(m))
     @test vn isa VarName
     @test get_node_value(m, vn) == vals[i]
     @test get_node_eval(m, vn) == evals[i]
-    @test get_node_kind(m, vn) == kinds[i]
+    @test get_nodekind(m, vn) == kinds[i]
     @test get_node_input(m, vn) == inputs[i]
 end
 

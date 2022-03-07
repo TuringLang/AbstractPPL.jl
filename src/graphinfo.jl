@@ -82,7 +82,6 @@ and returns the implied adjacency matrix and topologically ordered
 vertex list.
 """
 function dag(inputs)
-    input_names = Symbol[keys(inputs)...]
     A = adjacency_matrix(inputs) 
     sorted_vertices = topological_sort_by_dfs(A)
     sorted_A = permute(A, collect(1:length(inputs)), sorted_vertices)
@@ -99,7 +98,7 @@ input, eval and kind, as required by the GraphInfo type.
 @generated function getvals(nt::NamedTuple{T}) where T
     values = [:(nt[$i][$j]) for i in 1:length(T), j in 1:3]
     m = [:($(values[:,i]...), ) for i in 1:3]
-    return Expr(:tuple, m...) # :($(m...),)
+    return Expr(:tuple, m...)
 end
 
 """
@@ -222,10 +221,54 @@ function Base.getindex(m::Model, vn::VarName)
     return m.g[vn]
 end
 
+"""
+    set_node_value!(m::Model, ind::VarName, value::T) where Takes
+
+Change the value of the node. 
+
+# Examples
+
+```jl-doctest
+julia> m = Model( s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+                         μ = (1.0, () -> 1.0, :Logical), 
+                         y = (0.0, (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic))
+Nodes: 
+μ = (input = (), value = Base.RefValue{Float64}(1.0), eval = var"#38#41"(), kind = :Logical)
+s2 = (input = (), value = Base.RefValue{Float64}(0.0), eval = var"#37#40"(), kind = :Stochastic)
+y = (input = (:μ, :s2), value = Base.RefValue{Float64}(0.0), eval = var"#39#42"(), kind = :Stochastic)
+
+
+julia> set_node_value!(m, @varname(s2), 1.0)
+1.0
+
+julia> get_node_value(m, @varname s2)
+1.0
+```
+"""
 function set_node_value!(m::Model, ind::VarName, value::T) where T
     @assert typeof(m[ind].value[]) == T
     m[ind].value[] = value
 end
+
+"""
+    get_node_value(m::Model, ind::VarName)
+
+Retrieve the value of a particular node, indexed by a VarName.
+
+# Examples
+
+julia> m = Model( s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+                         μ = (1.0, () -> 1.0, :Logical), 
+                         y = (0.0, (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic))
+Nodes: 
+μ = (input = (), value = Base.RefValue{Float64}(1.0), eval = var"#44#47"(), kind = :Logical)
+s2 = (input = (), value = Base.RefValue{Float64}(0.0), eval = var"#43#46"(), kind = :Stochastic)
+y = (input = (:μ, :s2), value = Base.RefValue{Float64}(0.0), eval = var"#45#48"(), kind = :Stochastic)
+
+
+julia> get_node_value(m, @varname s2)
+0.0
+"""
 
 function get_node_value(m::Model, ind::VarName) 
     v = getproperty(m[ind], :value)
@@ -233,9 +276,26 @@ function get_node_value(m::Model, ind::VarName)
 end
 #Base.get(m::Model, ind::VarName, field::Symbol) = field==:value ? getvalue(m, ind) : getproperty(m[ind],field)
 
+"""
+    get_node_input(m::Model, ind::VarName)
+
+Retrieve the inputs/parents of a node, as given by model DAG.
+"""
 get_node_input(m::Model, ind::VarName) = getproperty(m[ind], :input)
+
+"""
+    get_node_input(m::Model, ind::VarName)
+
+Retrieve the evaluation function for a node. 
+"""
 get_node_eval(m::Model, ind::VarName) = getproperty(m[ind], :eval)
-get_node_kind(m::Model, ind::VarName) = getproperty(m[ind], :kind)
+
+"""
+    get_nodekind(m::Model, ind::VarName)
+
+Retrieve the type of the node, i.e. stochastic or logical. 
+"""
+get_nodekind(m::Model, ind::VarName) = getproperty(m[ind], :kind)
 
 """
     get_dag(m::Model)
@@ -245,7 +305,7 @@ Returns the adjacency matrix of the model as a SparseArray.
 get_dag(m::Model) = m.g.A
 
 """
-    nodes(m::Model)
+    get_sorted_vertices(m::Model)
 
 Returns a `Vector{Symbol}` containing the sorted vertices 
 of the DAG. 
