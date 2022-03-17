@@ -38,7 +38,7 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test eltype(m) == valtype(m)
 
 # check the values from the NamedTuple match the values in the fields of GraphInfo
-vals, evals, kinds = AbstractPPL.GraphPPL.getvals(model[Tuple(sorted_vertices)])
+vals, evals, kinds = AbstractPPL.GraphPPL.getvals(NamedTuple{Tuple(sorted_vertices)}(model))
 inputs = (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
 
 for (i, vn) in enumerate(keys(m))

@@ -70,7 +70,7 @@ function Model(;kwargs...)
     A, sorted_inds = dag(NamedTuple{node_keys}(args))    
     sorted_vertices = node_keys[sorted_inds]
     model_inputs = NamedTuple{node_keys}.([Tuple.(args), vals...])
-    sorted_model_inputs = [m[sorted_vertices] for m in model_inputs]
+    sorted_model_inputs = [NamedTuple{sorted_vertices}(m) for m in model_inputs]
     Model(GraphInfo(sorted_model_inputs..., A, [sorted_vertices...]))
 end
 
