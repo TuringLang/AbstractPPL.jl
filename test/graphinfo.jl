@@ -1,7 +1,9 @@
 using AbstractPPL
-import AbstractPPL.GraphPPL: GraphInfo, Model, get_dag
+import AbstractPPL.GraphPPL:GraphInfo, Model, get_dag, set_node_value!, 
+                            get_node_value, get_sorted_vertices, get_node_eval,
+                            get_nodekind, get_node_input
 using SparseArrays
-using Test
+
 ## Example taken from Mamba
 line = Dict{Symbol, Any}(
   :x => [1, 2, 3, 4, 5],
@@ -23,9 +25,10 @@ m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constr
 
 # test the type of the model is correct
 @test typeof(m) <: Model
-@test typeof(m) == Model{(:s2, :xmat, :β, :μ, :y)}
+sorted_vertices = get_sorted_vertices(m)
+@test typeof(m) == Model{Tuple(sorted_vertices)}
 @test typeof(m.g) <: GraphInfo <: AbstractModelTrace
-@test typeof(m.g) == GraphInfo{(:s2, :xmat, :β, :μ, :y)}
+@test typeof(m.g) == GraphInfo{Tuple(sorted_vertices)}
 
 # test the dag is correct
 A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
@@ -35,27 +38,32 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test eltype(m) == valtype(m)
 
 # check the values from the NamedTuple match the values in the fields of GraphInfo
-vals = AbstractPPL.GraphPPL.getvals(model)
-for (i, field) in enumerate([:value, :eval, :kind])
-    @test eval( :( values(m.g.$field) == vals[$i] ) )
+vals, evals, kinds = AbstractPPL.GraphPPL.getvals(NamedTuple{Tuple(sorted_vertices)}(model))
+inputs = (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
+
+for (i, vn) in enumerate(keys(m))
+    @test vn isa VarName
+    @test get_node_value(m, vn) == vals[i]
+    @test get_node_eval(m, vn) == evals[i]
+    @test get_nodekind(m, vn) == kinds[i]
+    @test get_node_input(m, vn) == inputs[i]
 end
 
 for node in m 
     @test typeof(node) <: NamedTuple{fieldnames(GraphInfo)[1:4]}
 end
 
-# test the right inputs have been inferred 
-@test m.g.input == (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
-
-# test keys are VarNames
-for key in keys(m)
-    @test typeof(key) <: VarName
-end
-
 # test Model constructor for model with single parent node
 single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
 @test typeof(single_parent_m) == Model{(:μ, :y)}
 @test typeof(single_parent_m.g) == GraphInfo{(:μ, :y)}
+
+# test setindex
+
+@test_throws AssertionError set_node_value!(m, @varname(s2), [0.0])
+@test_throws AssertionError set_node_value!(m, @varname(s2), (1.0,))
+set_node_value!(m, @varname(s2), 1.0)
+@test get_node_value(m, @varname s2) == 1.0
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
