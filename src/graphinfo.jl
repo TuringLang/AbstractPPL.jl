@@ -274,6 +274,16 @@ function get_node_value(m::Model, ind::VarName)
     v = getproperty(m[ind], :value)
     v[]
 end
+
+function get_node_value(m::Model, ind::NTuple{N, Symbol}) where N
+    # [get_node_value(m, VarName{S}()) for S in ind]
+    values = Vector{Union{Float64, Array{Float64}}}()
+    for i in ind
+        push!(values, get_node_value(m, VarName{i}()))
+    end
+    values
+end
+
 #Base.get(m::Model, ind::VarName, field::Symbol) = field==:value ? getvalue(m, ind) : getproperty(m[ind],field)
 
 """
@@ -319,7 +329,7 @@ function Base.iterate(m::Model, state=1)
 end
 
 Base.eltype(m::Model) = NamedTuple{fieldnames(GraphInfo)[1:4]}
-Base.IteratorEltype(m::Model) = HasEltype()
+Base.IteratorEltype(m::Model) = Base.HasEltype()
 
 Base.keys(m::Model) = (VarName{n}() for n in m.g.sorted_vertices)
 Base.values(m::Model) = Base.Generator(identity, m)
