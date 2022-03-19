@@ -344,3 +344,20 @@ function Base.show(io::IO, m::Model)
         print(io, "$node = ", m[VarName{node}()], "\n")
     end
 end
+
+# Sampling 
+function rand!(m::AbstractPPL.GraphPPL.Model)
+    for vn in keys(m)
+        input, _, f, kind = m[vn]
+        input_values = get_node_value(m, input)
+        if kind == :Stochastic
+            set_node_value!(m, vn, rand(f(input_values...)))
+        else
+            set_node_value!(m, vn, f(input_values...))
+        end
+    end
+end
+
+# function AbstractMCMC.step(m::Model, ctx::AbstractContext)
+#     evaluate!!(m, m.g, ctx)
+# end
