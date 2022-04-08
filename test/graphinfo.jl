@@ -9,16 +9,20 @@ line = Dict{Symbol, Any}(
   :x => [1, 2, 3, 4, 5],
   :y => [1, 3, 3, 3, 5]
 )
+
 line[:xmat] = [ones(5) line[:x]]
 
 # just making it a NamedTuple so that the values can be tested later. Constructor should be used as Model(;kwargs...).
 model = (
     β = (zeros(2), () -> MvNormal(2, sqrt(1000)), :Stochastic),
     xmat = (line[:xmat], () -> line[:xmat], :Logical), 
-    s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+    s2 = (1.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
     μ = (zeros(5), (xmat, β) -> xmat * β, :Logical), 
     y = (zeros(5), (μ, s2) -> MvNormal(μ, sqrt(s2)), :Stochastic)
 )
+
+# better handling of stochastic and logical nodes. 
+# Automatically set logistic nodes initial values to their deterministic values.
 
 # construct the model!
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
@@ -62,8 +66,8 @@ single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNorma
 
 @test_throws AssertionError set_node_value!(m, @varname(s2), [0.0])
 @test_throws AssertionError set_node_value!(m, @varname(s2), (1.0,))
-set_node_value!(m, @varname(s2), 1.0)
-@test get_node_value(m, @varname s2) == 1.0
+set_node_value!(m, @varname(s2), 2.0)
+@test get_node_value(m, @varname s2) == 2.0
 
 # test ErrorException for parent node not found
 @test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))

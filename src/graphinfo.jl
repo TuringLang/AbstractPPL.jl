@@ -3,6 +3,9 @@ import Base.getindex
 using SparseArrays
 using Setfield
 using Setfield: PropertyLens, get
+using DensityInterface
+import AbstractMCMC
+using Random
 
 """
     GraphInfo
@@ -346,18 +349,27 @@ function Base.show(io::IO, m::Model)
 end
 
 # Sampling 
-function rand!(m::AbstractPPL.GraphPPL.Model)
+# pass in RNG as first argument
+# return values instead of the model
+# make non-mutating
+function Random.rand!(rng::AbstractRNG, m::AbstractPPL.GraphPPL.Model{T}) where T
     for vn in keys(m)
         input, _, f, kind = m[vn]
         input_values = get_node_value(m, input)
         if kind == :Stochastic
-            set_node_value!(m, vn, rand(f(input_values...)))
+            set_node_value!(m, vn, rand(rng, f(input_values...)))
         else
             set_node_value!(m, vn, f(input_values...))
         end
     end
 end
 
-# function AbstractMCMC.step(m::Model, ctx::AbstractContext)
-#     evaluate!!(m, m.g, ctx)
-# end
+function Random.rand!(m::AbstractPPL.GraphPPL.Model{T}) where T
+    rand!(Random.GLOBAL_RNG, m)
+end
+
+function Random.rand(rng::AbstractRNG, m::Random.SamplerTrivial{Model{T}}) where T 
+    new_m = deepcopy(m[])
+    rand!(rng, new_m)
+    new_m
+end
