@@ -274,7 +274,7 @@ julia> get_node_value(m, @varname s2)
 """
 
 function get_node_value(m::Model, ind::VarName) 
-    v = getproperty(m[ind], :value)
+    v = get(m[ind], @lens _.value)
     v[]
 end
 
@@ -287,28 +287,33 @@ function get_node_value(m::Model, ind::NTuple{N, Symbol}) where N
     values
 end
 
-#Base.get(m::Model, ind::VarName, field::Symbol) = field==:value ? getvalue(m, ind) : getproperty(m[ind],field)
+"""
+    get_model_values(m::Model)
+"""
+function get_model_values(m::Model{T}) where T
+    get_node_value(m, T)
+end
 
 """
     get_node_input(m::Model, ind::VarName)
 
 Retrieve the inputs/parents of a node, as given by model DAG.
 """
-get_node_input(m::Model, ind::VarName) = getproperty(m[ind], :input)
+get_node_input(m::Model, ind::VarName) = get(m[ind], @lens _.input)
 
 """
     get_node_input(m::Model, ind::VarName)
 
 Retrieve the evaluation function for a node. 
 """
-get_node_eval(m::Model, ind::VarName) = getproperty(m[ind], :eval)
+get_node_eval(m::Model, ind::VarName) = get(m[ind], @lens _.eval)
 
 """
     get_nodekind(m::Model, ind::VarName)
 
 Retrieve the type of the node, i.e. stochastic or logical. 
 """
-get_nodekind(m::Model, ind::VarName) = getproperty(m[ind], :kind)
+get_nodekind(m::Model, ind::VarName) = get(m[ind], @lens _.kind)
 
 """
     get_dag(m::Model)
@@ -323,7 +328,7 @@ get_dag(m::Model) = m.g.A
 Returns a `Vector{Symbol}` containing the sorted vertices 
 of the DAG. 
 """
-get_sorted_vertices(m::Model) = getproperty(m.g, :sorted_vertices)
+get_sorted_vertices(m::Model) =  get(m.g, @lens _.sorted_vertices)
 
 # iterators
 
@@ -351,7 +356,7 @@ end
 # Sampling 
 # pass in RNG as first argument
 # return values instead of the model
-# make non-mutating
+# make non-mutatingi
 function Random.rand!(rng::AbstractRNG, m::AbstractPPL.GraphPPL.Model{T}) where T
     for vn in keys(m)
         input, _, f, kind = m[vn]
@@ -368,8 +373,52 @@ function Random.rand!(m::AbstractPPL.GraphPPL.Model{T}) where T
     rand!(Random.GLOBAL_RNG, m)
 end
 
-function Random.rand(rng::AbstractRNG, m::Random.SamplerTrivial{Model{T}}) where T 
-    new_m = deepcopy(m[])
-    rand!(rng, new_m)
-    new_m
+function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{T}}) where T 
+    values = Vector{Union{Float64, Array{Float64}}}()
+    m = sm[]
+    for vn in keys(m)
+        input, _, f, kind = m[vn]
+        input_values = get_node_value(m, input)
+        if kind == :Stochastic
+            push!(values, rand(rng, f(input_values...)))
+        else
+            push!(values, f(input_values...))
+        end
+    end
+    values
 end
+# pass in values seperately
+# values should have getindex for model keys
+# function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model)
+#     lp = 0.0
+#     for vn in keys(m)
+#         input, _, f, kind = m[vn]
+#         input_values = get_node_value(m, input)
+#         value = get_node_value(m, vn)
+#         if kind == :Stochastic
+#             # check whether this is a constrained variable #TODO use bijectors.jl
+#             lp += logdensityof(f(input_values...), value)
+#         end
+#     end
+#     lp
+# end
+
+# function AbstractMCMC.step(
+#     rng::Random.AbstractRNG,
+#     model::AbstractPPL.GraphPPL.Model,
+#     N::Integer,
+#     ::Nothing;
+#     kwargs...
+# )
+#     rand!(rng, model)
+# end
+
+# function AbstractMCMC.step(
+#     rng::Random.AbstractRNG,
+#     model::AbstractPPL.GraphPPL.Model,
+#     N::Integer,
+#     θ_prev::AbstractPPL.GraphPPL.Model;
+#     kwargs...
+# )
+#     rand!(rng, model)
+# end
