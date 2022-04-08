@@ -288,13 +288,6 @@ function get_node_value(m::Model, ind::NTuple{N, Symbol}) where N
 end
 
 """
-    get_model_values(m::Model)
-"""
-function get_model_values(m::Model{T}) where T
-    get_node_value(m, T)
-end
-
-"""
     get_node_input(m::Model, ind::VarName)
 
 Retrieve the inputs/parents of a node, as given by model DAG.
@@ -330,6 +323,21 @@ of the DAG.
 """
 get_sorted_vertices(m::Model) =  get(m.g, @lens _.sorted_vertices)
 
+
+"""
+    get_model_values(m::Model)
+"""
+function get_model_values(m::Model{T}) where T
+    NamedTuple{T}(get_node_value(m, T))
+end
+
+"""
+"""
+function set_model_values(m::Model{T}, values) where T
+    for vn in keys(m)
+        set_node_value!(m, vn, get(values, vn))
+    end
+end
 # iterators
 
 function Base.iterate(m::Model, state=1)
@@ -385,7 +393,7 @@ function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{T}}) wher
             push!(values, f(input_values...))
         end
     end
-    values
+    NamedTuple{T}(values)
 end
 # pass in values seperately
 # values should have getindex for model keys
