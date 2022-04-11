@@ -26,9 +26,9 @@ m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constr
 # test the type of the model is correct
 @test typeof(m) <: Model
 sorted_vertices = get_sorted_vertices(m)
-@test typeof(m) == Model{Tuple(sorted_vertices)}
+@test typeof(m) <: Model{Tuple(sorted_vertices)}
 @test typeof(m.g) <: GraphInfo <: AbstractModelTrace
-@test typeof(m.g) == GraphInfo{Tuple(sorted_vertices)}
+@test typeof(m.g) <: GraphInfo{Tuple(sorted_vertices)}
 
 # test the dag is correct
 A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
@@ -37,11 +37,19 @@ A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
 @test length(m) == 5
 @test eltype(m) == valtype(m)
 
+
 # check the values from the NamedTuple match the values in the fields of GraphInfo
 vals, evals, kinds = AbstractPPL.GraphPPL.getvals(NamedTuple{Tuple(sorted_vertices)}(model))
 inputs = (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
 
 for (i, vn) in enumerate(keys(m))
+
+    @inferred m[vn]
+    @inferred get_node_value(m, vn)
+    @inferred get_node_eval(m, vn)
+    @inferred get_nodekind(m, vn)
+    @inferred get_node_input(m, vn)
+
     @test vn isa VarName
     @test get_node_value(m, vn) == vals[i]
     @test get_node_eval(m, vn) == evals[i]
@@ -55,11 +63,11 @@ end
 
 # test Model constructor for model with single parent node
 single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
-@test typeof(single_parent_m) == Model{(:μ, :y)}
-@test typeof(single_parent_m.g) == GraphInfo{(:μ, :y)}
+@test typeof(single_parent_m) <: Model{(:μ, :y)}
+@test typeof(single_parent_m.g) <: GraphInfo{(:μ, :y)}
+
 
 # test setindex
-
 @test_throws AssertionError set_node_value!(m, @varname(s2), [0.0])
 @test_throws AssertionError set_node_value!(m, @varname(s2), (1.0,))
 set_node_value!(m, @varname(s2), 1.0)
