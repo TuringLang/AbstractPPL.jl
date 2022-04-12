@@ -20,11 +20,11 @@ adjacency matrix and topologically ordered vertex list and stored.
 GraphInfo is instantiated using the `Model` constctor. 
 """
 
-struct GraphInfo{T, input_T, value_T, eval_T, kind_T} <: AbstractModelTrace
-    input::NamedTuple{T, input_T}
-    value::NamedTuple{T, value_T}
-    eval::NamedTuple{T, eval_T}
-    kind::NamedTuple{T, kind_T}
+struct GraphInfo{names_T, input_T, value_T, eval_T, kind_T} <: AbstractModelTrace
+    input::NamedTuple{names_T, input_T}
+    value::NamedTuple{names_T, value_T}
+    eval::NamedTuple{names_T, eval_T}
+    kind::NamedTuple{names_T, kind_T}
     A::SparseMatrixCSC
     sorted_vertices::Vector{Symbol}
 end
@@ -55,8 +55,8 @@ y = (value = 0.0, input = (:μ, :s2), eval = var"#7#10"(), kind = :Stochastic)
 ```
 """
 
-struct Model{T, input_T, value_T, eval_T, kind_T} <: AbstractProbabilisticProgram
-    g::GraphInfo{T, input_T, value_T, eval_T, kind_T}
+struct Model{names_T, input_T, value_T, eval_T, kind_T} <: AbstractProbabilisticProgram
+    g::GraphInfo{names_T, input_T, value_T, eval_T, kind_T}
 end
 
 function Model(;kwargs...)
