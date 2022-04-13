@@ -24,11 +24,11 @@ model = (
 m = Model(; zip(keys(model), values(model))...) # uses Model(; kwargs...) constructor
 
 # test the type of the model is correct
-@test typeof(m) <: Model
+@test m isa Model
 sorted_vertices = get_sorted_vertices(m)
-@test typeof(m) <: Model{Tuple(sorted_vertices)}
-@test typeof(m.g) <: GraphInfo <: AbstractModelTrace
-@test typeof(m.g) <: GraphInfo{Tuple(sorted_vertices)}
+@test m isa Model{Tuple(sorted_vertices)}
+@test m.g isa GraphInfo <: AbstractModelTrace
+@test m.g isa GraphInfo{Tuple(sorted_vertices)}
 
 # test the dag is correct
 A = sparse([0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 1 1 0 0; 1 0 0 1 0])
@@ -43,7 +43,6 @@ vals, evals, kinds = AbstractPPL.GraphPPL.getvals(NamedTuple{Tuple(sorted_vertic
 inputs = (s2 = (), xmat = (), β = (), μ = (:xmat, :β), y = (:μ, :s2))
 
 for (i, vn) in enumerate(keys(m))
-
     @inferred m[vn]
     @inferred get_node_value(m, vn)
     @inferred get_node_eval(m, vn)
@@ -58,13 +57,13 @@ for (i, vn) in enumerate(keys(m))
 end
 
 for node in m 
-    @test typeof(node) <: NamedTuple{fieldnames(GraphInfo)[1:4]}
+    @test node isa NamedTuple{fieldnames(GraphInfo)[1:4]}
 end
 
 # test Model constructor for model with single parent node
 single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
-@test typeof(single_parent_m) <: Model{(:μ, :y)}
-@test typeof(single_parent_m.g) <: GraphInfo{(:μ, :y)}
+@test single_parent_m isa Model{(:μ, :y)}
+@test single_parent_m.g isa GraphInfo{(:μ, :y)}
 
 
 # test setindex
