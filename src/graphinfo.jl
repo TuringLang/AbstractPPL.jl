@@ -381,7 +381,7 @@ function Random.rand!(m::AbstractPPL.GraphPPL.Model{T}) where T
     rand!(Random.GLOBAL_RNG, m)
 end
 
-function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{T}}) where T 
+function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{Tnames, Tinput, Tvalue, Teval, Tkind}}) where {Tnames, Tinput, Tvalue, Teval, Tkind}
     values = Vector{Union{Float64, Array{Float64}}}()
     m = sm[]
     for vn in keys(m)
@@ -393,13 +393,13 @@ function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{T}}) wher
             push!(values, f(input_values...))
         end
     end
-    NamedTuple{T}(values)
+    NamedTuple{Tnames}(values)
 end
 
 # pass in values seperately
 # values should have getindex for model keys
 function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model)
-    logdensityof(m, get_model_values(m))
+    logdensityof(m, get_model_values)
 end
 
 function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model, v::NamedTuple{T, V}) where {T, V}
