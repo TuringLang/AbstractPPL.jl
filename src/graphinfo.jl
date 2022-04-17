@@ -364,7 +364,7 @@ end
 # Sampling 
 # pass in RNG as first argument
 # return values instead of the model
-# make non-mutatingi
+# make non-mutating
 function Random.rand!(rng::AbstractRNG, m::AbstractPPL.GraphPPL.Model{T}) where T
     for vn in keys(m)
         input, _, f, kind = m[vn]
@@ -395,21 +395,26 @@ function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{T}}) wher
     end
     NamedTuple{T}(values)
 end
+
 # pass in values seperately
 # values should have getindex for model keys
-# function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model)
-#     lp = 0.0
-#     for vn in keys(m)
-#         input, _, f, kind = m[vn]
-#         input_values = get_node_value(m, input)
-#         value = get_node_value(m, vn)
-#         if kind == :Stochastic
-#             # check whether this is a constrained variable #TODO use bijectors.jl
-#             lp += logdensityof(f(input_values...), value)
-#         end
-#     end
-#     lp
-# end
+function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model)
+    logdensityof(m, get_model_values(m))
+end
+
+function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model, v::NamedTuple{T, V}) where {T, V}
+    lp = 0.0
+    for vn in keys(m)
+        input, _, f, kind = m[vn]
+        input_values = get_node_value(m, input)
+        value = get(v, vn)
+        if kind == :Stochastic
+            # check whether this is a constrained variable #TODO use bijectors.jl
+            lp += logdensityof(f(input_values...), value)
+        end
+    end
+    lp
+end
 
 # function AbstractMCMC.step(
 #     rng::Random.AbstractRNG,
