@@ -4,6 +4,7 @@ import AbstractPPL.GraphPPL:GraphInfo, Model, get_dag, set_node_value!,
                             get_nodekind, get_node_input, get_model_values, 
                             set_model_values, rand, rand!, logdensityof
 using SparseArrays
+using AbstractMCMC
 
 ## Example taken from Mamba
 line = Dict{Symbol, Any}(
