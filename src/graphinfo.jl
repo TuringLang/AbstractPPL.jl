@@ -4,10 +4,7 @@ using SparseArrays
 using Setfield
 using Setfield: PropertyLens, get
 using DensityInterface
-import AbstractMCMC
 using Random
-import AdvancedMH.MHSampler
-using MCMCChains
 
 """
     GraphInfo
@@ -227,7 +224,7 @@ function Base.getindex(m::Model, vn::VarName)
 end
 
 """
-    set_node_value!(m::Model, ind::VarName, value::T) where Takes
+    set_node_value!(m::Model, ind::VarName, value::T) where T
 
 Change the value of the node. 
 
@@ -289,6 +286,19 @@ function get_node_value(m::Model, ind::NTuple{N, Symbol}) where N
     values
 end
 
+function get_node_ref_value(m::Model, ind::VarName) 
+    v = get(m[ind], @lens _.value)
+end
+
+function get_node_ref_value(m::Model, ind::NTuple{N, Symbol}) where N
+    # [get_node_value(m, VarName{S}()) for S in ind]
+    values = Vector{Union{Base.RefValue{Float64}, Base.RefValue{Vector{Float64}}}}()
+    for i in ind
+        push!(values, get_node_ref_value(m, VarName{i}()))
+    end
+    values
+end
+
 """
     get_node_input(m::Model, ind::VarName)
 
@@ -328,16 +338,33 @@ get_sorted_vertices(m::Model) =  get(m.g, @lens _.sorted_vertices)
 
 """
     get_model_values(m::Model)
+
+Returns a Named Tuple of nodes and node values.
 """
 function get_model_values(m::Model{T}) where T
     NamedTuple{T}(get_node_value(m, T))
 end
 
 """
+    get_model_ref_values(m::Model)
+
+Returns a Named Tuple of nodes and node Ref values.
 """
-function set_model_values(m::Model{T}, values) where T
+function get_model_ref_values(m::Model{T}) where T
+    NamedTuple{T}(get_node_ref_value(m, T))
+end
+
+"""
+    set_model_values!(m::Model, values::NamedTuple)
+
+Changes the values of the `Model` node values to those 
+given by a Named Tuple of node symboles and new values. 
+"""
+function set_model_values!(m::Model{T}, values::NamedTuple{T}) where T
     for vn in keys(m)
-        set_node_value!(m, vn, get(values, vn))
+        if get_nodekind(m, vn) != :Observations
+            set_node_value!(m, vn, get(values, vn))
+        end
     end
 end
 # iterators
@@ -371,7 +398,7 @@ function Random.rand!(rng::AbstractRNG, m::AbstractPPL.GraphPPL.Model{T}) where 
     for vn in keys(m)
         input, _, f, kind = m[vn]
         input_values = get_node_value(m, input)
-        if kind == :Stochastic
+        if kind == :Stochastic || kind == :Observations
             set_node_value!(m, vn, rand(rng, f(input_values...)))
         else
             set_node_value!(m, vn, f(input_values...))
@@ -391,6 +418,8 @@ function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{Tnames, T
         input_values = get_node_value(m, input)
         if kind == :Stochastic
             push!(values, rand(rng, f(input_values...)))
+        elseif kind == :Observations
+            push!(values, get_node_value(m, vn))
         else
             push!(values, f(input_values...))
         end
@@ -410,91 +439,10 @@ function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model, v::NamedTu
         input, _, f, kind = m[vn]
         input_values = get_node_value(m, input)
         value = get(v, vn)
-        if kind == :Stochastic
+        if kind == :Stochastic || kind == :Observations
             # check whether this is a constrained variable #TODO use bijectors.jl
             lp += logdensityof(f(input_values...), value)
         end
     end
     lp
-end
-
-function AbstractMCMC.step(
-    rng::Random.AbstractRNG, 
-    model::AbstractPPL.GraphPPL.Model, 
-    sampler::MHSampler;
-    init_from=rand(rng, model),  # `rand` draws a named tuple from the prior
-    kwargs...
-)
-    state = (init_from, logdensityof(model, init_from),)
-    return AbstractMCMC.step(rng, model, sampler, state; kwargs...)
-end
-
-# step!
-function AbstractMCMC.step(
-    rng::Random.AbstractRNG, 
-    model::AbstractPPL.GraphPPL.Model, 
-    sampler::MHSampler, 
-    state;
-    kwargs...
-)
-    # state is just a tuple containing the last sample and its log probability
-    sample, logjoint_sample = state
-    proposed = rand(rng, model)
-    logjoint_proposed = logdensityof(model, proposed)
-    # decide whether to accept or reject the next proposal
-    if logjoint_sample < logjoint_proposed + randexp(rng)
-        sample = proposed
-        logjoint_sample = logjoint_proposed
-        set_model_values(model, sample)
-    end
-
-    return sample, (sample, logjoint_sample)
-end
-
-function AbstractMCMC.bundle_samples(
-    samples, 
-    m::AbstractPPL.GraphPPL.Model, 
-    ::AbstractMCMC.AbstractSampler, 
-    ::Any, 
-    ::Type; 
-    kwargs...
-)
-    return Chains(m, samples)
-end
-
-function get_namemap(m::AbstractPPL.GraphPPL.Model)
-    names = []
-    nodes = []
-    for vn in keys(m)
-        if get_nodekind(m, vn) == :Stochastic
-            v = get_node_value(m, vn)
-            key = getsym(vn)
-            push!(nodes, key)
-            if length(v) == 1
-                push!(names, Symbol("$(key)"))
-            else    
-                for i in 1:length(v)
-                    push!(names, Symbol("$(key)_$i"))
-                end
-            end
-        end
-    end
-    names, nodes
-end
-
-function flatten_samples(v::Vector{NamedTuple{T, S}}, dims, nodes) where {T, S}
-    samples = Array{Float64}(undef, dims, length(v))
-    for i in 1:length(v)
-        samples[:,i] = reduce(vcat, v[i][Tuple(nodes)])
-    end
-    samples
-end
-
-"""
-    Chains(m::Model, vals::Matrix{Float64})
-Constructor for MCMCChains.Chains. 
-"""
-function MCMCChains.Chains(m::AbstractPPL.GraphPPL.Model, vals::Vector{NamedTuple{T, S}}) where {T, S}
-    names, nodes = get_namemap(m)
-    Chains(transpose(flatten_samples(vals, length(names), nodes)), names)
 end
