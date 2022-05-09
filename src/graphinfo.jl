@@ -547,6 +547,3 @@ function DensityInterface.logdensityof(m::AbstractPPL.GraphPPL.Model{T}, v::Name
     end
     lp
 end
-
-## Test right types and shapes
-# Test known parameters
