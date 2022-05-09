@@ -4,7 +4,10 @@ import AbstractPPL.GraphPPL:GraphInfo, Model, get_dag, set_node_value!,
                             get_nodekind, get_node_input, get_model_values, 
                             set_model_values!, rand, rand!, logdensityof
 using SparseArrays
+using LinearAlgebra
 using AbstractMCMC
+using Distributions
+using Random; Random.seed!(1234)
 
 ## Example taken from Mamba
 line = Dict{Symbol, Any}(
@@ -67,10 +70,9 @@ for node in m
 end
 
 # test Model constructor for model with single parent node
-single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
+single_parent_m = Model(μ = (1.0, () -> 3, :Logical), y = (1.0, (μ) -> Normal(μ, sqrt(1)), :Stochastic))
 @test single_parent_m isa Model{(:μ, :y)}
 @test single_parent_m.g isa GraphInfo{(:μ, :y)}
-
 
 # test setindex
 @test_throws AssertionError set_node_value!(m, @varname(s2), [0.0])
@@ -79,7 +81,43 @@ set_node_value!(m, @varname(s2), 2.0)
 @test get_node_value(m, @varname s2) == 2.0
 
 # test ErrorException for parent node not found
-@test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
+@test_throws ErrorException Model( μ = (1.0, (β) -> 3, :Logical), y = (1.0, (μ) -> Normal(μ, sqrt(1)), :Stochastic))
 
 # test AssertionError thrown for kwargs with the wrong order of inputs
-@test_throws AssertionError Model( μ = ((β) -> 3, 1.0, :Logical), y = (1.0, (μ) -> MvNormal(μ, sqrt(1)), :Stochastic))
+@test_throws AssertionError Model( μ = ((β) -> 3, 1.0, :Logical), y = (1.0, (μ) -> Normal(μ, sqrt(1)), :Stochastic))
+
+# testing random + logdensityof
+sample = rand(m)
+
+@test keys(sample) == Tuple(get_sorted_vertices(m))
+
+for vn in keys(m)
+    mv = get_node_value(m, vn)
+    sv = get(sample, vn)
+    @test size(mv) == size(sv)
+    @test sv isa typeof(mv)
+end
+
+model1 = Model(μ = (3.0, () -> 3.0, :Logical),
+                    y = (0.0, (μ) -> Normal(μ, 1.0), :Stochastic))
+
+priorsamples = rand(model1, 1000)
+
+@test mean([s.μ for s in priorsamples]) == 3
+@test mean([s.y for s in priorsamples]) ≈ 3 atol=2
+
+@test logdensityof(model1, (μ = 3.0, y = 3.0)) == logdensityof(Normal(3.0,1.0), 3.0)
+
+model2 = Model(μ = (3.0, () -> 3.0, :Logical),
+               y1 = (0.0, (μ) -> Normal(μ, 1.0), :Stochastic),
+               y2 = (0.0, (μ) -> Normal(μ, 1.0), :Stochastic),
+               y3 = (0.0, (μ) -> Normal(μ, 1.0), :Stochastic))
+
+model3 = Model(μ = (ones(3) * 3, () -> ones(3) * 3, :Logical),
+               y = (zeros(3), (μ) -> MvNormal(μ, I), :Stochastic))
+
+ldmodel1 = logdensityof(normalmodel, (μ = 3.0, y = 3.0))
+ldmodel2 = logdensityof(model2, (μ = 3.0, y3 = 3.0, y2 = 3.0, y1 = 3.0))
+ldmodel3 = logdensityof(model3, (μ = ones(3) * 3, y = ones(3) * 3))
+
+@test 3 * ldmodel1 == ldmodel2 == ldmodel3
