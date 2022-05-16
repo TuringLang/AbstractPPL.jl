@@ -410,9 +410,9 @@ julia> import AbstractPPL.GraphPPL: Model, rand!
 julia> using Random; Random.seed!(1234)
 TaskLocalRNG()
 
-julia> m = Model( s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
-                                       μ = (1.0, () -> 1.0, :Logical), 
-                                       y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
+julia> m = Model(s2 = (0.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+                 μ = (1.0, () -> 1.0, :Logical), 
+                 y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
 Nodes: 
 μ = (input = (), value = Base.RefValue{Float64}(1.0), eval = var"#6#9"(), kind = :Logical)
 s2 = (input = (), value = Base.RefValue{Float64}(0.0), eval = var"#5#8"(), kind = :Stochastic)
@@ -458,9 +458,9 @@ julia> import AbstractPPL.GraphPPL: Model, rand
 
 julia> using Distributions
 
-julia> m = Model( s2 = (1.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
-                                              μ = (0.0, () -> 1.0, :Logical), 
-                                              y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
+julia> m = Model(s2 = (1.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+                 μ = (0.0, () -> 1.0, :Logical), 
+                 y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
 Nodes: 
 μ = (input = (), value = Base.RefValue{Float64}(1.0), eval = var"#6#9"(), kind = :Logical)
 s2 = (input = (), value = Base.RefValue{Float64}(0.0), eval = var"#5#8"(), kind = :Stochastic)
@@ -491,9 +491,9 @@ julia> import AbstractPPL.GraphPPL: Model, logdensityof
 
 julia> using Distributions
 
-julia> m = Model( s2 = (1.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
-                                              μ = (0.0, () -> 1.0, :Logical), 
-                                              y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
+julia> m = Model(s2 = (1.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+                 μ = (0.0, () -> 1.0, :Logical), 
+                 y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
 Nodes: 
 μ = (input = (), value = Base.RefValue{Float64}(1.0), eval = var"#6#9"(), kind = :Logical)
 s2 = (input = (), value = Base.RefValue{Float64}(0.0), eval = var"#5#8"(), kind = :Stochastic)
@@ -523,9 +523,9 @@ julia> import AbstractPPL.GraphPPL: Model, logdensityof, get_model_values
 
 julia> using Distributions
 
-julia> m = Model( s2 = (1.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
-                                              μ = (0.0, () -> 1.0, :Logical), 
-                                              y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
+julia> m = Model(s2 = (1.0, () -> InverseGamma(2.0,3.0), :Stochastic), 
+                 μ = (0.0, () -> 1.0, :Logical), 
+                 y = (0.0, (μ, s2) -> Normal(μ, sqrt(s2)), :Stochastic))
 Nodes: 
 μ = (input = (), value = Base.RefValue{Float64}(1.0), eval = var"#6#9"(), kind = :Logical)
 s2 = (input = (), value = Base.RefValue{Float64}(0.0), eval = var"#5#8"(), kind = :Stochastic)
