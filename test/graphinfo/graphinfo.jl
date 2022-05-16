@@ -99,7 +99,7 @@ for vn in keys(m)
 end
 
 model1 = Model(μ = (3.0, () -> 3.0, :Logical),
-                    y = (0.0, (μ) -> Normal(μ, 1.0), :Stochastic))
+               y = (0.0, (μ) -> Normal(μ, 1.0), :Stochastic))
 
 priorsamples = rand(model1, 1000)
 
