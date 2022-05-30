@@ -5,7 +5,6 @@ import AbstractPPL.GraphPPL:GraphInfo, Model, get_dag, set_node_value!,
                             set_model_values!, rand, rand!, logdensityof
 using SparseArrays
 using LinearAlgebra
-using AbstractMCMC
 using Distributions
 using Random; Random.seed!(1234)
 
