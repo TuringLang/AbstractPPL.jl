@@ -115,7 +115,7 @@ model2 = Model(μ = (3.0, () -> 3.0, :Logical),
 model3 = Model(μ = (ones(3) * 3, () -> ones(3) * 3, :Logical),
                y = (zeros(3), (μ) -> MvNormal(μ, I), :Stochastic))
 
-ldmodel1 = logdensityof(normalmodel, (μ = 3.0, y = 3.0))
+ldmodel1 = logdensityof(model1, (μ = 3.0, y = 3.0))
 ldmodel2 = logdensityof(model2, (μ = 3.0, y3 = 3.0, y2 = 3.0, y1 = 3.0))
 ldmodel3 = logdensityof(model3, (μ = ones(3) * 3, y = ones(3) * 3))
 
