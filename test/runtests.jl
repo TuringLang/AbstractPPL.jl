@@ -12,7 +12,7 @@ using Test
 
 @testset "AbstractPPL.jl" begin
     include("deprecations.jl")
-
+    include("graphinfo/graphinfo.jl")
     @testset "doctests" begin
         DocMeta.setdocmeta!(
             AbstractPPL,
@@ -23,4 +23,3 @@ using Test
         doctest(AbstractPPL; manual=false)
     end
 end
-
