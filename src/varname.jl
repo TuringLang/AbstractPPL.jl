@@ -368,7 +368,7 @@ function subsumes_indices(t::Lens, u::Lens)
         # or something left for `u`, i.e. `t` indeed `subsumes` `u`.
         return true
     elseif u_next === nothing
-        # If `t_next` is not `nothing` but `u_ntext` is, then
+        # If `t_next` is not `nothing` but `u_next` is, then
         # `t` does not subsume `u`.
         return false
     end
@@ -419,6 +419,12 @@ subsumes_index(i::AbstractVector, j) = issubset(j, i)
 subsumes_index(i, j) = i == j
 
 
+"""
+    ConcretizedSlice(::Base.Slice)
+
+An indexing object wrapping the range of a `Base.Slice` object representing the concrete indices a
+`:` indicates.  Behaves the same, but prints differently, namely, still as `:`.
+"""
 struct ConcretizedSlice{T, R} <: AbstractVector{T}
     range::R
 end
@@ -445,7 +451,7 @@ index, and `lowered_index` the respective position of the result of `to_indices`
 
 The only purpose of this are special cases like `:`, which we want to avoid becoming a
 `Base.Slice(OneTo(...))` -- it would confuse people when printed.  Instead, we concretize to a
-`UnitRange` based on the `lowered_index`, just what you'd get with an explicit `begin:end`
+`ConcretizedSlice` based on the `lowered_index`, just what you'd get with an explicit `begin:end`
 """
 reconcretize_index(original_index, lowered_index) = lowered_index
 reconcretize_index(original_index::Colon, lowered_index::Base.Slice) =
@@ -459,7 +465,7 @@ Return `l` instantiated on `x`, i.e. any information related to the runtime shap
 evaluated. This concerns `begin`, `end`, and `:` slices.
 
 Basically, every index is converted to a concrete value using `Base.to_index` on `x`.  However, `:`
-slices are only converted to `UnitRange`s (`a:b`) (as opposed to `Base.Slice{Base.OneTo}`), to keep
+slices are only converted to `ConcretizedSlice` (as opposed to `Base.Slice{Base.OneTo}`), to keep
 the result close to the original indexing.
 """
 concretize(I::Lens, x) = I
