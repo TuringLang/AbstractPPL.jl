@@ -274,6 +274,7 @@ end
 # `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
 # each other since at the same level/depth they access different properties.
 # E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
+subsumes(::IdentityLens, ::IdentityLens) = true  # disambiguation
 subsumes(t::IdentityLens, u::Lens) = true
 subsumes(t::Lens, u::IdentityLens) = false
 
