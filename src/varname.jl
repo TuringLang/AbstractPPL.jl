@@ -169,7 +169,7 @@ _print_application(io::IO, l::IndexLens) =
 # `concretize` anyways.
 _print_application(io::IO, l::DynamicIndexLens) = print(io, l, "(_)")
 
-prettify_index(x) = string(x)
+prettify_index(x) = repr(x)
 prettify_index(::Colon) = ":"
 
 """
@@ -274,9 +274,9 @@ end
 # `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
 # each other since at the same level/depth they access different properties.
 # E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
-subsumes(::IdentityLens, ::IdentityLens) = true  # disambiguation
-subsumes(t::IdentityLens, u::Lens) = true
-subsumes(t::Lens, u::IdentityLens) = false
+subsumes(::IdentityLens, ::IdentityLens) = true
+subsumes(::IdentityLens, ::Lens) = true
+subsumes(::Lens, ::IdentityLens) = false
 
 subsumes(t::ComposedLens, u::ComposedLens) =
     subsumes(t.outer, u.outer) && subsumes(t.inner, u.inner)
@@ -298,17 +298,26 @@ subsumes(t::PropertyLens, u::PropertyLens) = false
 # FIXME: Does not support `DynamicIndexLens`.
 # FIXME: Does not correctly handle cases such as `subsumes(x, x[:])`
 #        (but neither did old implementation).
-subsumes(t::IndexLens, u::IndexLens) = _issubindex(t.indices, u.indices)
-subsumes(t::ComposedLens{<:IndexLens}, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
-subsumes(t::IndexLens, u::ComposedLens{<:IndexLens}) = subsumes_index(t, u)
-subsumes(t::ComposedLens{<:IndexLens}, u::IndexLens) = subsumes_index(t, u)
+subsumes(
+    t::Union{IndexLens,ComposedLens{<:IndexLens}},
+    u::Union{IndexLens,ComposedLens{<:IndexLens}}
+) = subsumes_indices(t, u)
+
+
+subsumedby(t, u) = subsumes(u, t)
+uncomparable(t, u) = t ⋢ u && u ⋢ t
+const ⊒ = subsumes
+const ⊑ = subsumedby
+const ⋣ = !subsumes
+const ⋢ = !subsumedby
+const ≍ = uncomparable
 
 # Since expressions such as `x[:][:][:][1]` and `x[1]` are equal,
 # the indexing behavior must be considered jointly.
 # Therefore we must recurse until we reach something that is NOT
 # indexing, and then consider the sequence of indices leading up to this.
 """
-    subsumes_index(t::Lens, u::Lens)
+    subsumes_indices(t::Lens, u::Lens)
 
 Return `true` if the indexing represented by `t` subsumes `u`.
 
@@ -316,26 +325,26 @@ This is mostly useful for comparing compositions involving `IndexLens`
 e.g. `_[1][2].a[2]` and `_[1][2].a`. In such a scenario we do the following:
 1. Combine `[1][2]` into a `Tuple` of indices using [`combine_indices`](@ref).
 2. Do the same for `[1][2]`.
-3. Compare the two tuples from (1) and (2) using `subsumes_index`.
+3. Compare the two tuples from (1) and (2) using `subsumes_indices`.
 4. Since we're still undecided, we call `subsume(@lens(_.a[2]), @lens(_.a))`
    which then returns `false`.
 
 # Example
-```jldoctest; setup=:(using Setfield; using AbstractPPL: subsumes_index)
+```jldoctest; setup=:(using Setfield; using AbstractPPL: subsumes_indices)
 julia> t = @lens(_[1].a); u = @lens(_[1]);
 
-julia> subsumes_index(t, u)
+julia> subsumes_indices(t, u)
 false
 
-julia> subsumes_index(u, t)
+julia> subsumes_indices(u, t)
 true
 
 julia> # `IdentityLens` subsumes all.
-       subsumes_index(@lens(_), t)
+       subsumes_indices(@lens(_), t)
 true
 
 julia> # None subsumes `IdentityLens`.
-       subsumes_index(t, @lens(_))
+       subsumes_indices(t, @lens(_))
 false
 
 julia> AbstractPPL.subsumes(@lens(_[1][2].a[2]), @lens(_[1][2].a))
@@ -345,12 +354,12 @@ julia> AbstractPPL.subsumes(@lens(_[1][2].a), @lens(_[1][2].a[2]))
 true
 ```
 """
-function subsumes_index(t::Lens, u::Lens)
+function subsumes_indices(t::Lens, u::Lens)
     t_indices, t_next = combine_indices(t)
     u_indices, u_next = combine_indices(u)
 
     # If we already know that `u` is not subsumed by `t`, return early.
-    if !subsumes_index(t_indices, u_indices)
+    if !subsumes_indices(t_indices, u_indices)
         return false
     end
 
@@ -359,7 +368,7 @@ function subsumes_index(t::Lens, u::Lens)
         # or something left for `u`, i.e. `t` indeed `subsumes` `u`.
         return true
     elseif u_next === nothing
-        # If `t_next` is not `nothing` but `u_ntext` is, then
+        # If `t_next` is not `nothing` but `u_next` is, then
         # `t` does not subsume `u`.
         return false
     end
@@ -374,7 +383,7 @@ end
 Return sequential indexing into a single `Tuple` of indices,
 e.g. `x[:][1][2]` becomes `((Colon(), ), (1, ), (2, ))`.
 
-The result is compatible with [`subsumes_index`](@ref) for `Tuple` input.
+The result is compatible with [`subsumes_indices`](@ref) for `Tuple` input.
 """
 combine_indices(lens::Lens) = (), lens
 combine_indices(lens::IndexLens) = (lens.indices,), nothing
@@ -384,93 +393,148 @@ function combine_indices(lens::ComposedLens{<:IndexLens})
 end
 
 """
-    subsumes_index(left_index::Tuple, right_index::Tuple)
+    subsumes_indices(left_indices::Tuple, right_indices::Tuple)
 
-Return `true` if `right_index` is subsumed by `left_index`.
+Return `true` if `right_indices` is subsumed by `left_indices`.  `left_indices` is assumed to be 
+concretized and consist of either `Int`s or `AbstractArray`s of scalar indices that are supported 
+by array A.
 
 Currently _not_ supported are: 
 - Boolean indexing, literal `CartesianIndex` (these could be added, though)
 - Linear indexing of multidimensional arrays: `x[4]` does not subsume `x[2, 2]` for a matrix `x`
 - Trailing ones: `x[2, 1]` does not subsume `x[2]` for a vector `x`
-- Dynamic indexing, e.g. `x[1]` does not subsume `x[begin]`.
 """
-subsumes_index(::Tuple{}, ::Tuple{}) = true  # x subsumes x
-subsumes_index(::Tuple{}, ::Tuple) = true    # x subsumes x[1]
-subsumes_index(::Tuple, ::Tuple{}) = false   # x[1] does not subsume x
-function subsumes_index(t::Tuple, u::Tuple)  # does x[i]... subsume x[j]...?
-    return _issubindex(first(t), first(u)) && subsumes_index(Base.tail(t), Base.tail(u))
+subsumes_indices(::Tuple{}, ::Tuple{}) = true  # x subsumes x
+subsumes_indices(::Tuple{}, ::Tuple) = true    # x subsumes x...
+subsumes_indices(::Tuple, ::Tuple{}) = false   # x... does not subsume x
+function subsumes_indices(t1::Tuple, t2::Tuple)  # does x[i]... subsume x[j]...?
+    first_subsumed = all(Base.splat(subsumes_index), zip(first(t1), first(t2)))
+    return first_subsumed && subsumes_indices(Base.tail(t1), Base.tail(t2))
 end
 
-const AnyIndex = Union{Int,AbstractVector{Int},Colon}
-_issubindex_(::Tuple{Vararg{AnyIndex}}, ::Tuple{Vararg{AnyIndex}}) = false
-function _issubindex(t::NTuple{N,AnyIndex}, u::NTuple{N,AnyIndex}) where {N}
-    return all(_issubrange(j, i) for (i, j) in zip(t, u))
+subsumes_index(i::Colon, ::Colon) = error("Colons cannot be subsumed")
+subsumes_index(i, ::Colon) = error("Colons cannot be subsumed")
+subsumes_index(i::Colon, j) = true
+subsumes_index(i::AbstractVector, j) = issubset(j, i)
+subsumes_index(i, j) = i == j
+
+
+"""
+    ConcretizedSlice(::Base.Slice)
+
+An indexing object wrapping the range of a `Base.Slice` object representing the concrete indices a
+`:` indicates.  Behaves the same, but prints differently, namely, still as `:`.
+"""
+struct ConcretizedSlice{T, R} <: AbstractVector{T}
+    range::R
 end
 
-const ConcreteIndex = Union{Int,AbstractVector{Int}} # this include all kinds of ranges
+ConcretizedSlice(s::Base.Slice{R}) where {R} = ConcretizedSlice{eltype(s.indices), R}(s.indices)
+Base.show(io::IO, s::ConcretizedSlice) = print(io, ":")
+Base.show(io::IO, ::MIME"text/plain", s::ConcretizedSlice) =
+    print(io, "ConcretizedSlice(", s.range, ")")
+Base.size(s::ConcretizedSlice) = size(s.range)
+Base.iterate(s::ConcretizedSlice, state...) = Base.iterate(s.range, state...)
+Base.collect(s::ConcretizedSlice) = collect(s.range)
+Base.getindex(s::ConcretizedSlice, i) = s.range[i]
+Base.hasfastin(::Type{<:ConcretizedSlice}) = true
+Base.in(i, s::ConcretizedSlice) = i in s.range
 
-"""Determine whether indices `i` are contained in `j`, treating `:` as universal set."""
-_issubrange(i::ConcreteIndex, j::ConcreteIndex) = issubset(i, j)
-_issubrange(i::Colon, j::Colon) = true
-_issubrange(i::ConcreteIndex, j::Colon) = true
-# FIXME: [2021-07-31] This is wrong but we have tests in DPPL that tell
-# us that it SHOULD be correct. I'll leave it as is for now to ensure that
-# we preserve the status quo, but I'm confused.
-_issubrange(i::Colon, j::ConcreteIndex) = true
+# and this is the reason why we are doing this:
+Base.to_index(A, s::ConcretizedSlice) = Base.Slice(s.range)
+
+"""
+    reconcretize_index(original_index, lowered_index)
+
+Create the index to be emitted in `concretize`.  `original_index` is the original, unconcretized
+index, and `lowered_index` the respective position of the result of `to_indices`.
+
+The only purpose of this are special cases like `:`, which we want to avoid becoming a
+`Base.Slice(OneTo(...))` -- it would confuse people when printed.  Instead, we concretize to a
+`ConcretizedSlice` based on the `lowered_index`, just what you'd get with an explicit `begin:end`
+"""
+reconcretize_index(original_index, lowered_index) = lowered_index
+reconcretize_index(original_index::Colon, lowered_index::Base.Slice) =
+    ConcretizedSlice(lowered_index)
+
 
 """
     concretize(l::Lens, x)
 
-Return `l` instantiated on `x`, i.e. any runtime information evaluated using `x`.
+Return `l` instantiated on `x`, i.e. any information related to the runtime shape of `x` is
+evaluated. This concerns `begin`, `end`, and `:` slices.
+
+Basically, every index is converted to a concrete value using `Base.to_index` on `x`.  However, `:`
+slices are only converted to `ConcretizedSlice` (as opposed to `Base.Slice{Base.OneTo}`), to keep
+the result close to the original indexing.
 """
 concretize(I::Lens, x) = I
-concretize(I::DynamicIndexLens, x) = IndexLens(I.f(x))
+concretize(I::DynamicIndexLens, x) = concretize(IndexLens(I.f(x)), x)
+concretize(I::IndexLens, x) = IndexLens(reconcretize_index.(I.indices, to_indices(x, I.indices)))
 function concretize(I::ComposedLens, x)
-    x_inner = get(x, I.outer)
+    x_inner = get(x, I.outer) # TODO: get view here
     return ComposedLens(concretize(I.outer, x), concretize(I.inner, x_inner))
 end
+
 """
     concretize(vn::VarName, x)
 
-Return `vn` instantiated on `x`, i.e. any runtime information evaluated using `x`.
+Return `vn` concretized on `x`, i.e. any information related to the runtime shape of `x` is
+evaluated. This concerns `begin`, `end`, and `:` slices.
 
 # Examples
 ```jldoctest; setup=:(using Setfield)
-julia> x = (a = [1.0 2.0;], );
+julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
-julia> AbstractPPL.concretize(@varname(x.a[1, end][:]), x)
-x.a[1,2][:]
+julia> getlens(@varname(x.a[1:end, end][:], true)) # concrete=true required for @varname
+(@lens _.a[1:3, 2][:])
+
+julia> y = zeros(10, 10);
+
+julia> @varname(y[:], true)
+y[:]
+
+julia> # The underlying value is conretized, though:
+       AbstractPPL.getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices[1]
+ConcretizedSlice(Base.OneTo(100))
 ```
 """
 concretize(vn::VarName, x) = VarName(vn, concretize(getlens(vn), x))
 
 """
-    @varname(expr)
+    @varname(expr, concretize=false)
 
 A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing expression `expr`.
 
 If `concretize` is `true`, the resulting expression will be wrapped in a [`concretize`](@ref) call.
 
-Note that expressions involving dynamic indexing, i.e. `begin` and/or `end`, will need to be
-resolved as `VarName` only supports non-dynamic indexing as determined by
+Note that expressions involving dynamic indexing, i.e. `begin` and/or `end`, will always need to be
+concretized as `VarName` only supports non-dynamic indexing as determined by
 [`is_static_index`](@ref). See examples below.
 
 ## Examples
 ### Dynamic indexing
 ```jldoctest
-julia> # Dynamic indexing is not allowed in `VarName`
-       @varname(x[end])
-ERROR: UndefVarError: x not defined
+julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
+
+julia> @varname(x.a[1:end, end][:], true)
+x.a[1:3,2][:]
+
+julia> @varname(x.a[end])
+ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
 [...]
 
-julia> # To be able to resolve `end` we need `x` to be available.
-       x = randn(2); @varname(x[end])
-x[2]
+julia> @varname(x.a[end], true)
+x.a[6]
 
 julia> # Note that "dynamic" here refers to usage of `begin` and/or `end`,
        # _not_ "information only available at runtime", i.e. the following works.
-       [@varname(x[i]) for i = 1:length(x)][end]
-x[2]
+       [@varname(x.a[i]) for i = 1:length(x.a)][end]
+x.a[6]
+
+julia> # Potentially surprising behaviour, but this is equivalent to what Base does:
+       @varname(x[2:2:5]), 2:2:5
+(x[2:2:4], 2:2:4)
 ```
 
 ### General indexing
@@ -503,7 +567,7 @@ julia> getlens(@varname(x.a))
 julia> getlens(@varname(x.a[1]))
 (@lens _.a[1])
 
-julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end]))
+julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end], true))
 (@lens _.a[1].b[2])
 ```
 
@@ -511,12 +575,12 @@ julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end]))
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr,Symbol})
-    return varname(expr)
+macro varname(expr::Union{Expr,Symbol}, concretize::Bool=false)
+    return varname(expr, concretize)
 end
 
-varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr)
+varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+function varname(expr::Expr, concretize=false)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         # Split into object/base symbol and lens.
         sym_escaped, lens = Setfield.parse_obj_lens(expr)
@@ -524,17 +588,19 @@ function varname(expr::Expr)
         # to call `QuoteNode` on it.
         sym = drop_escape(sym_escaped)
 
-        return if Setfield.need_dynamic_lens(expr)
-            :(
+        if concretize
+            return :(
                 $(AbstractPPL.VarName){$(QuoteNode(sym))}(
                     $(AbstractPPL.concretize)($lens, $sym_escaped)
                 )
             )
+        elseif Setfield.need_dynamic_lens(expr)
+            error("Variable name `$(expr)` is dynamic and requires concretization!")
         else
             :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
         end
     else
-        error("Malformed variable name $(expr)!")
+        error("Malformed variable name `$(expr)`!")
     end
 end
 
@@ -571,7 +637,8 @@ end
     vsym(expr)
 
 Return name part of the [`@varname`](@ref)-compatible expression `expr` as a symbol for input of the
-[`VarName`](@ref) constructor."""
+[`VarName`](@ref) constructor.
+"""
 function vsym end
 
 vsym(expr::Symbol) = expr
@@ -579,6 +646,6 @@ function vsym(expr::Expr)
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         return vsym(expr.args[1])
     else
-        error("Malformed variable name $(expr)!")
+        error("Malformed variable name `$(expr)`!")
     end
 end
