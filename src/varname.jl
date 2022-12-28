@@ -520,11 +520,11 @@ julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 julia> @varname(x.a[1:end, end][:], true)
 x.a[1:3,2][:]
 
-julia> @varname(x.a[end])
+julia> @varname(x.a[end], false)  # disable concretization
 ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
 [...]
 
-julia> @varname(x.a[end], true)
+julia> @varname(x.a[end])  # concretization occurs by default if deemed necessary
 x.a[6]
 
 julia> # Note that "dynamic" here refers to usage of `begin` and/or `end`,
