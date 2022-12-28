@@ -579,7 +579,8 @@ macro varname(expr::Union{Expr,Symbol}, concretize::Bool=false)
     return varname(expr, concretize)
 end
 
-varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+varname(sym::Symbol, _) = varname(sym)
 function varname(expr::Expr, concretize=Setfield.need_dynamic_lens(expr))
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         # Split into object/base symbol and lens.
