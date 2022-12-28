@@ -414,6 +414,8 @@ end
 
 subsumes_index(i::Colon, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(i, ::Colon) = error("Colons cannot be subsumed")
+# Necessary to avoid ambiguity errors.
+subsumes_index(::AbstractVector, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(i::Colon, j) = true
 subsumes_index(i::AbstractVector, j) = issubset(j, i)
 subsumes_index(i, j) = i == j
