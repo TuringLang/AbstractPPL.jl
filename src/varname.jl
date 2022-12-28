@@ -575,7 +575,7 @@ julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end], true))
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr,Symbol}, concretize::Bool=false)
+macro varname(expr::Union{Expr,Symbol}, concretize::Bool=Setfield.need_dynamic_lens(expr))
     return varname(expr, concretize)
 end
 
