@@ -414,6 +414,8 @@ end
 
 subsumes_index(i::Colon, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(i, ::Colon) = error("Colons cannot be subsumed")
+# Necessary to avoid ambiguity errors.
+subsumes_index(::AbstractVector, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(i::Colon, j) = true
 subsumes_index(i::AbstractVector, j) = issubset(j, i)
 subsumes_index(i, j) = i == j
@@ -520,11 +522,11 @@ julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 julia> @varname(x.a[1:end, end][:], true)
 x.a[1:3,2][:]
 
-julia> @varname(x.a[end])
+julia> @varname(x.a[end], false)  # disable concretization
 ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
 [...]
 
-julia> @varname(x.a[end], true)
+julia> @varname(x.a[end])  # concretization occurs by default if deemed necessary
 x.a[6]
 
 julia> # Note that "dynamic" here refers to usage of `begin` and/or `end`,
@@ -575,12 +577,13 @@ julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end], true))
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
 """
-macro varname(expr::Union{Expr,Symbol}, concretize::Bool=false)
+macro varname(expr::Union{Expr,Symbol}, concretize::Bool=Setfield.need_dynamic_lens(expr))
     return varname(expr, concretize)
 end
 
-varname(sym::Symbol, concretize=false) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
-function varname(expr::Expr, concretize=false)
+varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
+varname(sym::Symbol, _) = varname(sym)
+function varname(expr::Expr, concretize=Setfield.need_dynamic_lens(expr))
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
         # Split into object/base symbol and lens.
         sym_escaped, lens = Setfield.parse_obj_lens(expr)
