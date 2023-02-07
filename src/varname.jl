@@ -515,6 +515,7 @@ concretized as `VarName` only supports non-dynamic indexing as determined by
 [`is_static_index`](@ref). See examples below.
 
 ## Examples
+
 ### Dynamic indexing
 ```jldoctest
 julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
@@ -573,6 +574,28 @@ julia> x = (a = [(b = rand(2), )], ); getlens(@varname(x.a[1].b[end], true))
 (@lens _.a[1].b[2])
 ```
 
+Interpolation can be used for names (the base name as well as property names).  Variables within
+indices are always evaluated in the calling scope, in the same manner as `Setfield` does:
+
+```jldoctest
+julia> name, i = :a, 10;
+
+julia> @varname(x.\$name[i, i+1])
+x.a[10,11]
+
+julia> @varname(\$name)
+a
+
+julia> @varname(\$name[1])
+a[1]
+
+julia> @varname(\$name.x[1])
+a.x[1]
+
+julia> @varname(b.\$name.x[1])
+b.a.x[1]
+```
+
 !!! compat "Julia 1.5"
     Using `begin` in an indexing expression to refer to the first index requires at least
     Julia 1.5.
@@ -591,17 +614,31 @@ function varname(expr::Expr, concretize=Setfield.need_dynamic_lens(expr))
         # to call `QuoteNode` on it.
         sym = drop_escape(sym_escaped)
 
+        # This is to handle interpolated heads -- Setfield treats them differently:
+        # julia> Setfield.parse_obj_lens(@q $name.a)
+        # (:($(Expr(:escape, :_))), :((Setfield.compose)($(Expr(:escape, :name)), (Setfield.PropertyLens){:a}())))
+        # julia> Setfield.parse_obj_lens(@q x.a)
+        # (:($(Expr(:escape, :x))), :((Setfield.compose)((Setfield.PropertyLens){:a}())))
+        if sym != :_
+            sym = QuoteNode(sym)
+        else
+            sym = lens.args[2]
+            lens = Expr(:call, lens.args[1], lens.args[3:end]...)
+        end
+
         if concretize
             return :(
-                $(AbstractPPL.VarName){$(QuoteNode(sym))}(
+                $(AbstractPPL.VarName){$sym}(
                     $(AbstractPPL.concretize)($lens, $sym_escaped)
                 )
             )
         elseif Setfield.need_dynamic_lens(expr)
             error("Variable name `$(expr)` is dynamic and requires concretization!")
         else
-            :($(AbstractPPL.VarName){$(QuoteNode(sym))}($lens))
+            :($(AbstractPPL.VarName){$sym}($lens))
         end
+    elseif Meta.isexpr(expr, :$, 1)
+        return :($(AbstractPPL.VarName){$(esc(expr.args[1]))}())
     else
         error("Malformed variable name `$(expr)`!")
     end
