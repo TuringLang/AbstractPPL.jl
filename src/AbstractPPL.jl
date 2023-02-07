@@ -1,7 +1,16 @@
 module AbstractPPL
 
 # VarName
-export VarName, getsym, getlens, inspace, subsumes, varname, vsym, @varname, @vsym
+export VarName,
+    getsym,
+    getlens,
+    inspace,
+    subsumes,
+    subsumedby,
+    varname,
+    vsym,
+    @varname,
+    @vsym
 
 
 # Abstract model functions
