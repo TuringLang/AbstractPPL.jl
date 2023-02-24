@@ -66,8 +66,7 @@ function condition end
 """
     rand([rng=Random.default_rng()], [T=NamedTuple], model::AbstractProbabilisticProgram) -> T
 
-Draw a sample from the prior and prior-predictive distribution of the model specified by the
-probabilistic program.
+Draw a sample from the joint distribution of the model specified by the probabilistic program.
 
 The sample will be returned as format specified by `T`.
 """
