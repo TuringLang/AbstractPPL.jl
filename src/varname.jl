@@ -460,7 +460,7 @@ resolved as `VarName` only supports non-dynamic indexing as determined by
 ```jldoctest
 julia> # Dynamic indexing is not allowed in `VarName`
        @varname(x[end])
-ERROR: UndefVarError: x not defined
+ERROR: UndefVarError: `x` not defined
 [...]
 
 julia> # To be able to resolve `end` we need `x` to be available.
