@@ -444,9 +444,9 @@ function Random.rand!(m::AbstractPPL.GraphPPL.Model{T}) where T
 end
 
 """
-    rand!(rng::AbstractRNG, m::Model)
+    rand(m::Model)
 
-Draw random samples from the model and mutate the node values. 
+Draw random samples from the model and return the samples as NamedTuple. 
 
 # Examples
 
@@ -470,9 +470,13 @@ julia> rand(m)
 (μ = 1.0, s2 = 1.0907695400401212, y = 0.05821954440386368)
 ```
 """
-function Random.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{Tnames, Tinput, Tvalue, Teval, Tkind}}) where {Tnames, Tinput, Tvalue, Teval, Tkind}
+function Base.rand(rng::AbstractRNG, sm::Random.SamplerTrivial{Model{Tnames, Tinput, Tvalue, Teval, Tkind}}) where {Tnames, Tinput, Tvalue, Teval, Tkind}
     m = deepcopy(sm[])
     get_model_values(rand!(rng, m))
+end
+
+function Base.rand(rng::AbstractRNG, ::Type{NamedTuple}, m::Model)
+    rand(rng, Random.SamplerTrivial(m))
 end
 
 """
