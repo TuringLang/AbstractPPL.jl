@@ -9,6 +9,10 @@ on:
       - trying
       # Build the main branch.
       - main
+  pull_request:
+    branches:
+      - main
+      - releases-0.5.x
 
 jobs:
   test:
