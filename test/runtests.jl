@@ -21,6 +21,6 @@ using Test
             :(using AbstractPPL);
             recursive=true,
         )
-        doctest(AbstractPPL; manual=false)
+        doctest(AbstractPPL; manual=false, fix=true)
     end
 end

@@ -461,7 +461,9 @@ resolved as `VarName` only supports non-dynamic indexing as determined by
 julia> # Dynamic indexing is not allowed in `VarName`
        @varname(x[end])
 ERROR: UndefVarError: `x` not defined
-[...]
+Stacktrace:
+ [1] top-level scope
+   @ none:1
 
 julia> # To be able to resolve `end` we need `x` to be available.
        x = randn(2); @varname(x[end])
