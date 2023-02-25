@@ -11,9 +11,11 @@ DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 AbstractMCMC = "2, 3, 4"
 DensityInterface = "0.4"
 Setfield = "0.8.2, 1"
+StatsBase = "0.32, 0.33"
 julia = "~1.6.6, 1.7.3"
