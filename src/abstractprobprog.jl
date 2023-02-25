@@ -1,5 +1,6 @@
 using AbstractMCMC
 using DensityInterface
+using Random
 
 
 """
@@ -60,3 +61,22 @@ m = decondition(condition(m, obs))
 should hold for generative models `m` and arbitrary `obs`.
 """
 function condition end
+
+
+"""
+    rand([rng=Random.default_rng()], [T=NamedTuple], model::AbstractProbabilisticProgram) -> T
+
+Draw a sample from the joint distribution of the model specified by the probabilistic program.
+
+The sample will be returned as format specified by `T`.
+"""
+Base.rand(rng::Random.AbstractRNG, ::Type, model::AbstractProbabilisticProgram)
+function Base.rand(rng::Random.AbstractRNG, model::AbstractProbabilisticProgram)
+    return rand(rng, NamedTuple, model)
+end
+function Base.rand(::Type{T}, model::AbstractProbabilisticProgram) where {T}
+    return rand(Random.default_rng(), T, model)
+end
+function Base.rand(model::AbstractProbabilisticProgram)
+    return rand(Random.default_rng(), NamedTuple, model)
+end
