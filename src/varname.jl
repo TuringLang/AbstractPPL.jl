@@ -269,6 +269,35 @@ function subsumes(u::VarName, v::VarName)
     return getsym(u) == getsym(v) && subsumes(u.lens, v.lens)
 end
 
+"""
+    subsumes(parent::Symbol, child::Symbol)
+
+Check whether the Symbol `child` describes a sub-range of the Symbol `parent`. This is a String to String comparison.
+
+# Examples
+```jldoctest
+julia> subsumes(Symbol("s"), Symbol("s"))
+true
+
+julia> subsumes(Symbol("s"), Symbol("s[:,1][1]"))
+true
+
+julia> subsumes(Symbol("s[:,1][1]"), Symbol("s"))
+false
+```
+"""
+function subsumes(parent::Symbol, child::Symbol)
+    parent_str = string(parent)
+    child_str = string(child)
+    if parent_str == child_str
+        return true
+    end
+    if length(parent_str) > length(child_str)
+        return false
+    end
+    return child_str[1:length(parent_str)] == parent_str
+end
+
 # Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
 # checking `subsumes` for every level. This for example means that if we are comparing
 # `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
