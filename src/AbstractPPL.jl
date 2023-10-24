@@ -26,9 +26,4 @@ include("abstractprobprog.jl")
 include("evaluate.jl")
 include("deprecations.jl")
 
-# GraphInfo
-module GraphPPL
-    include("graphinfo.jl")    
-end
-
 end # module
