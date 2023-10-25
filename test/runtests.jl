@@ -14,7 +14,6 @@ using Test
     include("deprecations.jl")
     include("varname.jl")
     include("abstractprobprog.jl")
-    include("graphinfo/graphinfo.jl")
     @testset "doctests" begin
         DocMeta.setdocmeta!(
             AbstractPPL,
