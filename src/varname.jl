@@ -145,7 +145,10 @@ end
 # TODO: ⨟ or ∘?
 # Allow compositions with lenses.
 function Base.:∘(vn::VarName{sym,T}, optic) where {sym,T}
-    return VarName{sym}(getoptic(vn) ∘ optic)
+    return VarName{sym}(getoptic(vn) ⨟ optic)
+end
+function Base.:∘(vn::VarName{sym,typeof(identity)}, optic) where {sym}
+    return VarName{sym}(optic)
 end
 
 function Base.show(io::IO, vn::VarName{sym,T}) where {sym,T}
@@ -459,7 +462,6 @@ The only purpose of this are special cases like `:`, which we want to avoid beco
 reconcretize_index(original_index, lowered_index) = lowered_index
 reconcretize_index(original_index::Colon, lowered_index::Base.Slice) =
     ConcretizedSlice(lowered_index)
-
 
 """
     concretize(l, x)

@@ -1,7 +1,6 @@
 using Accessors
 using InvertedIndices
 using OffsetArrays
-using Setfield
 
 using AbstractPPL: ⊑, ⊒, ⋢, ⋣, ≍
 
@@ -22,18 +21,20 @@ end
         
         @test @varname(A[:, 1][1+1]) == @varname(A[:, 1][2])
         @test(@varname(A[:, 1][2]) ==
-            VarName{:A}(@lens(_[:, 1]) ∘ @lens(_[2])) ==
-            VarName{:A}(@lens(_[:, 1])) ∘ @lens(_[2]) ==
-            VarName{:A}() ∘ @lens(_[:, 1]) ∘ @lens(_[2]))
+            VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])) ==
+            VarName{:A}(@o(_[:, 1])) ∘ @o(_[2]) ==
+            VarName{:A}() ∘ @o(_[:, 1]) ∘ @o(_[2]))
 
         # concretization
         y = zeros(10, 10)
         x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
+        # TODO: how can these no error before? 
+        # former create optic with `ConcretizedSlice`, latter with `UnitRange`
         @test @varname(y[:], true) ==  @varname(y[1:100])
         @test @varname(y[:, begin], true) == @varname(y[1:10, 1])
-        @test getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
+        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
         @test @varname(x.a[1:end, end][:], true) == @varname(x.a[1:3,2][1:3])
     end
