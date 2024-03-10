@@ -1,6 +1,9 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
 
+using Setfield: Setfield
+using MacroTools
+
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
 """
@@ -21,13 +24,13 @@ optic expression through the [`@varname`](@ref) convenience macro.
 
 ```jldoctest; setup=:(using Accessors)
 julia> vn = VarName{:x}(Accessors.IndexLens((Colon(), 1)) ⨟ Accessors.IndexLens((2, )))
-x_[:, 1][2]
+x[:, 1][2]
 
 julia> getoptic(vn)
 (@o _[:, 1][2])
 
 julia> @varname x[:, 1][1+1]
-x[:,1][2]
+x[:, 1][2]
 ```
 """
 struct VarName{sym,T}
@@ -75,7 +78,7 @@ x
 VarName(vn::VarName, optic=identity) = VarName{getsym(vn)}(optic)
 
 function VarName(vn::VarName, indexing::Tuple)
-    return VarName{getsym(vn)}(optic)
+    return VarName{getsym(vn)}(tupleindex2optic(indexing))
 end
 
 tupleindex2optic(indexing::Tuple{}) = identity
@@ -110,10 +113,10 @@ Return the optic of the Julia variable used to generate `vn`.
 
 ```jldoctest
 julia> getoptic(@varname(x[1][2:3]))
-(@lens _[1][2:3])
+(@o _[1][2:3])
 
 julia> getoptic(@varname(y))
-(@lens _)
+identity (generic function with 1 method)
 ```
 """
 getoptic(vn::VarName) = vn.optic
@@ -121,19 +124,19 @@ getoptic(vn::VarName) = vn.optic
 """
     get(obj, vn::VarName{sym})
 
-Alias for `get(obj, PropertyLens{sym}() ∘ getlens(vn))`.
+Alias for `getoptic(vn)(obj)`.
 """
-function Accessors.get(obj, vn::VarName{sym}) where {sym}
-    return Accessors.get(obj, PropertyLens{sym}() ∘ getlens(vn))
+function Base.get(obj, vn::VarName{sym}) where {sym}
+    return getoptic(vn)(obj)
 end
 
 """
     set(obj, vn::VarName{sym}, value)
 
-Alias for `set(obj, PropertyLens{sym}() ∘ getlens(vn), value)`.
+Alias for `set(obj, PropertyLens{sym}() ∘ getoptic(vn), value)`.
 """
 function Accessors.set(obj, vn::VarName{sym}, value) where {sym}
-    return Accessors.set(obj, PropertyLens{sym}() ∘ getlens(vn), value)
+    return Accessors.set(obj, PropertyLens{sym}() ∘ getoptic(vn), value)
 end
 
 
@@ -142,7 +145,6 @@ function Base.:(==)(x::VarName, y::VarName)
     return getsym(x) == getsym(y) && getoptic(x) == getoptic(y)
 end
 
-# TODO: ⨟ or ∘?
 # Allow compositions with lenses.
 function Base.:∘(vn::VarName{sym,T}, optic) where {sym,T}
     return VarName{sym}(getoptic(vn) ⨟ optic)
@@ -524,7 +526,7 @@ concretized as `VarName` only supports non-dynamic indexing as determined by
 julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
 julia> @varname(x.a[1:end, end][:], true)
-x.a[1:3,2][:]
+x.a[1:3, 2][:]
 
 julia> @varname(x.a[end], false)  # disable concretization
 ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
@@ -549,7 +551,7 @@ Under the hood `optic`s are used for the indexing:
 
 ```jldoctest
 julia> getoptic(@varname(x))
-identity
+identity (generic function with 1 method)
 
 julia> getoptic(@varname(x[1]))
 (@o _[1])
@@ -561,7 +563,7 @@ julia> getoptic(@varname(x[:, 1][2]))
 (@o _[:, 1][2])
 
 julia> getoptic(@varname(x[1,2][1+5][45][3]))
-(@0 _[1, 2][6][45][3])
+(@o _[1, 2][6][45][3])
 ```
 
 This also means that we support property access:
@@ -571,7 +573,7 @@ julia> getoptic(@varname(x.a))
 (@o _.a)
 
 julia> getoptic(@varname(x.a[1]))
-(o _.a[1])
+(@o _.a[1])
 
 julia> x = (a = [(b = rand(2), )], ); getoptic(@varname(x.a[1].b[end], true))
 (@o _.a[1].b[2])
@@ -583,6 +585,9 @@ indices are always evaluated in the calling scope
 ```jldoctest
 julia> name, i = :a, 10;
 
+julia> @varname(x.\$name[i, i+1])
+x.a[10, 11]
+
 julia> @varname(\$name)
 a
 
@@ -591,6 +596,9 @@ a[1]
 
 julia> @varname(\$name.x[1])
 a.x[1]
+
+julia> @varname(b.\$name.x[1])
+b.a.x[1]
 ```
 """
 macro varname(expr::Union{Expr,Symbol}, concretize::Bool=Accessors.need_dynamic_optic(expr))
@@ -601,22 +609,35 @@ varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 varname(sym::Symbol, _) = varname(sym)
 function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
-        # Split into object/base symbol and optic.
-        sym_escaped, optic = Accessors.parse_obj_optic(expr)
-        # `parse_obj_optic` escapes the return symbol, so we need to unescape
+        # Split into object/base symbol and lens.
+        sym_escaped, lens = Setfield.parse_obj_lens(expr)
+        lens = lens_to_optic(lens)
+        # Setfield.jl escapes the return symbol, so we need to unescape
         # to call `QuoteNode` on it.
-        sym = QuoteNode(drop_escape(sym_escaped))
+        sym = drop_escape(sym_escaped)
+
+        # This is to handle interpolated heads -- Setfield treats them differently:
+        # julia> Setfield.parse_obj_lens(@q $name.a)
+        # (:($(Expr(:escape, :_))), :((Setfield.compose)($(Expr(:escape, :name)), (Setfield.PropertyLens){:a}())))
+        # julia> Setfield.parse_obj_lens(@q x.a)
+        # (:($(Expr(:escape, :x))), :((Setfield.compose)((Setfield.PropertyLens){:a}())))
+        if sym != :_
+            sym = QuoteNode(sym)
+        else
+            sym = lens.args[2]
+            lens = Expr(:call, lens.args[1], lens.args[3:end]...)
+        end
 
         if concretize
             return :(
                 $(AbstractPPL.VarName){$sym}(
-                $(AbstractPPL.concretize)($optic, $sym_escaped)
+                    $(AbstractPPL.concretize)($lens, $sym_escaped)
+                )
             )
-            )
-        elseif Accessors.need_dynamic_optic(expr)
-            throw(ArgumentError("Variable name `$(expr)` is dynamic and requires concretization!"))
+        elseif Setfield.need_dynamic_lens(expr)
+            error("Variable name `$(expr)` is dynamic and requires concretization!")
         else
-            return :($(AbstractPPL.VarName){$sym}($optic))
+            :($(AbstractPPL.VarName){$sym}($lens))
         end
     elseif Meta.isexpr(expr, :$, 1)
         return :($(AbstractPPL.VarName){$(esc(expr.args[1]))}())
@@ -629,6 +650,21 @@ drop_escape(x) = x
 function drop_escape(expr::Expr)
     Meta.isexpr(expr, :escape) && return drop_escape(expr.args[1])
     return Expr(expr.head, map(x -> drop_escape(x), expr.args)...)
+end
+
+function lens_to_optic(lens)
+    MacroTools.postwalk(lens) do ex
+        if ex == (Setfield.compose)
+            return :(Accessors.opcompose)
+        elseif ex == (Setfield.PropertyLens)
+            return :(Accessors.PropertyLens)
+        elseif ex == (Setfield.IndexLens)
+            return :(Accessors.IndexLens)
+        elseif ex == (Setfield.DynamicIndexLens)
+            return :(Accessors.DynamicIndexLens)
+        end
+        return ex
+    end
 end
 
 """
