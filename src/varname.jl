@@ -272,7 +272,7 @@ Currently _not_ supported are:
   - Trailing ones: `x[2, 1]` does not subsume `x[2]` for a vector `x`
 """
 function subsumes(u::VarName, v::VarName)
-    return getsym(u) == getsym(v) && subsumes(getoptic(optic), getoptic(v))
+    return getsym(u) == getsym(v) && subsumes(getoptic(u), getoptic(v))
 end
 
 # Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
