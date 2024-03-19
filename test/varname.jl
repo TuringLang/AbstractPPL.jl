@@ -21,9 +21,7 @@ end
         
         @test @varname(A[:, 1][1+1]) == @varname(A[:, 1][2])
         @test(@varname(A[:, 1][2]) ==
-            VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])) ==
-            VarName{:A}(@o(_[:, 1])) ∘ @o(_[2]) ==
-            VarName{:A}() ∘ @o(_[:, 1]) ∘ @o(_[2]))
+            VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])))
 
         # concretization
         y = zeros(10, 10)

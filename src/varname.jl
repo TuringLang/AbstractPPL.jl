@@ -145,14 +145,6 @@ function Base.:(==)(x::VarName, y::VarName)
     return getsym(x) == getsym(y) && getoptic(x) == getoptic(y)
 end
 
-# Allow compositions with lenses.
-function Base.:∘(vn::VarName{sym,T}, optic) where {sym,T}
-    return VarName{sym}(getoptic(vn) ⨟ optic)
-end
-function Base.:∘(vn::VarName{sym,typeof(identity)}, optic) where {sym}
-    return VarName{sym}(optic)
-end
-
 function Base.show(io::IO, vn::VarName{sym,T}) where {sym,T}
     print(io, getsym(vn))
     _show_optic(io, getoptic(vn))
