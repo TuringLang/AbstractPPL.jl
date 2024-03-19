@@ -158,12 +158,10 @@ function Base.show(io::IO, vn::VarName{sym,T}) where {sym,T}
     _print_application(io, getoptic(vn))
 end
 
-# This is all just to allow to convert `Colon()` into `:`.
-# TODO: modify from https://github.com/JuliaObjects/Accessors.jl/blob/01528a81fdf17c07436e1f3d99119d3f635e4c26/src/sugar.jl#L502
 function _print_application(io::IO, optic)
     opts = Accessors.deopcompose(optic)
-    inner = Iterators.takewhile(x -> applicable(Accessors._shortstring, "", x), opts)
-    outer = Iterators.dropwhile(x -> applicable(Accessors._shortstring, "", x), opts)
+    inner = Iterators.takewhile(x -> applicable(_shortstring, "", x), opts)
+    outer = Iterators.dropwhile(x -> applicable(_shortstring, "", x), opts)
     if !isempty(outer)
         show(io, opcompose(outer...))
         print(io, " ∘ ")
@@ -171,9 +169,10 @@ function _print_application(io::IO, optic)
     shortstr = reduce(Accessors._shortstring, inner; init="")
     print(io, shortstr)
 end
-# TODO: type piracy https://github.com/JuliaObjects/Accessors.jl/blob/01528a81fdf17c07436e1f3d99119d3f635e4c26/src/sugar.jl#L495
-Accessors._shortstring(prev, o::IndexLens) = "$prev[$(join(map(prettify_index, o.indices), ", "))]"
-Accessors._shortstring(prev, o::typeof(identity)) = "$prev"
+
+_shortstring(prev, o::IndexLens) = "$prev[$(join(map(prettify_index, o.indices), ", "))]"
+_shortstring(prev, ::typeof(identity)) = "$prev"
+_shortstring(prev, o) = Accessors._shortstring(prev, o)
 
 prettify_index(x) = repr(x)
 prettify_index(::Colon) = ":"
