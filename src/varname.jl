@@ -47,7 +47,8 @@ end
 """
     is_static_optic(l)
 
-Return `true` if `l` is one or a composition of `identity`, `PropertyLens`, and `IndexLens`.
+Return `true` if `l` is one or a composition of `identity`, `PropertyLens`, and `IndexLens`; `false` if `l` is 
+one or a composition of `DynamicIndexLens`; and undefined otherwise.
 """
 is_static_optic(::Type{<:Union{typeof(identity),PropertyLens,IndexLens}}) = true
 function is_static_optic(::Type{ComposedOptic{LO,LI}}) where {LO,LI}
