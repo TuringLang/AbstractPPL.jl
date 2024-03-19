@@ -27,7 +27,7 @@ julia> vn = VarName{:x}(Accessors.IndexLens((Colon(), 1)) ⨟ Accessors.IndexLen
 x[:, 1][2]
 
 julia> getoptic(vn)
-(@o _[:, 1][2])
+(@o _[Colon(), 1][2])
 
 julia> @varname x[:, 1][1+1]
 x[:, 1][2]
@@ -155,10 +155,11 @@ end
 
 function Base.show(io::IO, vn::VarName{sym,T}) where {sym,T}
     print(io, getsym(vn))
-    _print_application(io, getoptic(vn))
+    _show_optic(io, getoptic(vn))
 end
 
-function _print_application(io::IO, optic)
+# modified from https://github.com/JuliaObjects/Accessors.jl/blob/01528a81fdf17c07436e1f3d99119d3f635e4c26/src/sugar.jl#L502
+function _show_optic(io::IO, optic)
     opts = Accessors.deopcompose(optic)
     inner = Iterators.takewhile(x -> applicable(_shortstring, "", x), opts)
     outer = Iterators.dropwhile(x -> applicable(_shortstring, "", x), opts)
@@ -166,7 +167,7 @@ function _print_application(io::IO, optic)
         show(io, opcompose(outer...))
         print(io, " ∘ ")
     end
-    shortstr = reduce(Accessors._shortstring, inner; init="")
+    shortstr = reduce(_shortstring, inner; init="")
     print(io, shortstr)
 end
 
@@ -556,10 +557,10 @@ julia> getoptic(@varname(x[1]))
 (@o _[1])
 
 julia> getoptic(@varname(x[:, 1]))
-(@o _[:, 1])
+(@o _[Colon(), 1])
 
 julia> getoptic(@varname(x[:, 1][2]))
-(@o _[:, 1][2])
+(@o _[Colon(), 1][2])
 
 julia> getoptic(@varname(x[1,2][1+5][45][3]))
 (@o _[1, 2][6][45][3])
