@@ -124,6 +124,19 @@ getoptic(vn::VarName) = vn.optic
     get(obj, vn::VarName{sym})
 
 Alias for `getoptic(vn)(obj)`.
+
+# Example
+
+```jldoctest; setup = :(nt = (a = 1, b = (c = [1, 2, 3],)); name = :nt)
+julia> get(nt, @varname(nt.a))
+1
+
+julia> get(nt, @varname(nt.b.c[1]))
+1
+
+julia> get(nt, @varname(\$name.b.c[1]))
+1
+```
 """
 function Base.get(obj, vn::VarName{sym}) where {sym}
     return getoptic(vn)(obj)
@@ -132,10 +145,20 @@ end
 """
     set(obj, vn::VarName{sym}, value)
 
-Alias for `set(obj, PropertyLens{sym}() ∘ getoptic(vn), value)`.
+Alias for `set(obj, PropertyLens{sym}() ⨟ getoptic(vn), value)`.
+
+# Example
+
+```jldoctest; setup = :(nt = (a = 1, b = (c = [1, 2, 3],)); name = :nt)
+julia> Accessors.set(nt, @varname(a), 10)
+(a = 10, b = (c = [1, 2, 3],))
+
+julia> Accessors.set(nt, @varname(b.c[1]), 10)
+(a = 1, b = (c = [10, 2, 3],))
+```
 """
 function Accessors.set(obj, vn::VarName{sym}, value) where {sym}
-    return Accessors.set(obj, PropertyLens{sym}() ∘ getoptic(vn), value)
+    return Accessors.set(obj, PropertyLens{sym}() ⨟ getoptic(vn), value)
 end
 
 

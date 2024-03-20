@@ -4,6 +4,8 @@ using OffsetArrays
 
 using AbstractPPL: ⊑, ⊒, ⋢, ⋣, ≍
 
+using AbstractPPL: Accessors
+using AbstractPPL.Accessors: IndexLens, PropertyLens
 
 macro test_strict_subsumption(x, y)
     quote
@@ -86,5 +88,24 @@ end
         B = OffsetArray(A, -5, -5) # indices -4:5×-4:5
         @test collect(get(B, @varname(B[1, :], true))) == collect(get(B, @varname(B[1, -4:5])))
 
+    end
+
+    @testset "type stability" begin
+        @inferred VarName{:a}()
+        @inferred VarName{:a}(IndexLens(1))
+        @inferred VarName{:a}(IndexLens(1, 2))
+        @inferred VarName{:a}(PropertyLens(:b))
+        @inferred VarName{:a}(Accessors.opcompose(IndexLens(1), PropertyLens(:b)))
+
+        a = [1, 2, 3]
+        @inferred get(a, @varname(a[1]))
+
+        b = (a=[1, 2, 3],)
+        @inferred get(b, @varname(b.a[1]))
+        @inferred Accessors.set(b, @varname(a[1]), 10)
+
+        c = (b=(a=[1, 2, 3],),)
+        @inferred get(c, @varname(c.b.a[1]))
+        @inferred Accessors.set(c, @varname(b.a[1]), 10)
     end
 end
