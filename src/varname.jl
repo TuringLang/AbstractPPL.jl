@@ -13,7 +13,7 @@ The Julia variable in the model corresponding to `sym` can refer to a single val
 hierarchical array structure of univariate, multivariate or matrix variables. The field `lens`
 stores the indices requires to access the random variable from the Julia variable indicated by `sym`
 as a tuple of tuples. Each element of the tuple thereby contains the indices of one optic
-operation.  
+operation.
 
 `VarName`s can be manually constructed using the `VarName{sym}(optic)` constructor, or from an
 optic expression through the [`@varname`](@ref) convenience macro.
