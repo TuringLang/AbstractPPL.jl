@@ -149,7 +149,7 @@ Alias for `set(obj, PropertyLens{sym}() ⨟ getoptic(vn), value)`.
 
 # Example
 
-```jldoctest; setup = :(nt = (a = 1, b = (c = [1, 2, 3],)); name = :nt)
+```jldoctest; setup = :(using AbstractPPL: Accessors; nt = (a = 1, b = (c = [1, 2, 3],)); name = :nt)
 julia> Accessors.set(nt, @varname(a), 10)
 (a = 10, b = (c = [1, 2, 3],))
 
