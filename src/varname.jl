@@ -1,7 +1,5 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
-
-using Setfield: Setfield
 using MacroTools
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
@@ -572,14 +570,11 @@ julia> x = (a = [(b = rand(2), )], ); getoptic(@varname(x.a[1].b[end], true))
 (@o _.a[1].b[2])
 ```
 
-Interpolation can be used for names (only the base name as well as property name).  Variables within
-indices are always evaluated in the calling scope
+Interpolation can be used for variable names, or array name, but not the lhs of a `.` expression.
+Variables within indices are always evaluated in the calling scope.
 
 ```jldoctest
 julia> name, i = :a, 10;
-
-julia> @varname(x.\$name[i, i+1])
-x.a[10, 11]
 
 julia> @varname(\$name)
 a
@@ -590,8 +585,9 @@ a[1]
 julia> @varname(\$name.x[1])
 a.x[1]
 
-julia> @varname(b.\$name.x[1])
-b.a.x[1]
+julia> @varname(a.\$name[1])
+ERROR: LoadError: ArgumentError: Error while parsing :(a.:(\$name)). Second argument to `getproperty` can only bean `Int`, `Symbol` or `String` literal, received `\$name` instead.
+[...]
 ```
 """
 macro varname(expr::Union{Expr,Symbol}, concretize::Bool=Accessors.need_dynamic_optic(expr))
@@ -602,35 +598,21 @@ varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 varname(sym::Symbol, _) = varname(sym)
 function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
-        # Split into object/base symbol and lens.
-        sym_escaped, lens = Setfield.parse_obj_lens(expr)
-        lens = lens_to_optic(lens)
-        # Setfield.jl escapes the return symbol, so we need to unescape
-        # to call `QuoteNode` on it.
-        sym = drop_escape(sym_escaped)
+        sym_escaped, optic = Accessors.parse_obj_optic(expr)
 
-        # This is to handle interpolated heads -- Setfield treats them differently:
-        # julia> Setfield.parse_obj_lens(@q $name.a)
-        # (:($(Expr(:escape, :_))), :((Setfield.compose)($(Expr(:escape, :name)), (Setfield.PropertyLens){:a}())))
-        # julia> Setfield.parse_obj_lens(@q x.a)
-        # (:($(Expr(:escape, :x))), :((Setfield.compose)((Setfield.PropertyLens){:a}())))
-        if sym != :_
-            sym = QuoteNode(sym)
-        else
-            sym = lens.args[2]
-            lens = Expr(:call, lens.args[1], lens.args[3:end]...)
-        end
+        sym = get_head_sym(expr)
+        sym = sym isa Symbol ? QuoteNode(sym) : sym_escaped
 
         if concretize
             return :(
                 $(AbstractPPL.VarName){$sym}(
-                    $(AbstractPPL.concretize)($lens, $sym_escaped)
-                )
+                $(AbstractPPL.concretize)($optic, $sym_escaped)
             )
-        elseif Setfield.need_dynamic_lens(expr)
+            )
+        elseif Accessors.need_dynamic_optic(expr)
             error("Variable name `$(expr)` is dynamic and requires concretization!")
         else
-            :($(AbstractPPL.VarName){$sym}($lens))
+            return :($(AbstractPPL.VarName){$sym}($optic))
         end
     elseif Meta.isexpr(expr, :$, 1)
         return :($(AbstractPPL.VarName){$(esc(expr.args[1]))}())
@@ -639,25 +621,39 @@ function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
     end
 end
 
-drop_escape(x) = x
-function drop_escape(expr::Expr)
-    Meta.isexpr(expr, :escape) && return drop_escape(expr.args[1])
-    return Expr(expr.head, map(x -> drop_escape(x), expr.args)...)
-end
+"""
+    get_head_sym(expr)
 
-function lens_to_optic(lens)
-    MacroTools.postwalk(lens) do ex
-        if ex == (Setfield.compose)
-            return :(Accessors.opcompose)
-        elseif ex == (Setfield.PropertyLens)
-            return :(Accessors.PropertyLens)
-        elseif ex == (Setfield.IndexLens)
-            return :(Accessors.IndexLens)
-        elseif ex == (Setfield.DynamicIndexLens)
-            return :(Accessors.DynamicIndexLens)
+Extract the head symbol from a variable name expression.
+`Accessors.parse_obj_optic` always returns escaped symbol, so we need a way to tell if we should unescape it or not.
+Should only be called from `varname` function in the `if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)` clause.
+
+# Example
+```jldoctest; setup = :(using AbstractPPL: get_head_sym)
+julia> get_head_sym(:(x[1].a[1]))
+:x
+
+julia> get_head_sym(Meta.parse("\\\$x[1].a[1].b"))
+:(\$(Expr(:\$, :x)))
+```
+"""
+function get_head_sym(expr)
+    head_sym = nothing
+    MacroTools.postwalk(expr) do sub_expr
+        if Meta.isexpr(sub_expr, (:ref, :.))
+            v = sub_expr.args[1]
+            if v isa Symbol || Meta.isexpr(v, :$)
+                head_sym = v
+            end
         end
-        return ex
+        return sub_expr
     end
+
+    if head_sym === nothing
+        error("Malformed variable name `$(expr)`!")
+    end
+
+    return head_sym
 end
 
 """
