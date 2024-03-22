@@ -599,6 +599,9 @@ Variables within indices are always evaluated in the calling scope.
 ```jldoctest
 julia> name, i = :a, 10;
 
+julia> @varname(x.\$name[i, i+1])
+x.a[10, 11]
+
 julia> @varname(\$name)
 a
 
@@ -608,9 +611,8 @@ a[1]
 julia> @varname(\$name.x[1])
 a.x[1]
 
-julia> @varname(a.\$name[1])
-ERROR: LoadError: ArgumentError: Error while parsing :(a.:(\$name)). Second argument to `getproperty` can only bean `Int`, `Symbol` or `String` literal, received `\$name` instead.
-[...]
+julia> @varname(b.\$name.x[1])
+b.a.x[1]
 ```
 """
 macro varname(expr::Union{Expr,Symbol}, concretize::Bool=Accessors.need_dynamic_optic(expr))
@@ -621,21 +623,34 @@ varname(sym::Symbol) = :($(AbstractPPL.VarName){$(QuoteNode(sym))}())
 varname(sym::Symbol, _) = varname(sym)
 function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
     if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
-        sym_escaped, optic = Accessors.parse_obj_optic(expr)
+        # Split into object/base symbol and lens.
+        sym_escaped, optics = _parse_obj_optic(expr)
+        # Setfield.jl escapes the return symbol, so we need to unescape
+        # to call `QuoteNode` on it.
+        sym = drop_escape(sym_escaped)
 
-        sym = get_head_sym(expr)
-        sym = sym isa Symbol ? QuoteNode(sym) : sym_escaped
+        # This is to handle interpolated heads -- Setfield treats them differently:
+        # julia> _parse_obj_optics(@q $name.a)
+        # (:($(Expr(:escape, :_))), :((Setfield.compose)($(Expr(:escape, :name)), (Setfield.PropertyLens){:a}())))
+        # julia> _parse_obj_optics(@q x.a)
+        # (:($(Expr(:escape, :x))), :((Setfield.compose)((Setfield.PropertyLens){:a}())))
+        if sym != :_
+            sym = QuoteNode(sym)
+        else
+            sym = optics.args[2]
+            optics = Expr(:call, optics.args[1], optics.args[3:end]...)
+        end
 
         if concretize
             return :(
                 $(AbstractPPL.VarName){$sym}(
-                $(AbstractPPL.concretize)($optic, $sym_escaped)
-            )
+                    $(AbstractPPL.concretize)($optics, $sym_escaped)
+                )
             )
         elseif Accessors.need_dynamic_optic(expr)
             error("Variable name `$(expr)` is dynamic and requires concretization!")
         else
-            return :($(AbstractPPL.VarName){$sym}($optic))
+            return :($(AbstractPPL.VarName){$sym}($optics))
         end
     elseif Meta.isexpr(expr, :$, 1)
         return :($(AbstractPPL.VarName){$(esc(expr.args[1]))}())
@@ -644,39 +659,70 @@ function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
     end
 end
 
-"""
-    get_head_sym(expr)
+drop_escape(x) = x
+function drop_escape(expr::Expr)
+    Meta.isexpr(expr, :escape) && return drop_escape(expr.args[1])
+    return Expr(expr.head, map(x -> drop_escape(x), expr.args)...)
+end
 
-Extract the head symbol from a variable name expression.
-`Accessors.parse_obj_optic` always returns escaped symbol, so we need a way to tell if we should unescape it or not.
-Should only be called from `varname` function in the `if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)` clause.
+function _parse_obj_optic(ex)
+    obj, optics = _parse_obj_optics(ex)
+    optic = Expr(:call, :(Accessors.opticcompose), optics...)
+    obj, optic
+end
 
-# Example
-```jldoctest; setup = :(using AbstractPPL: get_head_sym)
-julia> get_head_sym(:(x[1].a[1]))
-:x
+# Accessors doesn't have the same support for interpolation, so copy and modify Setfield's parsing functions
+is_interpolation(x) = x isa Expr && x.head == :$
 
-julia> get_head_sym(Meta.parse("\\\$x[1].a[1].b"))
-:(\$(Expr(:\$, :x)))
-```
-"""
-function get_head_sym(expr)
-    head_sym = nothing
-    MacroTools.postwalk(expr) do sub_expr
-        if Meta.isexpr(sub_expr, (:ref, :.))
-            v = sub_expr.args[1]
-            if v isa Symbol || Meta.isexpr(v, :$)
-                head_sym = v
-            end
+function _parse_obj_optics_composite(lensexprs::Vector)
+    if isempty(lensexprs)
+        return esc(:_), ()
+    else
+        obj, outermostlens = _parse_obj_optics(lensexprs[1])
+        innerlenses = map(lensexprs[2:end]) do innerex
+            o, lens = _parse_obj_optics(innerex)
+            @assert o == esc(:_)
+            lens
         end
-        return sub_expr
+        return obj, (outermostlens, innerlenses...)
     end
+end
 
-    if head_sym === nothing
-        error("Malformed variable name `$(expr)`!")
+function _parse_obj_optics(ex)
+    if @capture(ex, ∘(opticsexprs__))
+        return _parse_obj_optics_composite(opticsexprs)
+    elseif is_interpolation(ex)
+        @assert length(ex.args) == 1
+        return esc(:_), (esc(ex.args[1]),)
+    elseif @capture(ex, front_[indices__])
+        obj, frontoptics = _parse_obj_optics(front)
+        if any(Accessors.need_dynamic_optic, indices)
+            @gensym collection
+            indices = Accessors.replace_underscore.(indices, collection)
+            dims = length(indices) == 1 ? nothing : 1:length(indices)
+            lindices = esc.(Accessors.lower_index.(collection, indices, dims))
+            optics = :($(Accessors.DynamicIndexLens)($(esc(collection)) -> ($(lindices...),)))
+        else
+            index = esc(Expr(:tuple, indices...))
+            optics = :($(Accessors.IndexLens)($index))
+        end
+    elseif @capture(ex, front_.property_)
+        obj, frontoptics = _parse_obj_optics(front)
+        if property isa Union{Symbol,String}
+            optics = :($(Accessors.PropertyLens){$(QuoteNode(property))}())
+        elseif is_interpolation(property)
+            optics = :($(Accessors.PropertyLens){$(esc(property.args[1]))}())
+        else
+            throw(ArgumentError(
+                string("Error while parsing :($ex). Second argument to `getproperty` can only be",
+                       "a `Symbol` or `String` literal, received `$property` instead.")
+            ))
+        end
+    else
+        obj = esc(ex)
+        return obj, ()
     end
-
-    return head_sym
+    obj, tuple(frontoptics..., optics)
 end
 
 """
