@@ -630,10 +630,10 @@ function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
         sym = drop_escape(sym_escaped)
 
         # This is to handle interpolated heads -- Setfield treats them differently:
-        # julia> _parse_obj_optics(@q $name.a)
-        # (:($(Expr(:escape, :_))), :((Setfield.compose)($(Expr(:escape, :name)), (Setfield.PropertyLens){:a}())))
-        # julia> _parse_obj_optics(@q x.a)
-        # (:($(Expr(:escape, :x))), :((Setfield.compose)((Setfield.PropertyLens){:a}())))
+        # julia>  AbstractPPL._parse_obj_optics(Meta.parse("\$name.a"))
+        # (:($(Expr(:escape, :_))), (:($(Expr(:escape, :name))), :((PropertyLens){:a}())))
+        # julia> AbstractPPL._parse_obj_optic(:(x.a))
+        # (:($(Expr(:escape, :x))), :(Accessors.opticcompose((PropertyLens){:a}())))
         if sym != :_
             sym = QuoteNode(sym)
         else
