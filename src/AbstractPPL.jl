@@ -3,7 +3,7 @@ module AbstractPPL
 # VarName
 export VarName,
     getsym,
-    getlens,
+    getoptic,
     inspace,
     subsumes,
     subsumedby,

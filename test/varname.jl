@@ -1,9 +1,11 @@
+using Accessors
 using InvertedIndices
 using OffsetArrays
-using Setfield
 
 using AbstractPPL: ⊑, ⊒, ⋢, ⋣, ≍
 
+using AbstractPPL: Accessors
+using AbstractPPL.Accessors: IndexLens, PropertyLens
 
 macro test_strict_subsumption(x, y)
     quote
@@ -21,20 +23,18 @@ end
         
         @test @varname(A[:, 1][1+1]) == @varname(A[:, 1][2])
         @test(@varname(A[:, 1][2]) ==
-            VarName{:A}(@lens(_[:, 1]) ∘ @lens(_[2])) ==
-            VarName{:A}(@lens(_[:, 1])) ∘ @lens(_[2]) ==
-            VarName{:A}() ∘ @lens(_[:, 1]) ∘ @lens(_[2]))
+            VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])))
 
         # concretization
         y = zeros(10, 10)
         x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
 
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
-        @test @varname(y[:], true) ==  @varname(y[1:100])
-        @test @varname(y[:, begin], true) == @varname(y[1:10, 1])
-        @test getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
+        @test get(y, @varname(y[:], true)) ==  get(y, @varname(y[1:100]))
+        @test get(y, @varname(y[:, begin], true)) == get(y, @varname(y[1:10, 1]))
+        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
-        @test @varname(x.a[1:end, end][:], true) == @varname(x.a[1:3,2][1:3])
+        @test get(x, @varname(x.a[1:end, end][:], true)) == get(x, @varname(x.a[1:3,2][1:3]))
     end
     
     @testset "subsumption with standard indexing" begin
@@ -83,10 +83,29 @@ end
 
     @testset "non-standard indexing" begin
         A = rand(10, 10)
-        @test @varname(A[1, Not(3)], true) == @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]])
+        @test get(A, @varname(A[1, Not(3)], true)) == get(A, @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]]))
         
         B = OffsetArray(A, -5, -5) # indices -4:5×-4:5
-        @test @varname(B[1, :], true) == @varname(B[1, -4:5])
+        @test collect(get(B, @varname(B[1, :], true))) == collect(get(B, @varname(B[1, -4:5])))
 
+    end
+
+    @testset "type stability" begin
+        @inferred VarName{:a}()
+        @inferred VarName{:a}(IndexLens(1))
+        @inferred VarName{:a}(IndexLens(1, 2))
+        @inferred VarName{:a}(PropertyLens(:b))
+        @inferred VarName{:a}(Accessors.opcompose(IndexLens(1), PropertyLens(:b)))
+
+        a = [1, 2, 3]
+        @inferred get(a, @varname(a[1]))
+
+        b = (a=[1, 2, 3],)
+        @inferred get(b, @varname(b.a[1]))
+        @inferred Accessors.set(b, @varname(a[1]), 10)
+
+        c = (b=(a=[1, 2, 3],),)
+        @inferred get(c, @varname(c.b.a[1]))
+        @inferred Accessors.set(c, @varname(b.a[1]), 10)
     end
 end
