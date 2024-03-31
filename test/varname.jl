@@ -90,14 +90,6 @@ end
 
     end
     
-    @testset "parsing composite optics" begin
-        ex = :(∘(_.f, _[1]))
-        obj, optics = AbstractPPL._parse_obj_optics(ex)
-        @test obj == :($(Expr(:escape, :_)))
-        @test optics[1] == (:(($(Accessors.PropertyLens)){:f}()),)
-        @test optics[2] == (:(($(Accessors.IndexLens))($(Expr(:escape, :((1,)))))),)
-    end
-    
     @testset "type stability" begin
         @inferred VarName{:a}()
         @inferred VarName{:a}(IndexLens(1))

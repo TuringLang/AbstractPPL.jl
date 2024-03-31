@@ -670,28 +670,10 @@ function _parse_obj_optic(ex)
     obj, optic
 end
 
-# Accessors doesn't have the same support for interpolation, so copy and modify Setfield's parsing functions
-is_interpolation(x) = x isa Expr && x.head == :$
-
-function _parse_obj_optics_composite(lensexprs::Vector)
-    if isempty(lensexprs)
-        return esc(:_), ()
-    else
-        obj, outermostlens = _parse_obj_optics(lensexprs[1])
-        innerlenses = map(lensexprs[2:end]) do innerex
-            o, lens = _parse_obj_optics(innerex)
-            @assert o == esc(:_)
-            lens
-        end
-        return obj, (outermostlens, innerlenses...)
-    end
-end
-
+# Accessors doesn't have the same support for interpolation
+# so this function is copied and altered from `Setfield._parse_obj_lens`
 function _parse_obj_optics(ex)
-    if Meta.isexpr(ex, :call) && ex.args[1] == :∘ # matching ∘(opticsexprs)
-        opticsexprs = ex.args[2:end]
-        return _parse_obj_optics_composite(opticsexprs)
-    elseif is_interpolation(ex)
+    if ex isa Expr && ex.head == :$
         @assert length(ex.args) == 1
         return esc(:_), (esc(ex.args[1]),)
     elseif Meta.isexpr(ex, :ref)
@@ -713,7 +695,7 @@ function _parse_obj_optics(ex)
         obj, frontoptics = _parse_obj_optics(front)
         if property isa Union{Symbol,String}
             optics = :($(Accessors.PropertyLens){$(QuoteNode(property))}())
-        elseif is_interpolation(property)
+        elseif property isa Expr && property.head == :$
             optics = :($(Accessors.PropertyLens){$(esc(property.args[1]))}())
         else
             throw(ArgumentError(
