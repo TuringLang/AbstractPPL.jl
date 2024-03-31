@@ -89,7 +89,15 @@ end
         @test collect(get(B, @varname(B[1, :], true))) == collect(get(B, @varname(B[1, -4:5])))
 
     end
-
+    
+    @testset "optic expression parser" begin
+        ex = :(∘(_.f, _[1]))
+        obj, optics = AbstractPPL._parse_obj_optics(ex)
+        @test obj == :($(Expr(:escape, :_)))
+        @test optics[1] == (:(($(Accessors.PropertyLens)){:f}()),)
+        @test optics[2] == (:(($(Accessors.IndexLens))($(Expr(:escape, :((1,)))))),)
+    end
+    
     @testset "type stability" begin
         @inferred VarName{:a}()
         @inferred VarName{:a}(IndexLens(1))

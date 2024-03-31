@@ -1,6 +1,5 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
-using Accessors.MacroTools: @capture
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
@@ -689,12 +688,14 @@ function _parse_obj_optics_composite(lensexprs::Vector)
 end
 
 function _parse_obj_optics(ex)
-    if @capture(ex, ∘(opticsexprs__))
+    if Meta.isexpr(ex, :call) && ex.args[1] == :∘ # matching ∘(opticsexprs)
+        opticsexprs = ex.args[2:end]
         return _parse_obj_optics_composite(opticsexprs)
     elseif is_interpolation(ex)
         @assert length(ex.args) == 1
         return esc(:_), (esc(ex.args[1]),)
-    elseif @capture(ex, front_[indices__])
+    elseif Meta.isexpr(ex, :ref)
+        front, indices... = ex.args
         obj, frontoptics = _parse_obj_optics(front)
         if any(Accessors.need_dynamic_optic, indices)
             @gensym collection
@@ -706,7 +707,9 @@ function _parse_obj_optics(ex)
             index = esc(Expr(:tuple, indices...))
             optics = :($(Accessors.IndexLens)($index))
         end
-    elseif @capture(ex, front_.property_)
+    elseif Meta.isexpr(ex, :.)
+        front = ex.args[1]
+        property = ex.args[2].value # ex.args[2] is a QuoteNode
         obj, frontoptics = _parse_obj_optics(front)
         if property isa Union{Symbol,String}
             optics = :($(Accessors.PropertyLens){$(QuoteNode(property))}())
