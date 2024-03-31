@@ -9,7 +9,6 @@ version = "0.8.0"
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
-MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
