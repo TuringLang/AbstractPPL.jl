@@ -1,5 +1,6 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
+using Accessors.MacroTools: @capture
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
