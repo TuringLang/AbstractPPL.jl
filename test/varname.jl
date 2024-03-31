@@ -90,7 +90,7 @@ end
 
     end
     
-    @testset "optic expression parser" begin
+    @testset "parsing composite optics" begin
         ex = :(∘(_.f, _[1]))
         obj, optics = AbstractPPL._parse_obj_optics(ex)
         @test obj == :($(Expr(:escape, :_)))
