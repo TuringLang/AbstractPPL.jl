@@ -89,7 +89,6 @@ end
         @test collect(get(B, @varname(B[1, :], true))) == collect(get(B, @varname(B[1, -4:5])))
 
     end
-    
     @testset "type stability" begin
         @inferred VarName{:a}()
         @inferred VarName{:a}(IndexLens(1))

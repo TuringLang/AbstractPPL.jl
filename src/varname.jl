@@ -673,10 +673,9 @@ end
 # Accessors doesn't have the same support for interpolation
 # so this function is copied and altered from `Setfield._parse_obj_lens`
 function _parse_obj_optics(ex)
-    if ex isa Expr && ex.head == :$
-        @assert length(ex.args) == 1
+    if Meta.isexpr(ex, :$, 1)
         return esc(:_), (esc(ex.args[1]),)
-    elseif Meta.isexpr(ex, :ref)
+    elseif Meta.isexpr(ex, :ref) && !isempty(ex.args)
         front, indices... = ex.args
         obj, frontoptics = _parse_obj_optics(front)
         if any(Accessors.need_dynamic_optic, indices)
@@ -689,13 +688,13 @@ function _parse_obj_optics(ex)
             index = esc(Expr(:tuple, indices...))
             optics = :($(Accessors.IndexLens)($index))
         end
-    elseif Meta.isexpr(ex, :.)
+    elseif Meta.isexpr(ex, :., 2)
         front = ex.args[1]
         property = ex.args[2].value # ex.args[2] is a QuoteNode
         obj, frontoptics = _parse_obj_optics(front)
         if property isa Union{Symbol,String}
             optics = :($(Accessors.PropertyLens){$(QuoteNode(property))}())
-        elseif property isa Expr && property.head == :$
+        elseif Meta.isexpr(property, :$, 1)
             optics = :($(Accessors.PropertyLens){$(esc(property.args[1]))}())
         else
             throw(ArgumentError(
