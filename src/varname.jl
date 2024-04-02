@@ -1,6 +1,5 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
-using MacroTools
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
@@ -671,30 +670,13 @@ function _parse_obj_optic(ex)
     obj, optic
 end
 
-# Accessors doesn't have the same support for interpolation, so copy and modify Setfield's parsing functions
-is_interpolation(x) = x isa Expr && x.head == :$
-
-function _parse_obj_optics_composite(lensexprs::Vector)
-    if isempty(lensexprs)
-        return esc(:_), ()
-    else
-        obj, outermostlens = _parse_obj_optics(lensexprs[1])
-        innerlenses = map(lensexprs[2:end]) do innerex
-            o, lens = _parse_obj_optics(innerex)
-            @assert o == esc(:_)
-            lens
-        end
-        return obj, (outermostlens, innerlenses...)
-    end
-end
-
+# Accessors doesn't have the same support for interpolation
+# so this function is copied and altered from `Setfield._parse_obj_lens`
 function _parse_obj_optics(ex)
-    if @capture(ex, ∘(opticsexprs__))
-        return _parse_obj_optics_composite(opticsexprs)
-    elseif is_interpolation(ex)
-        @assert length(ex.args) == 1
+    if Meta.isexpr(ex, :$, 1)
         return esc(:_), (esc(ex.args[1]),)
-    elseif @capture(ex, front_[indices__])
+    elseif Meta.isexpr(ex, :ref) && !isempty(ex.args)
+        front, indices... = ex.args
         obj, frontoptics = _parse_obj_optics(front)
         if any(Accessors.need_dynamic_optic, indices)
             @gensym collection
@@ -706,11 +688,13 @@ function _parse_obj_optics(ex)
             index = esc(Expr(:tuple, indices...))
             optics = :($(Accessors.IndexLens)($index))
         end
-    elseif @capture(ex, front_.property_)
+    elseif Meta.isexpr(ex, :., 2)
+        front = ex.args[1]
+        property = ex.args[2].value # ex.args[2] is a QuoteNode
         obj, frontoptics = _parse_obj_optics(front)
         if property isa Union{Symbol,String}
             optics = :($(Accessors.PropertyLens){$(QuoteNode(property))}())
-        elseif is_interpolation(property)
+        elseif Meta.isexpr(property, :$, 1)
             optics = :($(Accessors.PropertyLens){$(esc(property.args[1]))}())
         else
             throw(ArgumentError(
