@@ -138,7 +138,7 @@ julia> get(nt, @varname(\$name.b.c[1]))
 ```
 """
 function Base.get(obj, vn::VarName{sym}) where {sym}
-    return getoptic(vn)(obj)
+    return (PropertyLens{sym}() ⨟ getoptic(vn))(obj)
 end
 
 """

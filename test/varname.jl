@@ -27,7 +27,7 @@ end
 
         # concretization
         y = zeros(10, 10)
-        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
+        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 1.0);
 
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
         @test get(y, @varname(y[:], true)) ==  get(y, @varname(y[1:100]))
@@ -35,6 +35,7 @@ end
         @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
         @test get(x, @varname(x.a[1:end, end][:], true)) == get(x, @varname(x.a[1:3,2][1:3]))
+        @test get(x, @varname(b)) == 1.0
     end
     
     @testset "subsumption with standard indexing" begin
