@@ -104,10 +104,10 @@ end
 
     @testset "non-standard indexing" begin
         A = rand(10, 10)
-        @test get(A, @varname(A[1, Not(3)], true)) == get(A, @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]]))
+        @test test_equal(@varname(A[1, Not(3)], true), @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]]))
         
         B = OffsetArray(A, -5, -5) # indices -4:5×-4:5
-        @test collect(get(B, @varname(B[1, :], true))) == collect(get(B, @varname(B[1, -4:5])))
+        @test test_equal(@varname(B[1, :], true), @varname(B[1, -4:5]))
 
     end
     @testset "type stability" begin
@@ -117,15 +117,12 @@ end
         @inferred VarName{:a}(PropertyLens(:b))
         @inferred VarName{:a}(Accessors.opcompose(IndexLens(1), PropertyLens(:b)))
 
-        a = [1, 2, 3]
-        @inferred get(a, @varname(a[1]))
-
         b = (a=[1, 2, 3],)
-        @inferred get(b, @varname(b.a[1]))
+        @inferred get(b, @varname(a[1]))
         @inferred Accessors.set(b, @varname(a[1]), 10)
 
         c = (b=(a=[1, 2, 3],),)
-        @inferred get(c, @varname(c.b.a[1]))
+        @inferred get(c, @varname(b.a[1]))
         @inferred Accessors.set(c, @varname(b.a[1]), 10)
     end
 end
