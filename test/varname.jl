@@ -14,6 +14,19 @@ macro test_strict_subsumption(x, y)
     end
 end
 
+function test_equal(o1::VarName{sym1}, o2::VarName{sym2}) where {sym1, sym2}
+    return sym1 === sym2 && test_equal(o1.optic, o2.optic)
+end
+function test_equal(o1::ComposedFunction, o2::ComposedFunction)
+    return test_equal(o1.inner, o2.inner) && test_equal(o1.outer, o2.outer)
+end
+function test_equal(o1::Accessors.IndexLens, o2::Accessors.IndexLens)
+    return test_equal(o1.indices, o2.indices)
+end
+function test_equal(o1, o2)
+    return o1 == o2
+end
+
 @testset "varnames" begin
     @testset "construction & concretization" begin
         i = 1:10
@@ -27,14 +40,19 @@ end
 
         # concretization
         y = zeros(10, 10)
-        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 1.0);
+        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0],);
 
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
-        @test get(y, @varname(y[:], true)) ==  get(y, @varname(y[1:100]))
-        @test get(y, @varname(y[:, begin], true)) == get(y, @varname(y[1:10, 1]))
-        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
+        @test test_equal(@varname(y[:], true), @varname(y[1:100]))
+        @test test_equal(@varname(y[:, begin], true), @varname(y[1:10, 1]))
+        @test AbstractPPL.concretize(@varname(y[:]), y).optic.indices[1] === 
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
-        @test get(x, @varname(x.a[1:end, end][:], true)) == get(x, @varname(x.a[1:3,2][1:3]))
+        @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3,2][1:3]))
+    end
+
+    @testset "get & set" begin
+        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 1.0);
+        @test get(x, @varname(a[1, 2])) == 2.0
         @test get(x, @varname(b)) == 1.0
     end
     
