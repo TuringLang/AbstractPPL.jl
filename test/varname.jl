@@ -45,7 +45,7 @@ end
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
         @test test_equal(@varname(y[:], true), @varname(y[1:100]))
         @test test_equal(@varname(y[:, begin], true), @varname(y[1:10, 1]))
-        @test AbstractPPL.concretize(@varname(y[:]), y).optic.indices[1] === 
+        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] === 
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
         @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3,2][1:3]))
     end
