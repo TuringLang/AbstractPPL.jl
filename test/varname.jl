@@ -54,6 +54,8 @@ end
         x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 1.0);
         @test get(x, @varname(a[1, 2])) == 2.0
         @test get(x, @varname(b)) == 1.0
+        @test set(x, @varname(a[1, 2]), 10) == (a = [1.0 10.0; 3.0 4.0; 5.0 6.0], b = 1.0)
+        @test set(x, @varname(b), 10) == (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 10.0)
     end
     
     @testset "subsumption with standard indexing" begin
