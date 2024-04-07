@@ -122,19 +122,7 @@ getoptic(vn::VarName) = vn.optic
 """
     get(obj, vn::VarName{sym})
 
-Alias for `getoptic(vn)(obj)`.
-
-# Example
-
-```jldoctest; setup = :(nt = (a = 1, b = (c = [1, 2, 3],)); name = :nt)
-julia> get(nt, @varname(nt.a))
-1
-
-julia> get(nt, @varname(nt.b.c[1]))
-1
-
-julia> get(nt, @varname(\$name.b.c[1]))
-1
+Alias for `(PropertyLens{sym}() ⨟ getoptic(vn))(obj)`.
 ```
 """
 function Base.get(obj, vn::VarName{sym}) where {sym}
