@@ -50,6 +50,14 @@ end
         @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3,2][1:3]))
     end
 
+    @testset "equality" begin
+        vn1 = VarName{:a}(IndexLens(1) ∘ identity)
+        vn2 = VarName{:a}(IndexLens(1))
+        vn3 = VarName{:a}(identity ∘ IndexLens(1))
+        @test vn1 == vn2
+        @test vn1 == vn3
+    end
+
     @testset "get & set" begin
         x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 1.0);
         @test get(x, @varname(a[1, 2])) == 2.0

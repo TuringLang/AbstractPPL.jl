@@ -151,7 +151,23 @@ end
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getoptic(vn)), h)
 function Base.:(==)(x::VarName, y::VarName)
-    return getsym(x) == getsym(y) && getoptic(x) == getoptic(y)
+    if getsym(x) !== getsym(y)
+        return false
+    end
+    o1, o2 = map((getoptic(x), getoptic(y))) do o
+        if o isa ComposedOptic
+            if o.inner == identity
+                return o.outer
+            elseif o.outer == identity
+                return o.inner
+            else
+                return o
+            end
+        else
+            return o
+        end
+    end
+    return o1 == o2
 end
 
 function Base.show(io::IO, vn::VarName{sym,T}) where {sym,T}
