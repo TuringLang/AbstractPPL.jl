@@ -5,7 +5,7 @@ using OffsetArrays
 using AbstractPPL: ⊑, ⊒, ⋢, ⋣, ≍
 
 using AbstractPPL: Accessors
-using AbstractPPL.Accessors: IndexLens, PropertyLens
+using AbstractPPL.Accessors: IndexLens, PropertyLens, ⨟
 
 macro test_strict_subsumption(x, y)
     quote
@@ -48,6 +48,11 @@ end
         @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] === 
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
         @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3,2][1:3]))
+    end
+
+    @testset "compose and opcompose" begin
+        @test IndexLens(1) ∘ @varname(x.a) == @varname(x.a[1])
+        @test @varname(x.a) ⨟ IndexLens(1) == @varname(x.a[1])
     end
 
     @testset "get & set" begin
