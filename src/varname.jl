@@ -1,6 +1,5 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
-import Accessors: opcompose, ⨟
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
@@ -152,9 +151,6 @@ end
 # Allow compositions with optic.
 function Base.:∘(optic::ALLOWED_OPTICS, vn::VarName{sym,<:ALLOWED_OPTICS}) where {sym}
     return VarName{sym}(optic ∘ getoptic(vn))
-end
-function Accessors.opcompose(vn::VarName{sym,<:ALLOWED_OPTICS}, optic::ALLOWED_OPTICS) where {sym}
-    return VarName{sym}(getoptic(vn) ⨟ optic)
 end
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getoptic(vn)), h)
