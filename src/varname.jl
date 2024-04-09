@@ -1,5 +1,6 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
+import Accessors: opcompose, ⨟
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
@@ -148,6 +149,13 @@ function Accessors.set(obj, vn::VarName{sym}, value) where {sym}
     return Accessors.set(obj, PropertyLens{sym}() ⨟ getoptic(vn), value)
 end
 
+# Allow compositions with optic.
+function Base.:∘(optic::ALLOWED_OPTICS, vn::VarName{sym,<:ALLOWED_OPTICS}) where {sym}
+    return VarName{sym}(optic ∘ getoptic(vn))
+end
+function Accessors.opcompose(vn::VarName{sym,<:ALLOWED_OPTICS}, optic::ALLOWED_OPTICS) where {sym}
+    return VarName{sym}(getoptic(vn) ⨟ optic)
+end
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getoptic(vn)), h)
 function Base.:(==)(x::VarName, y::VarName)
@@ -631,8 +639,8 @@ function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
         if concretize
             return :(
                 $(AbstractPPL.VarName){$sym}(
-                    $(AbstractPPL.concretize)($optics, $sym_escaped)
-                )
+                $(AbstractPPL.concretize)($optics, $sym_escaped)
+            )
             )
         elseif Accessors.need_dynamic_optic(expr)
             error("Variable name `$(expr)` is dynamic and requires concretization!")
@@ -687,7 +695,7 @@ function _parse_obj_optics(ex)
         else
             throw(ArgumentError(
                 string("Error while parsing :($ex). Second argument to `getproperty` can only be",
-                       "a `Symbol` or `String` literal, received `$property` instead.")
+                    "a `Symbol` or `String` literal, received `$property` instead.")
             ))
         end
     else
