@@ -148,25 +148,24 @@ function Accessors.set(obj, vn::VarName{sym}, value) where {sym}
     return Accessors.set(obj, PropertyLens{sym}() ⨟ getoptic(vn), value)
 end
 
+# recursively stripe off identity
+function stripe_off_identity(optic::ComposedOptic)
+    if optic.inner == identity
+        return stripe_off_identity(optic.outer)
+    elseif optic.outer == identity
+        return stripe_off_identity(optic.inner)
+    else
+        return stripe_off_identity(optic.outer) ∘ stripe_off_identity(optic.inner)
+    end
+end
+stripe_off_identity(optic) = optic
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getoptic(vn)), h)
 function Base.:(==)(x::VarName, y::VarName)
     if getsym(x) !== getsym(y)
         return false
     end
-    o1, o2 = map((getoptic(x), getoptic(y))) do o
-        if o isa ComposedOptic
-            if o.inner == identity
-                return o.outer
-            elseif o.outer == identity
-                return o.inner
-            else
-                return o
-            end
-        else
-            return o
-        end
-    end
+    o1, o2 = map(stripe_off_identity, (getoptic(x), getoptic(y)))
     return o1 == o2
 end
 
@@ -647,8 +646,8 @@ function varname(expr::Expr, concretize=Accessors.need_dynamic_optic(expr))
         if concretize
             return :(
                 $(AbstractPPL.VarName){$sym}(
-                    $(AbstractPPL.concretize)($optics, $sym_escaped)
-                )
+                $(AbstractPPL.concretize)($optics, $sym_escaped)
+            )
             )
         elseif Accessors.need_dynamic_optic(expr)
             error("Variable name `$(expr)` is dynamic and requires concretization!")
@@ -703,7 +702,7 @@ function _parse_obj_optics(ex)
         else
             throw(ArgumentError(
                 string("Error while parsing :($ex). Second argument to `getproperty` can only be",
-                       "a `Symbol` or `String` literal, received `$property` instead.")
+                    "a `Symbol` or `String` literal, received `$property` instead.")
             ))
         end
     else

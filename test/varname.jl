@@ -56,6 +56,13 @@ end
         vn3 = VarName{:a}(identity ∘ IndexLens(1))
         @test vn1 == vn2
         @test vn1 == vn3
+
+        vn4 = VarName{:a}(identity ∘ PropertyLens{:b}() ∘ (IndexLens(1) ∘ identity))
+        vn5 = VarName{:a}(PropertyLens{:b}() ∘ IndexLens(1))
+        @test vn4 == vn5
+
+        d = Dict(vn4 => 1)
+        @test d[vn5] == 1
     end
 
     @testset "get & set" begin
