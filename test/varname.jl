@@ -53,6 +53,13 @@ end
     @testset "compose and opcompose" begin
         @test IndexLens(1) ∘ @varname(x.a) == @varname(x.a[1])
         @test @varname(x.a) ⨟ IndexLens(1) == @varname(x.a[1])
+
+        @test @varname(x) ⨟ identity == @varname(x)
+        @test identity ∘ @varname(x) == @varname(x)
+        @test @varname(x.a) ⨟ identity == @varname(x.a)
+        @test identity ∘ @varname(x.a) == @varname(x.a)
+        @test @varname(x[1].b) ⨟ identity == @varname(x[1].b)
+        @test identity ∘ @varname(x[1].b) == @varname(x[1].b)
     end
 
     @testset "get & set" begin

@@ -150,7 +150,14 @@ end
 
 # Allow compositions with optic.
 function Base.:∘(optic::ALLOWED_OPTICS, vn::VarName{sym,<:ALLOWED_OPTICS}) where {sym}
-    return VarName{sym}(optic ∘ getoptic(vn))
+    vn_optic = getoptic(vn)
+    if vn_optic == identity
+        return VarName{sym}(optic)
+    elseif optic == identity
+        return vn
+    else
+        return VarName{sym}(optic ∘ vn_optic)
+    end
 end
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getoptic(vn)), h)
