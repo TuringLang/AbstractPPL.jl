@@ -665,7 +665,7 @@ end
 
 function _parse_obj_optic(ex)
     obj, optics = _parse_obj_optics(ex)
-    optic = Expr(:call, :(Accessors.opticcompose), optics...)
+    optic = Expr(:call, Accessors.opticcompose, optics...)
     obj, optic
 end
 
