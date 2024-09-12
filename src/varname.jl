@@ -302,7 +302,7 @@ subsumes(t::ComposedOptic, u::ComposedOptic) =
 # If `t` is still a composed lens, then there is no way it can subsume `u` since `u` is a
 # leaf of the "lens-tree".
 subsumes(t::ComposedOptic, u::PropertyLens) = false
-# Here we need to check if `u.outer` (i.e. the next lens to be applied from `u`) is
+# Here we need to check if `u.inner` (i.e. the next lens to be applied from `u`) is
 # subsumed by `t`, since this would mean that the rest of the composition is also subsumed
 # by `t`.
 subsumes(t::PropertyLens, u::ComposedOptic) = subsumes(t, u.inner)
