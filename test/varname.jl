@@ -156,12 +156,19 @@ end
             @test varname_from_str(repr(vn)) == vn
         end
 
+        # Variables
+        i = 10
+        vn = @varname(x[i])
+        @test varname_from_str(repr(vn)) == vn
+
         # Post-concretisation
         x = ones(10)
         vn = @varname(x[begin:end])
         @test varname_from_str(repr(vn)) == vn
 
         # When forcing concretisation
+        # This is broken. Should we have a repr_concretised() method or
+        # something like that?
         vn = @varname(x[:], true)
         @test_broken varname_from_str(repr(vn)) == vn
         dump(varname_from_str(repr(vn)))
