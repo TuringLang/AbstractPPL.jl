@@ -663,6 +663,8 @@ function drop_escape(expr::Expr)
     return Expr(expr.head, map(x -> drop_escape(x), expr.args)...)
 end
 
+varname_from_str(str::AbstractString) = eval(drop_escape(varname(Meta.parse(str))))
+
 function _parse_obj_optic(ex)
     obj, optics = _parse_obj_optics(ex)
     optic = Expr(:call, Accessors.opticcompose, optics...)

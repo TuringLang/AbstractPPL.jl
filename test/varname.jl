@@ -137,4 +137,34 @@ end
         @inferred get(c, @varname(b.a[1]))
         @inferred Accessors.set(c, @varname(b.a[1]), 10)
     end
+
+    @testset "roundtrip conversion to/from string" begin
+        # Static optics
+        vns = [
+            @varname(x),
+            @varname(x.a),
+            @varname(x[1]),
+            @varname(x[1:10]),
+            @varname(x[1, 2]),
+            @varname(x[1, 2:5]),
+            @varname(x[:]),
+            @varname(x.a[1]),
+            @varname(x.a[1:10]),
+            @varname(x[1].a),
+        ]
+        for vn in vns
+            @test varname_from_str(repr(vn)) == vn
+        end
+
+        # Post-concretisation
+        x = ones(10)
+        vn = @varname(x[begin:end])
+        @test varname_from_str(repr(vn)) == vn
+
+        # When forcing concretisation
+        vn = @varname(x[:], true)
+        @test_broken varname_from_str(repr(vn)) == vn
+        dump(varname_from_str(repr(vn)))
+        dump(vn)
+    end
 end

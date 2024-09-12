@@ -8,6 +8,7 @@ export VarName,
     subsumes,
     subsumedby,
     varname,
+    varname_from_str,
     vsym,
     @varname,
     @vsym
