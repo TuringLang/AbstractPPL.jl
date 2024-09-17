@@ -25,3 +25,5 @@ Manifest.toml
 
 # vs code environment
 .vscode
+
+.DS_Store
