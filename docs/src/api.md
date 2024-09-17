@@ -25,7 +25,7 @@ AbstractContext
 evaluate!!
 ```
 
-### Abstract traces
+## Abstract traces
 
 ```@docs
 AbstractModelTrace
