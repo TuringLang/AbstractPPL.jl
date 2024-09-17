@@ -139,11 +139,15 @@ end
     end
 
     @testset "roundtrip conversion to/from string" begin
-        # Static optics
+        y = ones(10)
         vns = [
             @varname(x),
+            @varname(ä),
             @varname(x.a),
+            @varname(x.a.b),
+            @varname(var"x.a"),
             @varname(x[1]),
+            @varname(var"x[1]"),
             @varname(x[1:10]),
             @varname(x[1, 2]),
             @varname(x[1, 2:5]),
@@ -151,27 +155,14 @@ end
             @varname(x.a[1]),
             @varname(x.a[1:10]),
             @varname(x[1].a),
+            @varname(y[:]),
+            @varname(y[begin:end]),
+            @varname(y[end]),
+            @varname(y[:], false),
+            @varname(y[:], true),
         ]
         for vn in vns
-            @test varname_from_str(repr(vn)) == vn
+            @test vn_from_string(vn_to_string(vn)) == vn
         end
-
-        # Variables
-        i = 10
-        vn = @varname(x[i])
-        @test varname_from_str(repr(vn)) == vn
-
-        # Post-concretisation
-        x = ones(10)
-        vn = @varname(x[begin:end])
-        @test varname_from_str(repr(vn)) == vn
-
-        # When forcing concretisation
-        # This is broken. Should we have a repr_concretised() method or
-        # something like that?
-        vn = @varname(x[:], true)
-        @test_broken varname_from_str(repr(vn)) == vn
-        dump(varname_from_str(repr(vn)))
-        dump(vn)
     end
 end

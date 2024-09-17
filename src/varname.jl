@@ -450,6 +450,7 @@ struct ConcretizedSlice{T,R} <: AbstractVector{T}
 end
 
 ConcretizedSlice(s::Base.Slice{R}) where {R} = ConcretizedSlice{eltype(s.indices),R}(s.indices)
+ConcretizedSlice(s::Base.OneTo{R}) where {R} = ConcretizedSlice(Base.Slice(s))
 Base.show(io::IO, s::ConcretizedSlice) = print(io, ":")
 Base.show(io::IO, ::MIME"text/plain", s::ConcretizedSlice) =
     print(io, "ConcretizedSlice(", s.range, ")")
@@ -663,8 +664,6 @@ function drop_escape(expr::Expr)
     return Expr(expr.head, map(x -> drop_escape(x), expr.args)...)
 end
 
-varname_from_str(str::AbstractString) = eval(drop_escape(varname(Meta.parse(str))))
-
 function _parse_obj_optic(ex)
     obj, optics = _parse_obj_optics(ex)
     optic = Expr(:call, Accessors.opticcompose, optics...)
@@ -748,4 +747,63 @@ function vsym(expr::Expr)
     else
         error("Malformed variable name `$(expr)`!")
     end
+end
+
+"""
+    index_to_str(i)
+
+Generates a string representation of the index `i`, or a tuple thereof.
+"""
+index_to_str(i::Integer) = string(i)
+index_to_str(r::UnitRange) = "$(first(r)):$(last(r))"
+index_to_str(::Colon) = ":"
+index_to_str(s::ConcretizedSlice{T,R}) where {T,R} = "ConcretizedSlice(" * repr(s.range) * ")"
+index_to_str(t::Tuple) = "(" * join(map(index_to_str, t), ", ") * ",)"
+
+"""
+    optic_to_nt(optic)
+
+Convert an optic to a named tuple representation.
+"""
+optic_to_nt(::typeof(identity)) = (type = "identity",)
+optic_to_nt(::PropertyLens{sym}) where {sym} = (type = "property", field = String(sym))
+optic_to_nt(i::IndexLens) = (type = "index", indices = index_to_str(i.indices))
+optic_to_nt(c::ComposedOptic) = (type = "composed", outer = optic_to_nt(c.outer), inner = optic_to_nt(c.inner))
+
+
+"""
+    nt_to_optic(nt)
+
+Convert a named tuple representation back to an optic.
+"""
+function nt_to_optic(nt)
+    if nt.type == "identity"
+        return identity
+    elseif nt.type == "index"
+        return IndexLens(eval(Meta.parse(nt.indices)))
+    elseif nt.type == "property"
+        return PropertyLens{Symbol(nt.field)}()
+    elseif nt.type == "composed"
+        return nt_to_optic(nt.outer) ∘ nt_to_optic(nt.inner)
+    end
+end
+
+"""
+    vn_to_string(vn::VarName)
+
+Convert a `VarName` as a string (via an intermediate named tuple).
+"""
+vn_to_string(vn::VarName) = repr((sym = String(getsym(vn)), optic = optic_to_nt(getoptic(vn))))
+
+"""
+    vn_from_string(str)
+
+Convert a string representation of a `VarName` back to a `VarName`.
+
+NOTE: This function should only be used with trusted input, as it uses `eval`
+and `Meta.parse` to parse the string.
+"""
+function vn_from_string(str)
+    new_fields = eval(Meta.parse(str))
+    return VarName{Symbol(new_fields.sym)}(nt_to_optic(new_fields.optic))
 end
