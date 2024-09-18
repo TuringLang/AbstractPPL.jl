@@ -211,7 +211,7 @@ Base.Symbol(vn::VarName) = Symbol(string(vn))  # simplified symbol
     inspace(vn::Union{VarName, Symbol}, space::Tuple)
 
 Check whether `vn`'s variable symbol is in `space`.  The empty tuple counts as the "universal space"
-containing all variables. Subsumption (see [`subsume`](@ref)) is respected.
+containing all variables. Subsumption (see [`subsumes`](@ref)) is respected.
 
 ## Examples
 
@@ -322,6 +322,11 @@ subsumes(
 ) = subsumes_indices(t, u)
 
 
+"""
+    subsumedby(t, u)
+
+True if `t` is subsumed by `u`, i.e., if `subsumes(u, t)` is true.
+"""
 subsumedby(t, u) = subsumes(u, t)
 uncomparable(t, u) = t ⋢ u && u ⋢ t
 const ⊒ = subsumes
@@ -514,7 +519,7 @@ julia> y = zeros(10, 10);
 julia> @varname(y[:], true)
 y[:]
 
-julia> # The underlying value is conretized, though:
+julia> # The underlying value is concretized, though:
        AbstractPPL.getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1]
 ConcretizedSlice(Base.OneTo(100))
 ```
@@ -526,11 +531,11 @@ concretize(vn::VarName, x) = VarName(vn, concretize(getoptic(vn), x))
 
 A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing expression `expr`.
 
-If `concretize` is `true`, the resulting expression will be wrapped in a [`concretize`](@ref) call.
+If `concretize` is `true`, the resulting expression will be wrapped in a `concretize()` call.
 
 Note that expressions involving dynamic indexing, i.e. `begin` and/or `end`, will always need to be
 concretized as `VarName` only supports non-dynamic indexing as determined by
-[`is_static_index`](@ref). See examples below.
+`is_static_optic`. See examples below.
 
 ## Examples
 
