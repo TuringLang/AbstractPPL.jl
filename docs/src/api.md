@@ -12,6 +12,8 @@ subsumedby
 vsym
 @varname
 @vsym
+vn_to_string
+vn_from_string
 ```
 
 ## Abstract model functions
