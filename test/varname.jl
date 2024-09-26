@@ -174,5 +174,14 @@ end
         for vn in vns
             @test vn_from_string2(vn_to_string2(vn)) == vn
         end
+
+        # For this VarName, the {de,}serialisation works correctly but we must
+        # test in a different way because equality comparison of structs with
+        # vector fields (such as Accessors.IndexLens) compares the memory
+        # addresses rather than the contents (thus vn_vec == vn_vec2 returns
+        # false).
+        vn_vec = @varname(x[[1, 2, 5, 6]])
+        vn_vec2 = vn_from_string2(vn_to_string2(vn_vec))
+        @test hash(vn_vec) == hash(vn_vec2)
     end
 end

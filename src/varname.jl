@@ -868,6 +868,7 @@ end
 # -----------------------------------------
 
 index_to_dict(i::Integer) = Dict(:type => "integer", :value => i)
+index_to_dict(v::AbstractVector{Int}) = Dict(:type => "vector", :values => v)
 index_to_dict(r::UnitRange) = Dict(:type => "unitrange", :start => r.start, :stop => r.stop)
 index_to_dict(r::StepRange) = Dict(:type => "steprange", :start => r.start, :stop => r.stop, :step => r.step)
 index_to_dict(::Colon) = Dict(:type => "colon")
@@ -880,6 +881,8 @@ function dict_to_index(dict)
     dict = Dict(Symbol(k) => v for (k, v) in dict)
     if dict[:type] == "integer"
         return dict[:value]
+    elseif dict[:type] == "vector"
+        return collect(Int, dict[:values])
     elseif dict[:type] == "unitrange"
         return dict[:start]:dict[:stop]
     elseif dict[:type] == "steprange"
