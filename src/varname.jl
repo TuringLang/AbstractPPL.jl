@@ -918,24 +918,24 @@ function dict_to_optic(dict)
     end
 end
 
-struct VarNameWithNTOptic
+struct VarNameWithDictOptic
     sym::Symbol
     optic::Dict{Symbol, Any}
 end
 
-function VarNameWithNTOptic(dict::Dict{Symbol, Any})
-    return VarNameWithNTOptic{dict[:sym]}(dict[:optic])
+function VarNameWithDictOptic(dict::Dict{Symbol, Any})
+    return VarNameWithDictOptic{dict[:sym]}(dict[:optic])
 end
 
 # Serialisation
-StructTypes.StructType(::Type{VarNameWithNTOptic}) = StructTypes.UnorderedStruct()
+StructTypes.StructType(::Type{VarNameWithDictOptic}) = StructTypes.UnorderedStruct()
 
-vn_to_string2(vn::VarName) = JSON3.write(VarNameWithNTOptic(getsym(vn), optic_to_dict(getoptic(vn))))
+vn_to_string2(vn::VarName) = JSON3.write(VarNameWithDictOptic(getsym(vn), optic_to_dict(getoptic(vn))))
 
 # Deserialisation
-Base.pairs(vn::VarNameWithNTOptic) = Dict(:sym => vn.sym, :optic => vn.optic)
+Base.pairs(vn::VarNameWithDictOptic) = Dict(:sym => vn.sym, :optic => vn.optic)
 
 function vn_from_string2(str)
-    vn_nt = JSON3.read(str, VarNameWithNTOptic)
+    vn_nt = JSON3.read(str, VarNameWithDictOptic)
     return VarName{vn_nt.sym}(dict_to_optic(vn_nt.optic))
 end
