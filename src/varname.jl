@@ -457,7 +457,6 @@ struct ConcretizedSlice{T,R} <: AbstractVector{T}
 end
 
 ConcretizedSlice(s::Base.Slice{R}) where {R} = ConcretizedSlice{eltype(s.indices),R}(s.indices)
-ConcretizedSlice(s::Base.OneTo{R}) where {R} = ConcretizedSlice(Base.Slice(s))
 Base.show(io::IO, s::ConcretizedSlice) = print(io, ":")
 Base.show(io::IO, ::MIME"text/plain", s::ConcretizedSlice) =
     print(io, "ConcretizedSlice(", s.range, ")")
