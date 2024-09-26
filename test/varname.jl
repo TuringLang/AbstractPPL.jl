@@ -140,6 +140,7 @@ end
 
     @testset "roundtrip conversion to/from string" begin
         y = ones(10)
+        z = ones(5, 2)
         vns = [
             @varname(x),
             @varname(ä),
@@ -160,6 +161,14 @@ end
             @varname(y[end]),
             @varname(y[:], false),
             @varname(y[:], true),
+            @varname(z[:], false),
+            @varname(z[:], true),
+            @varname(z[:][:], false),
+            @varname(z[:][:], true),
+            @varname(z[:,:], false),
+            @varname(z[:,:], true),
+            @varname(z[2:5,:], false),
+            @varname(z[2:5,:], true),
         ]
         for vn in vns
             @test vn_from_string2(vn_to_string2(vn)) == vn
