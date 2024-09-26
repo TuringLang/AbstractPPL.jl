@@ -868,9 +868,31 @@ end
 # Alternate implementation with StructTypes
 # -----------------------------------------
 
+index_to_dict(i::Integer) = Dict(:type => "integer", :value => i)
+index_to_dict(r::UnitRange) = Dict(:type => "unitrange", :first => first(r), :last => last(r))
+index_to_dict(::Colon) = Dict(:type => "colon")
+index_to_dict(s::ConcretizedSlice{T,R}) where {T,R} = Dict(:type => "concretized_slice", :range => repr(s.range))
+index_to_dict(t::Tuple) = Dict(:type => "tuple", :values => [index_to_dict(x) for x in t])
+
+function dict_to_index(dict)
+    dict = Dict(Symbol(k) => v for (k, v) in dict)
+    if dict[:type] == "integer"
+        return dict[:value]
+    elseif dict[:type] == "unitrange"
+        return dict[:first]:dict[:last]
+    elseif dict[:type] == "colon"
+        return Colon()
+    elseif dict[:type] == "concretized_slice"
+        return ConcretizedSlice(eval(Meta.parse(dict[:range])))
+    elseif dict[:type] == "tuple"
+        return tuple(map(dict_to_index, dict[:values])...)
+    end
+end
+
+
 optic_to_dict(::typeof(identity)) = Dict(:type => "identity")
 optic_to_dict(::PropertyLens{sym}) where {sym} = Dict(:type => "property", :field => String(sym))
-optic_to_dict(i::IndexLens) = Dict(:type => "index", :indices => index_to_str(i.indices))
+optic_to_dict(i::IndexLens) = Dict(:type => "index", :indices => index_to_dict(i.indices))
 optic_to_dict(c::ComposedOptic) = Dict(:type => "composed", :outer => optic_to_dict(c.outer), :inner => optic_to_dict(c.inner))
 
 function dict_to_optic(dict)
@@ -882,7 +904,7 @@ function dict_to_optic(dict)
     if dict[:type] == "identity"
         return identity
     elseif dict[:type] == "index"
-        return IndexLens(eval(Meta.parse(dict[:indices])))
+        return IndexLens(dict_to_index(dict[:indices]))
     elseif dict[:type] == "property"
         return PropertyLens{Symbol(dict[:field])}()
     elseif dict[:type] == "composed"
