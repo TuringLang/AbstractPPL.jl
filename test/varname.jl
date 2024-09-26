@@ -162,7 +162,7 @@ end
             @varname(y[:], true),
         ]
         for vn in vns
-            @test vn_from_string(vn_to_string(vn)) == vn
+            @test vn_from_string2(vn_to_string2(vn)) == vn
         end
     end
 end

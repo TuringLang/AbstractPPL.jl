@@ -1,5 +1,7 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
+using StructTypes: StructTypes
+using JSON3: JSON3
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
@@ -762,16 +764,16 @@ Generates a string representation of the index `i`, or a tuple thereof.
 ## Examples
 
 ```jldoctest
-julia> index_to_str(2)
+julia> AbstractPPL.index_to_str(2)
 "2"
 
-julia> index_to_str((1, 2:5))
+julia> AbstractPPL.index_to_str((1, 2:5))
 "(1, 2:5,)"
 
-julia> index_to_str(:)
+julia> AbstractPPL.index_to_str(:)
 ":"
 
-julia> index_to_str(ConcretizedSlice(Base.Slice(Base.OneTo(10))))
+julia> AbstractPPL.index_to_str(AbstractPPL.ConcretizedSlice(Base.Slice(Base.OneTo(10))))
 "ConcretizedSlice(Base.OneTo(10))"
 ```
 """
@@ -788,16 +790,16 @@ Convert an optic to a named tuple representation.
 
 ## Examples
 ```jldoctest; setup=:(using Accessors)
-julia> optic_to_nt(identity)
+julia> AbstractPPL.optic_to_nt(identity)
 (type = "identity",)
 
-julia> optic_to_nt(@optic _.a)
+julia> AbstractPPL.optic_to_nt(@optic _.a)
 (type = "property", field = "a")
 
-julia> optic_to_nt(@optic _.a.b)
+julia> AbstractPPL.optic_to_nt(@optic _.a.b)
 (type = "composed", outer = (type = "property", field = "b"), inner = (type = "property", field = "a"))
 
-julia> optic_to_nt(@optic _[1])  # uses index_to_str()
+julia> AbstractPPL.optic_to_nt(@optic _[1])  # uses index_to_str()
 (type = "index", indices = "(1,)")
 ```
 """
@@ -833,16 +835,16 @@ than being pretty-printed as colons).
 
 ```jldoctest
 julia> vn_to_string(@varname(x))
-"(sym = \"x\", optic = (type = \"identity\",))"
+"(sym = \\"x\\", optic = (type = \\"identity\\",))"
 
 julia> vn_to_string(@varname(x.a))
-"(sym = \"x\", optic = (type = \"property\", field = \"a\"))"
+"(sym = \\"x\\", optic = (type = \\"property\\", field = \\"a\\"))"
 
 julia> y = ones(2); vn_to_string(@varname(y[:]))
-"(sym = \"y\", optic = (type = \"index\", indices = \"(:,)\"))"
+"(sym = \\"y\\", optic = (type = \\"index\\", indices = \\"(:,)\\"))"
 
 julia> y = ones(2); vn_to_string(@varname(y[:], true))
-"(sym = \"y\", optic = (type = \"index\", indices = \"(ConcretizedSlice(Base.OneTo(2)),)\"))"
+"(sym = \\"y\\", optic = (type = \\"index\\", indices = \\"(ConcretizedSlice(Base.OneTo(2)),)\\"))"
 ```
 """
 vn_to_string(vn::VarName) = repr((sym = String(getsym(vn)), optic = optic_to_nt(getoptic(vn))))
@@ -860,4 +862,52 @@ and `Meta.parse` to parse the string.
 function vn_from_string(str)
     new_fields = eval(Meta.parse(str))
     return VarName{Symbol(new_fields.sym)}(nt_to_optic(new_fields.optic))
+end
+
+# -----------------------------------------
+# Alternate implementation with StructTypes
+# -----------------------------------------
+
+optic_to_dict(::typeof(identity)) = Dict(:type => "identity")
+optic_to_dict(::PropertyLens{sym}) where {sym} = Dict(:type => "property", :field => String(sym))
+optic_to_dict(i::IndexLens) = Dict(:type => "index", :indices => index_to_str(i.indices))
+optic_to_dict(c::ComposedOptic) = Dict(:type => "composed", :outer => optic_to_dict(c.outer), :inner => optic_to_dict(c.inner))
+
+function dict_to_optic(dict)
+    # Nested dicts are deserialised to Dict{String, Any}
+    # but the top level dict is deserialised to Dict{Symbol, Any}
+    # so for this recursive function to work we need to first
+    # convert String keys to Symbols
+    dict = Dict(Symbol(k) => v for (k, v) in dict)
+    if dict[:type] == "identity"
+        return identity
+    elseif dict[:type] == "index"
+        return IndexLens(eval(Meta.parse(dict[:indices])))
+    elseif dict[:type] == "property"
+        return PropertyLens{Symbol(dict[:field])}()
+    elseif dict[:type] == "composed"
+        return dict_to_optic(dict[:outer]) ∘ dict_to_optic(dict[:inner])
+    end
+end
+
+struct VarNameWithNTOptic
+    sym::Symbol
+    optic::Dict{Symbol, Any}
+end
+
+function VarNameWithNTOptic(dict::Dict{Symbol, Any})
+    return VarNameWithNTOptic{dict[:sym]}(dict[:optic])
+end
+
+# Serialisation
+StructTypes.StructType(::Type{VarNameWithNTOptic}) = StructTypes.UnorderedStruct()
+
+vn_to_string2(vn::VarName) = JSON3.write(VarNameWithNTOptic(getsym(vn), optic_to_dict(getoptic(vn))))
+
+# Deserialisation
+Base.pairs(vn::VarNameWithNTOptic) = Dict(:sym => vn.sym, :optic => vn.optic)
+
+function vn_from_string2(str)
+    vn_nt = JSON3.read(str, VarNameWithNTOptic)
+    return VarName{vn_nt.sym}(dict_to_optic(vn_nt.optic))
 end

@@ -10,6 +10,8 @@ export VarName,
     varname,
     vn_to_string,
     vn_from_string,
+    vn_to_string2,
+    vn_from_string2,
     vsym,
     @varname,
     @vsym
