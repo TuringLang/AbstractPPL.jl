@@ -150,6 +150,7 @@ end
             @varname(x[1]),
             @varname(var"x[1]"),
             @varname(x[1:10]),
+            @varname(x[1:3:10]),
             @varname(x[1, 2]),
             @varname(x[1, 2:5]),
             @varname(x[:]),

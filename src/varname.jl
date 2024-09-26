@@ -868,7 +868,8 @@ end
 # -----------------------------------------
 
 index_to_dict(i::Integer) = Dict(:type => "integer", :value => i)
-index_to_dict(r::UnitRange) = Dict(:type => "unitrange", :first => first(r), :last => last(r))
+index_to_dict(r::UnitRange) = Dict(:type => "unitrange", :start => r.start, :stop => r.stop)
+index_to_dict(r::StepRange) = Dict(:type => "steprange", :start => r.start, :stop => r.stop, :step => r.step)
 index_to_dict(::Colon) = Dict(:type => "colon")
 index_to_dict(s::ConcretizedSlice{T,Base.OneTo{I}}) where {T,I} = Dict(:type => "concretized_slice", :oneto => s.range.stop)
 index_to_dict(::ConcretizedSlice{T,R}) where {T,R} = error("ConcretizedSlice with range type $(R) not supported")
@@ -880,7 +881,9 @@ function dict_to_index(dict)
     if dict[:type] == "integer"
         return dict[:value]
     elseif dict[:type] == "unitrange"
-        return dict[:first]:dict[:last]
+        return dict[:start]:dict[:stop]
+    elseif dict[:type] == "steprange"
+        return dict[:start]:dict[:step]:dict[:stop]
     elseif dict[:type] == "colon"
         return Colon()
     elseif dict[:type] == "concretized_slice"
@@ -891,7 +894,6 @@ function dict_to_index(dict)
         error("Unknown index type: $(dict[:type])")
     end
 end
-
 
 optic_to_dict(::typeof(identity)) = Dict(:type => "identity")
 optic_to_dict(::PropertyLens{sym}) where {sym} = Dict(:type => "property", :field => String(sym))
