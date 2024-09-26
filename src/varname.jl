@@ -871,10 +871,12 @@ end
 index_to_dict(i::Integer) = Dict(:type => "integer", :value => i)
 index_to_dict(r::UnitRange) = Dict(:type => "unitrange", :first => first(r), :last => last(r))
 index_to_dict(::Colon) = Dict(:type => "colon")
-index_to_dict(s::ConcretizedSlice{T,R}) where {T,R} = Dict(:type => "concretized_slice", :range => repr(s.range))
+index_to_dict(s::ConcretizedSlice{T,Base.OneTo{I}}) where {T,I} = Dict(:type => "concretized_slice", :oneto => s.range.stop)
+index_to_dict(::ConcretizedSlice{T,R}) where {T,R} = error("ConcretizedSlice with range type $(R) not supported")
 index_to_dict(t::Tuple) = Dict(:type => "tuple", :values => [index_to_dict(x) for x in t])
 
 function dict_to_index(dict)
+    # conversion needed because of the same reason as in dict_to_optic
     dict = Dict(Symbol(k) => v for (k, v) in dict)
     if dict[:type] == "integer"
         return dict[:value]
@@ -883,9 +885,11 @@ function dict_to_index(dict)
     elseif dict[:type] == "colon"
         return Colon()
     elseif dict[:type] == "concretized_slice"
-        return ConcretizedSlice(eval(Meta.parse(dict[:range])))
+        return ConcretizedSlice(Base.Slice(Base.OneTo(dict[:oneto])))
     elseif dict[:type] == "tuple"
         return tuple(map(dict_to_index, dict[:values])...)
+    else
+        error("Unknown index type: $(dict[:type])")
     end
 end
 
@@ -909,6 +913,8 @@ function dict_to_optic(dict)
         return PropertyLens{Symbol(dict[:field])}()
     elseif dict[:type] == "composed"
         return dict_to_optic(dict[:outer]) ∘ dict_to_optic(dict[:inner])
+    else
+        error("Unknown optic type: $(dict[:type])")
     end
 end
 
