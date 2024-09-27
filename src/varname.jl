@@ -1,7 +1,6 @@
 using Accessors
 using Accessors: ComposedOptic, PropertyLens, IndexLens, DynamicIndexLens
-using StructTypes: StructTypes
-using JSON3: JSON3
+using JSON: JSON
 
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedOptic}
 
@@ -867,79 +866,58 @@ end
 # Alternate implementation with StructTypes
 # -----------------------------------------
 
-index_to_dict(i::Integer) = Dict(:type => "integer", :value => i)
-index_to_dict(v::AbstractVector{Int}) = Dict(:type => "vector", :values => v)
-index_to_dict(r::UnitRange) = Dict(:type => "unitrange", :start => r.start, :stop => r.stop)
-index_to_dict(r::StepRange) = Dict(:type => "steprange", :start => r.start, :stop => r.stop, :step => r.step)
-index_to_dict(::Colon) = Dict(:type => "colon")
-index_to_dict(s::ConcretizedSlice{T,Base.OneTo{I}}) where {T,I} = Dict(:type => "concretized_slice", :oneto => s.range.stop)
+index_to_dict(i::Integer) = Dict("type" => "integer", "value" => i)
+index_to_dict(v::AbstractVector{Int}) = Dict("type" => "vector", "values" => v)
+index_to_dict(r::UnitRange) = Dict("type" => "unitrange", "start" => r.start, "stop" => r.stop)
+index_to_dict(r::StepRange) = Dict("type" => "steprange", "start" => r.start, "stop" => r.stop, "step" => r.step)
+index_to_dict(::Colon) = Dict("type" => "colon")
+index_to_dict(s::ConcretizedSlice{T,Base.OneTo{I}}) where {T,I} = Dict("type" => "concretized_slice", "oneto" => s.range.stop)
 index_to_dict(::ConcretizedSlice{T,R}) where {T,R} = error("ConcretizedSlice with range type $(R) not supported")
-index_to_dict(t::Tuple) = Dict(:type => "tuple", :values => [index_to_dict(x) for x in t])
+index_to_dict(t::Tuple) = Dict("type" => "tuple", "values" => map(index_to_dict, t))
 
 function dict_to_index(dict)
-    # conversion needed because of the same reason as in dict_to_optic
-    dict = Dict(Symbol(k) => v for (k, v) in dict)
-    if dict[:type] == "integer"
-        return dict[:value]
-    elseif dict[:type] == "vector"
-        return collect(Int, dict[:values])
-    elseif dict[:type] == "unitrange"
-        return dict[:start]:dict[:stop]
-    elseif dict[:type] == "steprange"
-        return dict[:start]:dict[:step]:dict[:stop]
-    elseif dict[:type] == "colon"
+    if dict["type"] == "integer"
+        return dict["value"]
+    elseif dict["type"] == "vector"
+        return collect(Int, dict["values"])
+    elseif dict["type"] == "unitrange"
+        return dict["start"]:dict["stop"]
+    elseif dict["type"] == "steprange"
+        return dict["start"]:dict["step"]:dict["stop"]
+    elseif dict["type"] == "colon"
         return Colon()
-    elseif dict[:type] == "concretized_slice"
-        return ConcretizedSlice(Base.Slice(Base.OneTo(dict[:oneto])))
-    elseif dict[:type] == "tuple"
-        return tuple(map(dict_to_index, dict[:values])...)
+    elseif dict["type"] == "concretized_slice"
+        return ConcretizedSlice(Base.Slice(Base.OneTo(dict["oneto"])))
+    elseif dict["type"] == "tuple"
+        return tuple(map(dict_to_index, dict["values"])...)
     else
-        error("Unknown index type: $(dict[:type])")
+        error("Unknown index type: $(dict["type"])")
     end
 end
 
-optic_to_dict(::typeof(identity)) = Dict(:type => "identity")
-optic_to_dict(::PropertyLens{sym}) where {sym} = Dict(:type => "property", :field => String(sym))
-optic_to_dict(i::IndexLens) = Dict(:type => "index", :indices => index_to_dict(i.indices))
-optic_to_dict(c::ComposedOptic) = Dict(:type => "composed", :outer => optic_to_dict(c.outer), :inner => optic_to_dict(c.inner))
+optic_to_dict(::typeof(identity)) = Dict("type" => "identity")
+optic_to_dict(::PropertyLens{sym}) where {sym} = Dict("type" => "property", "field" => String(sym))
+optic_to_dict(i::IndexLens) = Dict("type" => "index", "indices" => index_to_dict(i.indices))
+optic_to_dict(c::ComposedOptic) = Dict("type" => "composed", "outer" => optic_to_dict(c.outer), "inner" => optic_to_dict(c.inner))
 
 function dict_to_optic(dict)
-    # Nested dicts are deserialised to Dict{String, Any}
-    # but the top level dict is deserialised to Dict{Symbol, Any}
-    # so for this recursive function to work we need to first
-    # convert String keys to Symbols
-    dict = Dict(Symbol(k) => v for (k, v) in dict)
-    if dict[:type] == "identity"
+    if dict["type"] == "identity"
         return identity
-    elseif dict[:type] == "index"
-        return IndexLens(dict_to_index(dict[:indices]))
-    elseif dict[:type] == "property"
-        return PropertyLens{Symbol(dict[:field])}()
-    elseif dict[:type] == "composed"
-        return dict_to_optic(dict[:outer]) ∘ dict_to_optic(dict[:inner])
+    elseif dict["type"] == "index"
+        return IndexLens(dict_to_index(dict["indices"]))
+    elseif dict["type"] == "property"
+        return PropertyLens{Symbol(dict["field"])}()
+    elseif dict["type"] == "composed"
+        return dict_to_optic(dict["outer"]) ∘ dict_to_optic(dict["inner"])
     else
-        error("Unknown optic type: $(dict[:type])")
+        error("Unknown optic type: $(dict["type"])")
     end
 end
 
-struct VarNameWithDictOptic
-    sym::Symbol
-    optic::Dict{Symbol, Any}
-end
+vn_to_dict(vn::VarName) = Dict("sym" => getsym(vn), "optic" => optic_to_dict(getoptic(vn)))
 
-function VarNameWithDictOptic(dict::Dict{Symbol, Any})
-    return VarNameWithDictOptic{dict[:sym]}(dict[:optic])
-end
+dict_to_vn(dict::Dict{<:AbstractString, Any}) = VarName{Symbol(dict["sym"])}(dict_to_optic(dict["optic"]))
 
-# Serialisation
-StructTypes.StructType(::Type{VarNameWithDictOptic}) = StructTypes.UnorderedStruct()
+vn_to_string2(vn::VarName) = JSON.json(vn_to_dict(vn))
 
-vn_to_string2(vn::VarName) = JSON3.write(VarNameWithDictOptic(getsym(vn), optic_to_dict(getoptic(vn))))
-
-# Deserialisation
-Base.pairs(vn::VarNameWithDictOptic) = Dict(:sym => vn.sym, :optic => vn.optic)
-
-function vn_from_string2(str)
-    vn_nt = JSON3.read(str, VarNameWithDictOptic)
-    return VarName{vn_nt.sym}(dict_to_optic(vn_nt.optic))
-end
+vn_from_string2(str) = dict_to_vn(JSON.parse(str))
