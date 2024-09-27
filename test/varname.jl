@@ -172,7 +172,7 @@ end
             @varname(z[2:5,:], true),
         ]
         for vn in vns
-            @test vn_from_string2(vn_to_string2(vn)) == vn
+            @test vn_from_string(vn_to_string(vn)) == vn
         end
 
         # For this VarName, the {de,}serialisation works correctly but we must
@@ -181,7 +181,7 @@ end
         # addresses rather than the contents (thus vn_vec == vn_vec2 returns
         # false).
         vn_vec = @varname(x[[1, 2, 5, 6]])
-        vn_vec2 = vn_from_string2(vn_to_string2(vn_vec))
+        vn_vec2 = vn_from_string(vn_to_string(vn_vec))
         @test hash(vn_vec) == hash(vn_vec2)
     end
 end
