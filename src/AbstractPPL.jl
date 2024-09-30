@@ -13,8 +13,8 @@ export VarName,
     @vsym,
     index_to_dict,
     dict_to_index,
-    vn_to_string,
-    vn_from_string
+    varname_to_string,
+    string_to_varname
 
 
 # Abstract model functions

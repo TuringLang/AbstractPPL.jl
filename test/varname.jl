@@ -172,7 +172,7 @@ end
             @varname(z[2:5,:], true),
         ]
         for vn in vns
-            @test vn_from_string(vn_to_string(vn)) == vn
+            @test string_to_varname(varname_to_string(vn)) == vn
         end
 
         # For this VarName, the {de,}serialisation works correctly but we must
@@ -181,7 +181,7 @@ end
         # addresses rather than the contents (thus vn_vec == vn_vec2 returns
         # false).
         vn_vec = @varname(x[[1, 2, 5, 6]])
-        vn_vec2 = vn_from_string(vn_to_string(vn_vec))
+        vn_vec2 = string_to_varname(varname_to_string(vn_vec))
         @test hash(vn_vec) == hash(vn_vec2)
     end
 
@@ -191,13 +191,13 @@ end
         vn = @varname(weird[:], true)
 
         # This won't work as we don't yet know how to handle OffsetArray
-        @test_throws MethodError vn_to_string(vn)
+        @test_throws MethodError varname_to_string(vn)
 
         # Now define the relevant methods
         AbstractPPL.index_to_dict(o::OffsetArrays.IdOffsetRange{I, R}) where {I,R} = Dict("type" => "OffsetArrays.OffsetArray", "parent" => AbstractPPL.index_to_dict(o.parent), "offset" => o.offset)
         AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) = OffsetArrays.IdOffsetRange(AbstractPPL.dict_to_index(d["parent"]), d["offset"])
 
         # Serialisation should now work
-        @test vn_from_string(vn_to_string(vn)) == vn
+        @test string_to_varname(varname_to_string(vn)) == vn
     end
 end
