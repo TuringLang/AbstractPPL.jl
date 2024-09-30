@@ -138,7 +138,7 @@ end
         @inferred Accessors.set(c, @varname(b.a[1]), 10)
     end
 
-    @testset "roundtrip conversion to/from string" begin
+    @testset "de/serialisation of VarNames" begin
         y = ones(10)
         z = ones(5, 2)
         vns = [
@@ -183,5 +183,21 @@ end
         vn_vec = @varname(x[[1, 2, 5, 6]])
         vn_vec2 = vn_from_string(vn_to_string(vn_vec))
         @test hash(vn_vec) == hash(vn_vec2)
+    end
+
+    @testset "de/serialisation of VarNames with custom index types" begin
+        using OffsetArrays: OffsetArrays, Origin
+        weird = Origin(4)(ones(10))
+        vn = @varname(weird[:], true)
+
+        # This won't work as we don't yet know how to handle OffsetArray
+        @test_throws MethodError vn_to_string(vn)
+
+        # Now define the relevant methods
+        AbstractPPL.index_to_dict(o::OffsetArrays.IdOffsetRange{I, R}) where {I,R} = Dict("type" => "OffsetArrays.OffsetArray", "parent" => AbstractPPL.index_to_dict(o.parent), "offset" => o.offset)
+        AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) = OffsetArrays.IdOffsetRange(AbstractPPL.dict_to_index(d["parent"]), d["offset"])
+
+        # Serialisation should now work
+        @test vn_from_string(vn_to_string(vn)) == vn
     end
 end

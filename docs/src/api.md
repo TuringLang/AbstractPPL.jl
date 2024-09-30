@@ -12,6 +12,13 @@ subsumedby
 vsym
 @varname
 @vsym
+```
+
+## VarName serialisation
+
+```@docs
+index_to_dict
+dict_to_index
 vn_to_string
 vn_from_string
 ```
