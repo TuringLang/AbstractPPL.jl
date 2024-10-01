@@ -14,6 +14,15 @@ vsym
 @vsym
 ```
 
+## VarName serialisation
+
+```@docs
+index_to_dict
+dict_to_index
+varname_to_string
+string_to_varname
+```
+
 ## Abstract model functions
 
 ```@docs
