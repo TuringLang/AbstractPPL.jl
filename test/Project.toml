@@ -8,7 +8,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Accessors = "0.1"
-Documenter = "0.26.3, 0.27"
+Documenter = "0.26.3, 0.27, 1"
 InvertedIndices = "1"
 OffsetArrays = "1"
 julia = "1"
