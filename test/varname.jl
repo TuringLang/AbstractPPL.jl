@@ -1,15 +1,30 @@
+using Accessors
 using InvertedIndices
 using OffsetArrays
-using Setfield
 
 using AbstractPPL: ⊑, ⊒, ⋢, ⋣, ≍
 
+using AbstractPPL: Accessors
+using AbstractPPL.Accessors: IndexLens, PropertyLens, ⨟
 
 macro test_strict_subsumption(x, y)
     quote
         @test $((varname(x))) ⊑ $((varname(y)))
         @test $((varname(x))) ⋣ $((varname(y)))
     end
+end
+
+function test_equal(o1::VarName{sym1}, o2::VarName{sym2}) where {sym1, sym2}
+    return sym1 === sym2 && test_equal(o1.optic, o2.optic)
+end
+function test_equal(o1::ComposedFunction, o2::ComposedFunction)
+    return test_equal(o1.inner, o2.inner) && test_equal(o1.outer, o2.outer)
+end
+function test_equal(o1::Accessors.IndexLens, o2::Accessors.IndexLens)
+    return test_equal(o1.indices, o2.indices)
+end
+function test_equal(o1, o2)
+    return o1 == o2
 end
 
 @testset "varnames" begin
@@ -21,20 +36,38 @@ end
         
         @test @varname(A[:, 1][1+1]) == @varname(A[:, 1][2])
         @test(@varname(A[:, 1][2]) ==
-            VarName{:A}(@lens(_[:, 1]) ∘ @lens(_[2])) ==
-            VarName{:A}(@lens(_[:, 1])) ∘ @lens(_[2]) ==
-            VarName{:A}() ∘ @lens(_[:, 1]) ∘ @lens(_[2]))
+            VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])))
 
         # concretization
         y = zeros(10, 10)
-        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
+        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0],);
 
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
-        @test @varname(y[:], true) ==  @varname(y[1:100])
-        @test @varname(y[:, begin], true) == @varname(y[1:10, 1])
-        @test getlens(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
+        @test test_equal(@varname(y[:], true), @varname(y[1:100]))
+        @test test_equal(@varname(y[:, begin], true), @varname(y[1:10, 1]))
+        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] === 
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
-        @test @varname(x.a[1:end, end][:], true) == @varname(x.a[1:3,2][1:3])
+        @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3,2][1:3]))
+    end
+
+    @testset "compose and opcompose" begin
+        @test IndexLens(1) ∘ @varname(x.a) == @varname(x.a[1])
+        @test @varname(x.a) ⨟ IndexLens(1) == @varname(x.a[1])
+
+        @test @varname(x) ⨟ identity == @varname(x)
+        @test identity ∘ @varname(x) == @varname(x)
+        @test @varname(x.a) ⨟ identity == @varname(x.a)
+        @test identity ∘ @varname(x.a) == @varname(x.a)
+        @test @varname(x[1].b) ⨟ identity == @varname(x[1].b)
+        @test identity ∘ @varname(x[1].b) == @varname(x[1].b)
+    end
+
+    @testset "get & set" begin
+        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 1.0);
+        @test get(x, @varname(a[1, 2])) == 2.0
+        @test get(x, @varname(b)) == 1.0
+        @test set(x, @varname(a[1, 2]), 10) == (a = [1.0 10.0; 3.0 4.0; 5.0 6.0], b = 1.0)
+        @test set(x, @varname(b), 10) == (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 10.0)
     end
     
     @testset "subsumption with standard indexing" begin
@@ -83,10 +116,88 @@ end
 
     @testset "non-standard indexing" begin
         A = rand(10, 10)
-        @test @varname(A[1, Not(3)], true) == @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]])
+        @test test_equal(@varname(A[1, Not(3)], true), @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]]))
         
         B = OffsetArray(A, -5, -5) # indices -4:5×-4:5
-        @test @varname(B[1, :], true) == @varname(B[1, -4:5])
+        @test test_equal(@varname(B[1, :], true), @varname(B[1, -4:5]))
 
+    end
+    @testset "type stability" begin
+        @inferred VarName{:a}()
+        @inferred VarName{:a}(IndexLens(1))
+        @inferred VarName{:a}(IndexLens(1, 2))
+        @inferred VarName{:a}(PropertyLens(:b))
+        @inferred VarName{:a}(Accessors.opcompose(IndexLens(1), PropertyLens(:b)))
+
+        b = (a=[1, 2, 3],)
+        @inferred get(b, @varname(a[1]))
+        @inferred Accessors.set(b, @varname(a[1]), 10)
+
+        c = (b=(a=[1, 2, 3],),)
+        @inferred get(c, @varname(b.a[1]))
+        @inferred Accessors.set(c, @varname(b.a[1]), 10)
+    end
+
+    @testset "de/serialisation of VarNames" begin
+        y = ones(10)
+        z = ones(5, 2)
+        vns = [
+            @varname(x),
+            @varname(ä),
+            @varname(x.a),
+            @varname(x.a.b),
+            @varname(var"x.a"),
+            @varname(x[1]),
+            @varname(var"x[1]"),
+            @varname(x[1:10]),
+            @varname(x[1:3:10]),
+            @varname(x[1, 2]),
+            @varname(x[1, 2:5]),
+            @varname(x[:]),
+            @varname(x.a[1]),
+            @varname(x.a[1:10]),
+            @varname(x[1].a),
+            @varname(y[:]),
+            @varname(y[begin:end]),
+            @varname(y[end]),
+            @varname(y[:], false),
+            @varname(y[:], true),
+            @varname(z[:], false),
+            @varname(z[:], true),
+            @varname(z[:][:], false),
+            @varname(z[:][:], true),
+            @varname(z[:,:], false),
+            @varname(z[:,:], true),
+            @varname(z[2:5,:], false),
+            @varname(z[2:5,:], true),
+        ]
+        for vn in vns
+            @test string_to_varname(varname_to_string(vn)) == vn
+        end
+
+        # For this VarName, the {de,}serialisation works correctly but we must
+        # test in a different way because equality comparison of structs with
+        # vector fields (such as Accessors.IndexLens) compares the memory
+        # addresses rather than the contents (thus vn_vec == vn_vec2 returns
+        # false).
+        vn_vec = @varname(x[[1, 2, 5, 6]])
+        vn_vec2 = string_to_varname(varname_to_string(vn_vec))
+        @test hash(vn_vec) == hash(vn_vec2)
+    end
+
+    @testset "de/serialisation of VarNames with custom index types" begin
+        using OffsetArrays: OffsetArrays, Origin
+        weird = Origin(4)(ones(10))
+        vn = @varname(weird[:], true)
+
+        # This won't work as we don't yet know how to handle OffsetArray
+        @test_throws MethodError varname_to_string(vn)
+
+        # Now define the relevant methods
+        AbstractPPL.index_to_dict(o::OffsetArrays.IdOffsetRange{I, R}) where {I,R} = Dict("type" => "OffsetArrays.OffsetArray", "parent" => AbstractPPL.index_to_dict(o.parent), "offset" => o.offset)
+        AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) = OffsetArrays.IdOffsetRange(AbstractPPL.dict_to_index(d["parent"]), d["offset"])
+
+        # Serialisation should now work
+        @test string_to_varname(varname_to_string(vn)) == vn
     end
 end
