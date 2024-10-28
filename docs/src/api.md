@@ -29,6 +29,8 @@ string_to_varname
 AbstractProbabilisticProgram
 condition
 decondition
+fix
+unfix
 logdensityof
 AbstractContext
 evaluate!!
