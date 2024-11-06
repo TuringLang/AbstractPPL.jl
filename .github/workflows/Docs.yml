@@ -20,9 +20,9 @@ permissions:
   pull-requests: read
 
 jobs:
-  build-docs:
+  docs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Build Documenter.jl docs
+      - name: Build and deploy Documenter.jl docs
         uses: TuringLang/DocsNav/DocsDocumenter@v2
