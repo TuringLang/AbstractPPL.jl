@@ -8,12 +8,12 @@
 A light-weight package to factor out interfaces and associated APIs for modelling languages for
 probabilistic programming.  High level goals are:
 
-- Definition of an interface of few abstract types and a small set of functions that should be
-supported by all [probabilistic programs](./src/abstractprobprog.jl) and [trace
-types](./src/abstractmodeltrace.jl).
-- Provision of some commonly used functionality and data structures, e.g., for managing [variable names](./src/varname.jl) and
-  traces.
-  
+  - Definition of an interface of few abstract types and a small set of functions that should be
+    supported by all [probabilistic programs](./src/abstractprobprog.jl) and [trace
+    types](./src/abstractmodeltrace.jl).
+  - Provision of some commonly used functionality and data structures, e.g., for managing [variable names](./src/varname.jl) and
+    traces.
+
 This should facilitate reuse of functions in modelling languages, to allow end users to handle
 models in a consistent way, and to simplify interaction between different languages and sampler
 implementations, from very rich, dynamic languages like Turing.jl to highly constrained or
@@ -22,41 +22,38 @@ simplified models such as GPs, GLMs, or plain log-density problems.
 A more short term goal is to start a process of cleanly refactoring and justifying parts of
 DynamicPPL.jl’s design, and hopefully to get on closer terms with Soss.jl.
 
-
 ## `AbstractProbabilisticProgram` interface (still somewhat drafty)
 
 There are at least two somewhat incompatible conventions used for the term “model”.  None of this is
 particularly exact, but:
 
-- In Turing.jl, if you write down a `@model` function and call it on arguments, you get a model
-  object paired with (a possibly empty set of) observations. This can be treated as instantiated
-  “conditioned” object with fixed values for parameters and observations.
-- In Soss.jl, “model” is used for a symbolic “generative” object from which concrete functions, such as
-  densities and sampling functions, can be derived, _and_ which you can later condition on (and in
-  turn get a conditional density etc.).
+  - In Turing.jl, if you write down a `@model` function and call it on arguments, you get a model
+    object paired with (a possibly empty set of) observations. This can be treated as instantiated
+    “conditioned” object with fixed values for parameters and observations.
+  - In Soss.jl, “model” is used for a symbolic “generative” object from which concrete functions, such as
+    densities and sampling functions, can be derived, _and_ which you can later condition on (and in
+    turn get a conditional density etc.).
 
 Relevant discussions:
 [1](https://julialang.zulipchat.com/#narrow/stream/234072-probprog/topic/Naming.20the.20.22likelihood.22.20thingy),
 [2](https://github.com/TuringLang/AbstractPPL.jl/discussions/10).
 
-
 ### TL/DR:
 
 There are three interrelating aspects that this interface intends to standardize:
 
-- Density calculation
-- Sampling
-- “Conversions” between different conditionings of models
+  - Density calculation
+  - Sampling
+  - “Conversions” between different conditionings of models
 
 Therefore, the interface consists of an `AbstractProbabilisticProgram` supertype, together with
 functions
 
-- `condition(::Model, ::Trace) -> ConditionedModel`
-- `decondition(::ConditionedModel) -> GenerativeModel`
-- `sample(::Model, ::Sampler = Exact(), [Int])` (from `AbstractMCMC.sample`)
-- `logdensityof(::Model, ::Trace)` and `densityof(::Model, ::Trace)` (from
-  [DensityInterface.jl](https://github.com/JuliaMath/DensityInterface.jl))
-
+  - `condition(::Model, ::Trace) -> ConditionedModel`
+  - `decondition(::ConditionedModel) -> GenerativeModel`
+  - `sample(::Model, ::Sampler = Exact(), [Int])` (from `AbstractMCMC.sample`)
+  - `logdensityof(::Model, ::Trace)` and `densityof(::Model, ::Trace)` (from
+    [DensityInterface.jl](https://github.com/JuliaMath/DensityInterface.jl))
 
 ### Traces & probability expressions
 
@@ -79,7 +76,6 @@ just choose some arbitrary macro-like syntax like the following:
 
 Some more ideas for this kind of object can be found at the end.
 
-
 ### “Conversions”
 
 The purpose of this part is to provide common names for how we want a model instance to be
@@ -95,7 +91,7 @@ Let’s start from a generative model with parameter `μ`:
 @generative_model function foo_gen(μ)
     X ~ Normal(0, μ)
     Y[1] ~ Normal(X)
-    Y[2] ~ Normal(X + 1)
+    return Y[2] ~ Normal(X + 1)
 end
 ```
 
@@ -103,7 +99,7 @@ Applying the “constructor” `foo_gen` now means to fix the parameter, and sho
 object of the generative type:
 
 ```julia
-g = foo_gen(μ=…)::SomeGenerativeModel
+g = foo_gen(; μ=…)::SomeGenerativeModel
 ```
 
 With this kind of object, we should be able to sample and calculate joint log-densities from, i.e.,
@@ -131,10 +127,10 @@ we have a situation like this, with the observations `Y` fixed in the instantiat
 @model function foo(Y, μ)
     X ~ Normal(0, μ)
     Y[1] ~ Normal(X)
-    Y[2] ~ Normal(X + 1)
+    return Y[2] ~ Normal(X + 1)
 end
 
-m = foo(Y=…, μ=…)::SomeConditionedModel
+m = foo(; Y=…, μ=…)::SomeConditionedModel
 ```
 
 From this we can, if supported, go back to the generative form via `decondition`, and back via
@@ -170,7 +166,6 @@ rather easy, since it is only a marginal of the generative distribution, while t
 more structural information.  Perhaps both can be generalized under the `query` function I discuss
 at the end.
 
-
 ### Sampling
 
 Sampling in this case refers to producing values from the distribution specified in a model
@@ -192,15 +187,15 @@ a (posterior) conditioned model with no known sampling procedure, we just have w
 `AbstractMCMC`:
 
 ```julia
-sample([rng], m, N, sampler; [args…]) # chain of length N using `sampler`
+sample([rng], m, N, sampler; [args]) # chain of length N using `sampler`
 ```
 
 In the case of a generative model, or a posterior model with exact solution, we can have some more
 methods without the need to specify a sampler:
 
 ```julia
-sample([rng], m; [args…])    # one random sample
-sample([rng], m, N; [args…]) # N iid samples; equivalent to `rand` in certain cases
+sample([rng], m; [args])    # one random sample
+sample([rng], m, N; [args]) # N iid samples; equivalent to `rand` in certain cases
 ```
 
 It should be possible to implement this by a special sampler, say, `Exact` (name still to be
@@ -223,7 +218,6 @@ Not all variants need to be supported – for example, a posterior model might n
 `rand` is then just a special case when “trivial” exact sampling works for a model, e.g. a joint
 model.
 
-
 ### Density Evaluation
 
 Since the different “versions” of how a model is to be understood as generative or conditioned are
@@ -234,7 +228,7 @@ therefore adapt the interface of
 `logdensityof` should suffice for variants, with the distinction being made by the capabilities of
 the concrete model instance.
 
- DensityInterface.jl also requires the trait function `DensityKind`, which is set to `HasDensity()`
+DensityInterface.jl also requires the trait function `DensityKind`, which is set to `HasDensity()`
 for the `AbstractProbabilisticProgram` type.  Additional functions
 
 ```
@@ -243,7 +237,7 @@ DensityInterface.logdensityof(d) = Base.Fix1(logdensityof, d)
 DensityInterface.densityof(d) = Base.Fix1(densityof, d)
 ```
 
-are provided automatically (repeated here for clarity). 
+are provided automatically (repeated here for clarity).
 
 Note that `logdensityof` strictly generalizes `logpdf`, since the posterior density will of course
 in general be unnormalized and hence not a probability density.
@@ -265,8 +259,7 @@ logdensityof(m, @T(X = …))
 
 Densities need (and usually, will) not be normalized.
 
-
-#### Implementation notes 
+#### Implementation notes
 
 It should be able to make this fall back on the internal method with the right definition and
 implementation of `maketrace`:
@@ -285,7 +278,6 @@ logdensityof(g, @T(X = …, Y = …, Z = …); normalized=Val{true})
 
 Although there is proably a better way through traits; maybe like for arrays, with
 `NormalizationStyle(g, t) = IsNormalized()`?
-
 
 ## More on probability expressions
 
@@ -311,22 +303,19 @@ and probability expression combination.
 
 Possible extensions of this idea:
 
-- Pearl-style do-notation: `@T(Y = y | do(X = x))`
-- Allowing free variables, to specify model transformations: `query(m, @T(X | Y))`
-- “Graph queries”: `@T(X | Parents(X))`, `@T(Y | Not(X))` (a nice way to express Gibbs conditionals!)
-- Predicate style for “measure queries”: `@T(X < Y + Z)`
+  - Pearl-style do-notation: `@T(Y = y | do(X = x))`
+  - Allowing free variables, to specify model transformations: `query(m, @T(X | Y))`
+  - “Graph queries”: `@T(X | Parents(X))`, `@T(Y | Not(X))` (a nice way to express Gibbs conditionals!)
+  - Predicate style for “measure queries”: `@T(X < Y + Z)`
 
 The latter applications are the reason I originally liked the idea of the macro being called `@P`
-(or even `@𝓅` or `@ℙ`), since then it would look like a “Bayesian probability expression”: `@P(X <
-Y + Z)`.  But this would not be so meaningful in the case of representing a trace instance.
+(or even `@𝓅` or `@ℙ`), since then it would look like a “Bayesian probability expression”: `@P(X < Y + Z)`.  But this would not be so meaningful in the case of representing a trace instance.
 
 Perhaps both `@T` and `@P` can coexist, and both produce different kinds of `ProbabilityExpression`
 objects?
 
 NB: the exact details of this kind of “schema application”, and what results from it, will need to
 be specified in the interface of `AbstractModelTrace`, aka “the new `VarInfo`”.
-
-
 
 # `AbstractModelTrace`/`VarInfo` interface draft
 
@@ -336,7 +325,7 @@ be specified in the interface of `AbstractModelTrace`, aka “the new `VarInfo`�
 
 ### Why do we do this?
 
-As I have said before: 
+As I have said before:
 
 > There are many aspects that make VarInfo a very complex data structure.
 
@@ -363,8 +352,8 @@ for a dictionary-like structure.
 
 Related previous discussions:
 
-- [Discussion about `VarName`](https://github.com/TuringLang/AbstractPPL.jl/discussions/7)
-- [`AbstractVarInfo` representation](https://github.com/TuringLang/AbstractPPL.jl/discussions/5)
+  - [Discussion about `VarName`](https://github.com/TuringLang/AbstractPPL.jl/discussions/7)
+  - [`AbstractVarInfo` representation](https://github.com/TuringLang/AbstractPPL.jl/discussions/5)
 
 Additionally (but closely related), the second part tries to formalize the “subsumption” mechanism
 of `VarName`s, and its interaction with using `VarName`s as keys/indices.
@@ -378,57 +367,56 @@ ParetoSmoothing.jl.
 
 ### What is going to change?
 
-- For the end user of Turing.jl: nothing.  You usually don’t use `VarInfo`, or the raw evaluator
-interface, anyways.  (Although if the newer data structures are more user-friendly, they might occur
-in more places in the future?)
-- For people having a look into code using `VarInfo`, or starting to hack on Turing.jl/DPPL.jl: a
-huge reduction in cognitive complexity.  `VarInfo` implementations should be readable on their own,
-and the implemented functions layed out somewhere.  Its usages should look like for any other nice,
-normal data structure.
-- For core DPPL.jl implementors: same as the previous, plus: a standard against which to improve and
-test `VarInfo`, and a clearly defined design space for new data structures.
-- For AbstractPPL.jl clients/PPL implementors: an interface to program against (as with the rest of
-APPL), and an existing set of well-specified, flexible trace data types with different
-characteristics.
+  - For the end user of Turing.jl: nothing.  You usually don’t use `VarInfo`, or the raw evaluator
+    interface, anyways.  (Although if the newer data structures are more user-friendly, they might occur
+    in more places in the future?)
+  - For people having a look into code using `VarInfo`, or starting to hack on Turing.jl/DPPL.jl: a
+    huge reduction in cognitive complexity.  `VarInfo` implementations should be readable on their own,
+    and the implemented functions layed out somewhere.  Its usages should look like for any other nice,
+    normal data structure.
+  - For core DPPL.jl implementors: same as the previous, plus: a standard against which to improve and
+    test `VarInfo`, and a clearly defined design space for new data structures.
+  - For AbstractPPL.jl clients/PPL implementors: an interface to program against (as with the rest of
+    APPL), and an existing set of well-specified, flexible trace data types with different
+    characteristics.
 
 And in terms of implementation work in DPPL.jl: once the interface is fixed (or even during fixing
 it), varinfo.jl will undergo a heavy refactoring – which should make it _simpler_! (No three
 different getter functions with slightly different semantics, etc…).
-
 
 ## Property interface
 
 The basic idea is for all `VarInfo`s to behave like ordered dictionaries with `VarName` keys – all
 common operations should just work.  There are two things that make them more special, though:
 
-1. “Fancy indexing”: since `VarName`s are structured themselves, the `VarInfo` should be have a bit
-   like a trie, in the sense that all prefixes of stored keys should be retrievable.  Also,
-   subsumption of `VarName`s should be respected (see end of this document):
-
+ 1. “Fancy indexing”: since `VarName`s are structured themselves, the `VarInfo` should be have a bit
+    like a trie, in the sense that all prefixes of stored keys should be retrievable.  Also,
+    subsumption of `VarName`s should be respected (see end of this document):
+    
     ```julia
-    vi[@varname(x.a)] = [1,2,3]
-    vi[@varname(x.b)] = [4,5,6]
+    vi[@varname(x.a)] = [1, 2, 3]
+    vi[@varname(x.b)] = [4, 5, 6]
     vi[@varname(x.a[2])] == 2
-    vi[@varname(x)] == (; a = [1,2,3], b = [4,5,6])
+    vi[@varname(x)] == (; a=[1, 2, 3], b=[4, 5, 6])
     ```
     
     Generalizations that go beyond simple cases (those that you can imagine by storing individual
     `setfield!`s in a tree) need not be implemented in the beginning; e.g.,
-
+    
     ```julia
     vi[@varname(x[1])] = 1
     vi[@varname(x[2])] = 2
     keys(vi) == [x[1], x[2]]
     
-    vi[@varname(x)] = [1,2]
+    vi[@varname(x)] = [1, 2]
     keys(vi) == [x]
     ```
-    
-2. (_This has to be discussed further._)  Information other than the sampled values, such as flags,
-   metadata, pointwise likelihoods, etc., can in principle be stored in multiple of these “`VarInfo`
-   dicts” with parallel structure.  For efficiency, it is thinkable to devise a design such that
-   multiple fields can be stored under the same indexing structure.
 
+ 2. (_This has to be discussed further._)  Information other than the sampled values, such as flags,
+    metadata, pointwise likelihoods, etc., can in principle be stored in multiple of these “`VarInfo`
+    dicts” with parallel structure.  For efficiency, it is thinkable to devise a design such that
+    multiple fields can be stored under the same indexing structure.
+    
     ```julia
     vi[@varname(x[1])] == 1
     vi[@varname(x[1])].meta["bla"] == false
@@ -446,23 +434,26 @@ common operations should just work.  There are two things that make them more sp
     The important question here is: should the “joint data structure” behave like a dictionary of
     `NamedTuple`s (`eltype(vi) == @NamedTuple{value::T, ℓ::Float64, meta}`), or like a struct of
     dicts with shared keys (`eltype(vi.value) <: T`, `eltype(vi.ℓ) <: Float64`, …)?
-    
+
 The required dictionary functions are about the following:
 
-- Pure functions: 
-  - `iterate`, yielding pairs of `VarName` and the stored value
-  - `IteratorEltype == HasEltype()`, `IteratorSize = HasLength()`
-  - `keys`, `values`, `pairs`, `length` consistent with `iterate`
-  - `eltype`, `keytype`, `valuetype`
-  - `get`, `getindex`, `haskey` for indexing by `VarName`
-  - `merge` to join two `VarInfo`s
-- Mutating functions:
-  - `insert!!`, `set!!`
-  - `merge!!` to add and join elements (TODO: think about `merge`)
-  - `setindex!!`
-  - `empty!!`, `delete!!`, `unset!!` (_Are these really used anywhere? Not having them makes persistent
-    implementations much easier!_)
+  - Pure functions:
     
+      + `iterate`, yielding pairs of `VarName` and the stored value
+      + `IteratorEltype == HasEltype()`, `IteratorSize = HasLength()`
+      + `keys`, `values`, `pairs`, `length` consistent with `iterate`
+      + `eltype`, `keytype`, `valuetype`
+      + `get`, `getindex`, `haskey` for indexing by `VarName`
+      + `merge` to join two `VarInfo`s
+
+  - Mutating functions:
+    
+      + `insert!!`, `set!!`
+      + `merge!!` to add and join elements (TODO: think about `merge`)
+      + `setindex!!`
+      + `empty!!`, `delete!!`, `unset!!` (_Are these really used anywhere? Not having them makes persistent
+        implementations much easier!_)
+
 I believe that adopting the interface of
 [Dictionaries.jl](https://github.com/andyferris/Dictionaries.jl), not `Base.AbstractDict`, would be
 ideal, since their approach make key sharing and certain operations naturally easy (particularly
@@ -471,13 +462,12 @@ ideal, since their approach make key sharing and certain operations naturally ea
 Other `Base` functions, like `enumerate`, should follow from the above.
 
 `length` might appear weird – but it should definitely be consistent with the iterator.
-  
+
 It would be really cool if `merge` supported the combination of distinct types of implementations,
 e.g., a dynamic and a tuple-based part.
 
 To support both mutable and immutable/persistent implementations, let’s require consistent
 BangBang.jl style mutators throughout.
-
 
 ## Transformations/Bijectors
 
@@ -490,20 +480,18 @@ Implementation-wise, they can probably be expressed as folds?
 map(v -> link(v.dist, v.value), vi)
 ```
 
-
 ## Linearization
 
 There are multiple possible approaches to handle this:
 
-1. As a special case of conversion: `Vector(vi)`
-2. `copy!(vals_array, vi)`.
-3. As a fold: `mapreduce(v -> vec(v.value), append!, vi, init=Float64[])`
+ 1. As a special case of conversion: `Vector(vi)`
+ 2. `copy!(vals_array, vi)`.
+ 3. As a fold: `mapreduce(v -> vec(v.value), append!, vi, init=Float64[])`
 
 Also here, I think that the best implementation would be through a fold.  Variants (1) or (2) might
 additionally be provided as syntactic sugar.
 
-
----
+* * *
 
 # `VarName`-based axioms
 
@@ -518,7 +506,7 @@ Now, `VarName`s have a compositional structure: they can be built by composing a
 more and more lenses (`VarName{v}()` starts off with an `IdentityLens`):
 
 ```julia
-julia> vn = VarName{:x}() ∘ Setfield.IndexLens((1:10, 1) ∘ Setfield.IndexLens((2, )))
+julia> vn = VarName{:x}() ∘ Setfield.IndexLens((1:10, 1) ∘ Setfield.IndexLens((2,)))
 x[1:10,1][2]
 ```
 
@@ -535,21 +523,21 @@ subsumes(@varname(x.a), @varname(x.a[1]))
 
 Thus, we have the following axioms for `VarName`s (“variables” are `VarName{n}()`):
 
-1. `x ⊑ x` for all variables `x`
-2. `x ≍ y` for `x ≠ y` (i.e., distinct variables are incomparable; `x ⋢ y` and `y ⋢ x`) (`≍` is `\asymp`)
-3. `x ∘ ℓ ⊑ x` for all variables `x` and lenses `ℓ`
-4. `x ∘ ℓ₁ ⊑ x ∘ ℓ₂ ⇔ ℓ₁ ⊑ ℓ₂`
+ 1. `x ⊑ x` for all variables `x`
+ 2. `x ≍ y` for `x ≠ y` (i.e., distinct variables are incomparable; `x ⋢ y` and `y ⋢ x`) (`≍` is `\asymp`)
+ 3. `x ∘ ℓ ⊑ x` for all variables `x` and lenses `ℓ`
+ 4. `x ∘ ℓ₁ ⊑ x ∘ ℓ₂ ⇔ ℓ₁ ⊑ ℓ₂`
 
 For the last axiom to work, we also have to define subsumption of individual, non-composed lenses:
 
-1. `PropertyLens(a) == PropertyLens(b) ⇔ a == b`, for all symbols `a`, `b`
-2. `FunctionLens(f) == FunctionLens(g) ⇔ f == g` (under extensional equality; I’m only mentioning
-   this in case we ever generalize to Bijector-ed variables like `@varname(log(x))`)
-3. `IndexLens(ι₁) ⊑ IndexLens(ι₂)` if the index tuple `ι₂` covers all indices in `ι₁`; for example,
-   `_[1, 2:10] ⊑ _[1:10, 1:20]`.  (_This is a bit fuzzy and not all corner cases have been
-   considered yet!_)
-4. `IdentityLens() == IdentityLens()`
-4. `ℓ₁ ≍ ℓ₂`, otherwise
+ 1. `PropertyLens(a) == PropertyLens(b) ⇔ a == b`, for all symbols `a`, `b`
+ 2. `FunctionLens(f) == FunctionLens(g) ⇔ f == g` (under extensional equality; I’m only mentioning
+    this in case we ever generalize to Bijector-ed variables like `@varname(log(x))`)
+ 3. `IndexLens(ι₁) ⊑ IndexLens(ι₂)` if the index tuple `ι₂` covers all indices in `ι₁`; for example,
+    `_[1, 2:10] ⊑ _[1:10, 1:20]`.  (_This is a bit fuzzy and not all corner cases have been
+    considered yet!_)
+ 4. `IdentityLens() == IdentityLens()`
+ 5. `ℓ₁ ≍ ℓ₂`, otherwise
 
 Together, this should make `VarName`s under subsumption a reflexive poset.
 
