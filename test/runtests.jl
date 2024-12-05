@@ -16,10 +16,7 @@ using Test
     include("abstractprobprog.jl")
     @testset "doctests" begin
         DocMeta.setdocmeta!(
-            AbstractPPL,
-            :DocTestSetup,
-            :(using AbstractPPL);
-            recursive=true,
+            AbstractPPL, :DocTestSetup, :(using AbstractPPL); recursive=true
         )
         doctest(AbstractPPL; manual=false)
     end
