@@ -2,7 +2,6 @@ using AbstractMCMC
 using DensityInterface
 using Random
 
-
 """
     AbstractProbabilisticProgram
 
@@ -11,7 +10,6 @@ Common base type for models expressed as probabilistic programs.
 abstract type AbstractProbabilisticProgram <: AbstractMCMC.AbstractModel end
 
 DensityInterface.DensityKind(::AbstractProbabilisticProgram) = HasDensity()
-
 
 """
     logdensityof(model, trace)
@@ -25,7 +23,6 @@ in `model`, at specific values for the random variables given through `trace`.
 probability theory.
 """
 DensityInterface.logdensityof(::AbstractProbabilisticProgram, ::AbstractModelTrace)
-
 
 """
     decondition(conditioned_model)
@@ -42,7 +39,6 @@ m == condition(decondition(m), obs)
 should hold for models `m` with conditioned variables `obs`.
 """
 function decondition end
-
 
 """
     condition(model, observations)
@@ -83,7 +79,6 @@ m == unfix(fix(m, params))
 should hold for any model `m` and parameters `params`.
 """
 function fix end
-
 
 """
     unfix(model)
