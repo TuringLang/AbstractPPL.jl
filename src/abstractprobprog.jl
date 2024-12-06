@@ -1,6 +1,7 @@
 using AbstractMCMC
 using DensityInterface
 using Random
+using StatsBase
 
 """
     AbstractProbabilisticProgram
@@ -115,4 +116,33 @@ function Base.rand(::Type{T}, model::AbstractProbabilisticProgram) where {T}
 end
 function Base.rand(model::AbstractProbabilisticProgram)
     return rand(Random.default_rng(), NamedTuple, model)
+end
+
+"""
+    predict(
+        [rng::AbstractRNG=Random.default_rng(),]
+        [T=NamedTuple,]
+        model::AbstractProbabilisticProgram,
+        params,
+    ) -> T
+
+Draw a sample from the predictive distribution specified by `model` with its parameters fixed to `params`.
+
+The sample will be returned as format specified by `T`.
+"""
+function StatsBase.predict(
+    rng::AbstractRNG, T::Type, model::AbstractProbabilisticProgram, params
+)
+    return rand(rng, T, fix(model, params))
+end
+function StatsBase.predict(T::Type, model::AbstractProbabilisticProgram, params)
+    return StatsBase.predict(Random.default_rng(), T, model, params)
+end
+function StatsBase.predict(model::AbstractProbabilisticProgram, params)
+    return StatsBase.predict(NamedTuple, model, params)
+end
+function StatsBase.predict(
+    rng::AbstractRNG, T::Type, model::AbstractProbabilisticProgram, params
+)
+    return StatsBase.predict(rng, NamedTuple, model, params)
 end
