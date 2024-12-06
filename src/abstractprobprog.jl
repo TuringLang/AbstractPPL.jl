@@ -130,7 +130,9 @@ Draw a sample from the predictive distribution specified by `model` with its par
 
 The sample will be returned as format specified by `T`.
 """
-function StatsBase.predict(rng::AbstractRNG, T::Type, model::AbstractProbabilisticProgram, params)
+function StatsBase.predict(
+    rng::AbstractRNG, T::Type, model::AbstractProbabilisticProgram, params
+)
     return rand(rng, T, fix(model, params))
 end
 function StatsBase.predict(T::Type, model::AbstractProbabilisticProgram, params)
@@ -139,6 +141,8 @@ end
 function StatsBase.predict(model::AbstractProbabilisticProgram, params)
     return StatsBase.predict(NamedTuple, model, params)
 end
-function StatsBase.predict(rng::AbstractRNG, T::Type, model::AbstractProbabilisticProgram, params)
+function StatsBase.predict(
+    rng::AbstractRNG, T::Type, model::AbstractProbabilisticProgram, params
+)
     return StatsBase.predict(rng, NamedTuple, model, params)
 end
