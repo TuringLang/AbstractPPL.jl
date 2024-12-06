@@ -7,12 +7,7 @@ DocMeta.setdocmeta!(AbstractPPL, :DocTestSetup, :(using AbstractPPL); recursive=
 makedocs(;
     sitename="AbstractPPL",
     modules=[AbstractPPL],
-    pages=[
-        "Home" => "index.md",
-        "API" => "api.md",
-    ],
+    pages=["Home" => "index.md", "API" => "api.md"],
     checkdocs=:exports,
     doctest=false,
 )
-
-deploydocs(; repo="github.com/TuringLang/AbstractPPL.jl.git", push_preview=true)

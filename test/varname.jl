@@ -14,7 +14,7 @@ macro test_strict_subsumption(x, y)
     end
 end
 
-function test_equal(o1::VarName{sym1}, o2::VarName{sym2}) where {sym1, sym2}
+function test_equal(o1::VarName{sym1}, o2::VarName{sym2}) where {sym1,sym2}
     return sym1 === sym2 && test_equal(o1.optic, o2.optic)
 end
 function test_equal(o1::ComposedFunction, o2::ComposedFunction)
@@ -28,26 +28,53 @@ function test_equal(o1, o2)
 end
 
 @testset "varnames" begin
+    @testset "string and symbol conversion" begin
+        vn1 = @varname x[1][2]
+        @test string(vn1) == "x[1][2]"
+        @test Symbol(vn1) == Symbol("x[1][2]")
+    end
+
+    @testset "equality and hashing" begin
+        vn1 = @varname x[1][2]
+        vn2 = @varname x[1][2]
+        @test vn2 == vn1
+        @test hash(vn2) == hash(vn1)
+    end
+
+    @testset "inspace" begin
+        space = (:x, :y, @varname(z[1]), @varname(M[1:10, :]))
+        @test inspace(@varname(x), space)
+        @test inspace(@varname(y), space)
+        @test inspace(@varname(x[1]), space)
+        @test inspace(@varname(z[1][1]), space)
+        @test inspace(@varname(z[1][:]), space)
+        @test inspace(@varname(z[1][2:3:10]), space)
+        @test inspace(@varname(M[[2, 3], 1]), space)
+        @test_throws ErrorException inspace(@varname(M[:, 1:4]), space)
+        @test inspace(@varname(M[1, [2, 4, 6]]), space)
+        @test !inspace(@varname(z[2]), space)
+        @test !inspace(@varname(z), space)
+    end
+
     @testset "construction & concretization" begin
         i = 1:10
         j = 2:2:5
         @test @varname(A[1].b[i]) == @varname(A[1].b[1:10])
         @test @varname(A[j]) == @varname(A[2:2:5])
-        
-        @test @varname(A[:, 1][1+1]) == @varname(A[:, 1][2])
-        @test(@varname(A[:, 1][2]) ==
-            VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])))
+
+        @test @varname(A[:, 1][1 + 1]) == @varname(A[:, 1][2])
+        @test(@varname(A[:, 1][2]) == VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])))
 
         # concretization
         y = zeros(10, 10)
-        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0],);
+        x = (a=[1.0 2.0; 3.0 4.0; 5.0 6.0],)
 
         @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
         @test test_equal(@varname(y[:], true), @varname(y[1:100]))
         @test test_equal(@varname(y[:, begin], true), @varname(y[1:10, 1]))
-        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] === 
+        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
             AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
-        @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3,2][1:3]))
+        @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3, 2][1:3]))
     end
 
     @testset "compose and opcompose" begin
@@ -63,13 +90,13 @@ end
     end
 
     @testset "get & set" begin
-        x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 1.0);
+        x = (a=[1.0 2.0; 3.0 4.0; 5.0 6.0], b=1.0)
         @test get(x, @varname(a[1, 2])) == 2.0
         @test get(x, @varname(b)) == 1.0
-        @test set(x, @varname(a[1, 2]), 10) == (a = [1.0 10.0; 3.0 4.0; 5.0 6.0], b = 1.0)
-        @test set(x, @varname(b), 10) == (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], b = 10.0)
+        @test set(x, @varname(a[1, 2]), 10) == (a=[1.0 10.0; 3.0 4.0; 5.0 6.0], b=1.0)
+        @test set(x, @varname(b), 10) == (a=[1.0 2.0; 3.0 4.0; 5.0 6.0], b=10.0)
     end
-    
+
     @testset "subsumption with standard indexing" begin
         # x ⊑ x
         @test @varname(x) ⊑ @varname(x)
@@ -97,11 +124,11 @@ end
         @test_strict_subsumption x[1] x[1:10]
         @test_strict_subsumption x[1:5] x[1:10]
         @test_strict_subsumption x[4:6] x[1:10]
-        
-        @test_strict_subsumption x[[2,3,5]] x[[7,6,5,4,3,2,1]]
+
+        @test_strict_subsumption x[[2, 3, 5]] x[[7, 6, 5, 4, 3, 2, 1]]
 
         @test_strict_subsumption x[:a][1] x[:a]
-        
+
         # boolean indexing works as long as it is concretized
         A = rand(10, 10)
         @test @varname(A[iseven.(1:10), 1], true) ⊑ @varname(A[1:10, 1])
@@ -116,11 +143,12 @@ end
 
     @testset "non-standard indexing" begin
         A = rand(10, 10)
-        @test test_equal(@varname(A[1, Not(3)], true), @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]]))
-        
+        @test test_equal(
+            @varname(A[1, Not(3)], true), @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]])
+        )
+
         B = OffsetArray(A, -5, -5) # indices -4:5×-4:5
         @test test_equal(@varname(B[1, :], true), @varname(B[1, -4:5]))
-
     end
     @testset "type stability" begin
         @inferred VarName{:a}()
@@ -166,10 +194,10 @@ end
             @varname(z[:], true),
             @varname(z[:][:], false),
             @varname(z[:][:], true),
-            @varname(z[:,:], false),
-            @varname(z[:,:], true),
-            @varname(z[2:5,:], false),
-            @varname(z[2:5,:], true),
+            @varname(z[:, :], false),
+            @varname(z[:, :], true),
+            @varname(z[2:5, :], false),
+            @varname(z[2:5, :], true),
         ]
         for vn in vns
             @test string_to_varname(varname_to_string(vn)) == vn
@@ -194,8 +222,13 @@ end
         @test_throws MethodError varname_to_string(vn)
 
         # Now define the relevant methods
-        AbstractPPL.index_to_dict(o::OffsetArrays.IdOffsetRange{I, R}) where {I,R} = Dict("type" => "OffsetArrays.OffsetArray", "parent" => AbstractPPL.index_to_dict(o.parent), "offset" => o.offset)
-        AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) = OffsetArrays.IdOffsetRange(AbstractPPL.dict_to_index(d["parent"]), d["offset"])
+        AbstractPPL.index_to_dict(o::OffsetArrays.IdOffsetRange{I,R}) where {I,R} = Dict(
+            "type" => "OffsetArrays.OffsetArray",
+            "parent" => AbstractPPL.index_to_dict(o.parent),
+            "offset" => o.offset,
+        )
+        AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) =
+            OffsetArrays.IdOffsetRange(AbstractPPL.dict_to_index(d["parent"]), d["offset"])
 
         # Serialisation should now work
         @test string_to_varname(varname_to_string(vn)) == vn
