@@ -11,6 +11,7 @@ Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 AbstractMCMC = "2, 3, 4, 5"
@@ -18,4 +19,5 @@ Accessors = "0.1"
 DensityInterface = "0.4"
 JSON = "0.19 - 0.21"
 Random = "1.6"
+StatsBase = "0.32, 0.33, 0.34"
 julia = "~1.6.6, 1.7.3"
