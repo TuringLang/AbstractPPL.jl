@@ -20,13 +20,13 @@ in `model`, at specific values for the random variables given through `trace`.
 
 `trace` can be of any supported internal trace type, or a fixed probability expression.
 
-`logdensityof` should interact with conditioning and deconditioning in the way required by
+`logdensityof` should interact with conditioning and unconditioning in the way required by
 probability theory.
 """
 DensityInterface.logdensityof(::AbstractProbabilisticProgram, ::AbstractModelTrace)
 
 """
-    decondition(conditioned_model)
+    uncondition(conditioned_model)
 
 Remove the conditioning (i.e., observation data) from `conditioned_model`, turning it into a
 generative model over prior and observed variables.
@@ -34,12 +34,12 @@ generative model over prior and observed variables.
 The invariant 
 
 ```
-m == condition(decondition(m), obs)
+m == condition(uncondition(m), obs)
 ```
 
 should hold for models `m` with conditioned variables `obs`.
 """
-function decondition end
+function uncondition end
 
 """
     condition(model, observations)
@@ -52,7 +52,7 @@ unnormalized) posterior distribution over them.
 The invariant 
 
 ```
-m = decondition(condition(m, obs))
+m = uncondition(condition(m, obs))
 ```
 
 should hold for generative models `m` and arbitrary `obs`.

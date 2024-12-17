@@ -18,7 +18,7 @@ export VarName,
 
 # Abstract model functions
 export AbstractProbabilisticProgram,
-    condition, decondition, fix, unfix, logdensityof, densityof, AbstractContext, evaluate!!
+    condition, uncondition, fix, unfix, logdensityof, densityof, AbstractContext, evaluate!!
 
 # Abstract traces
 export AbstractModelTrace

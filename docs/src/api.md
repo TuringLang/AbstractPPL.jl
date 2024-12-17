@@ -28,7 +28,7 @@ string_to_varname
 ```@docs
 AbstractProbabilisticProgram
 condition
-decondition
+uncondition
 fix
 unfix
 logdensityof

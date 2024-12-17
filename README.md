@@ -50,7 +50,7 @@ Therefore, the interface consists of an `AbstractProbabilisticProgram` supertype
 functions
 
   - `condition(::Model, ::Trace) -> ConditionedModel`
-  - `decondition(::ConditionedModel) -> GenerativeModel`
+  - `uncondition(::ConditionedModel) -> GenerativeModel`
   - `sample(::Model, ::Sampler = Exact(), [Int])` (from `AbstractMCMC.sample`)
   - `logdensityof(::Model, ::Trace)` and `densityof(::Model, ::Trace)` (from
     [DensityInterface.jl](https://github.com/JuliaMath/DensityInterface.jl))
@@ -133,18 +133,18 @@ end
 m = foo(; Y=…, μ=…)::SomeConditionedModel
 ```
 
-From this we can, if supported, go back to the generative form via `decondition`, and back via
+From this we can, if supported, go back to the generative form via `uncondition`, and back via
 `condition`:
 
 ```julia
-decondition(m) == g::SomeGenerativeModel
+uncondition(m) == g::SomeGenerativeModel
 m == condition(g, @T(Y = …))
 ```
 
 (with equality in distribution).
 
 In the case of Turing.jl, the object `m` would at the same time contain the information about the
-generative and posterior distribution `condition` and `decondition` can simply return different
+generative and posterior distribution `condition` and `uncondition` can simply return different
 kinds of “tagged” model types which put the model specification into a certain context.
 
 Soss.jl pretty much already works like the examples above, with one model object being either a
@@ -152,7 +152,7 @@ Soss.jl pretty much already works like the examples above, with one model object
 
 A hypothetical `DensityModel`, or something like the types from LogDensityProblems.jl, would be a
 case for a model type that does not support the structural operations `condition` and
-`decondition`.
+`uncondition`.
 
 The invariances between these operations should follow normal rules of probability theory.  Not all
 methods or directions need to be supported for every modelling language; in this case, a
