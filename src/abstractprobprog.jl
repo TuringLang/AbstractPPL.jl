@@ -128,5 +128,5 @@ end
 Draw a sample from the predictive distribution specified by `model` with its parameters fixed to `params`.
 """
 function StatsBase.predict(model::AbstractProbabilisticProgram, params)
-    return predict(Random.default_rng(), NamedTuple, model, params)
+    return StatsBase.predict(Random.default_rng(), model, params)
 end

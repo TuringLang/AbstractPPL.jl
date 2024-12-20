@@ -13,6 +13,12 @@ function Base.rand(rng::Random.AbstractRNG, ::Type{T}, model::RandModel) where {
     return nothing
 end
 
+struct PredModel <: AbstractProbabilisticProgram end
+
+function AbstractPPL.predict(rng::Random.AbstractRNG, model::PredModel, params)
+    return rng
+end
+
 @testset "AbstractProbabilisticProgram" begin
     @testset "rand defaults" begin
         model = RandModel(nothing, nothing)
@@ -33,5 +39,10 @@ end
             @test model.rng === rng
             @test model.T === NamedTuple
         end
+    end
+
+    @testset "predict defaults" begin
+        model = PredModel()
+        @test AbstractPPL.predict(model, nothing) == Random.default_rng()
     end
 end
