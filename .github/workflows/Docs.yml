@@ -6,8 +6,6 @@ on:
       - main
     tags: '*'
   pull_request:
-    branches:
-      - main
 
 concurrency:
   # Skip intermediate builds: always.
@@ -25,4 +23,4 @@ jobs:
 
     steps:
       - name: Build and deploy Documenter.jl docs
-        uses: TuringLang/DocsNav/DocsDocumenter@v2
+        uses: TuringLang/actions/DocsDocumenter@main
