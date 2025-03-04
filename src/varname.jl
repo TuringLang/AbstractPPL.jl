@@ -975,7 +975,6 @@ identity (generic function with 1 method)
 ```
 """
 _inner(o::Base.ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.inner
-_inner(o::Base.ComposedFunction{Outer,typeof(identity)}) where {Outer} = o.outer
 _inner(o::Accessors.PropertyLens) = o
 _inner(o::Accessors.IndexLens) = o
 _inner(o::typeof(identity)) = o
