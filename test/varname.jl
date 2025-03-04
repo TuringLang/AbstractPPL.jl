@@ -246,5 +246,6 @@ end
         @test unprefix(@varname(x.a.y), @varname(x.a)) == @varname(y)
         @test unprefix(@varname(x.y.a), @varname(x)) == @varname(y.a)
         @test_throws ArgumentError unprefix(@varname(x.y.a), @varname(n))
+        @test_throws ArgumentError unprefix(@varname(x.y.a), @varname(x[1]))
     end
 end
