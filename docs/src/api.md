@@ -14,6 +14,13 @@ vsym
 @vsym
 ```
 
+## VarName prefixing and unprefixing
+
+```@docs
+prefix
+unprefix
+```
+
 ## VarName serialisation
 
 ```@docs

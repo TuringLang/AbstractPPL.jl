@@ -233,4 +233,19 @@ end
         # Serialisation should now work
         @test string_to_varname(varname_to_string(vn)) == vn
     end
+
+    @testset "prefix and unprefix" begin
+        @test prefix(@varname(y), @varname(x)) == @varname(x.y)
+        @test prefix(@varname(y), @varname(x[1])) == @varname(x[1].y)
+        @test prefix(@varname(y), @varname(x.a)) == @varname(x.a.y)
+        @test prefix(@varname(y[1]), @varname(x)) == @varname(x.y[1])
+        @test prefix(@varname(y.a), @varname(x)) == @varname(x.y.a)
+
+        @test unprefix(@varname(x.y[1]), @varname(x)) == @varname(y[1])
+        @test unprefix(@varname(x[1].y), @varname(x[1])) == @varname(y)
+        @test unprefix(@varname(x.a.y), @varname(x.a)) == @varname(y)
+        @test unprefix(@varname(x.y.a), @varname(x)) == @varname(y.a)
+        @test_throws ArgumentError unprefix(@varname(x.y.a), @varname(n))
+        @test_throws ArgumentError unprefix(@varname(x.y.a), @varname(x[1]))
+    end
 end

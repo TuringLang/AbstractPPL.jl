@@ -14,7 +14,9 @@ export VarName,
     index_to_dict,
     dict_to_index,
     varname_to_string,
-    string_to_varname
+    string_to_varname,
+    prefix,
+    unprefix
 
 # Abstract model functions
 export AbstractProbabilisticProgram,
