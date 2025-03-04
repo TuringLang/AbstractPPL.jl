@@ -1059,6 +1059,26 @@ function unprefix_optic(optic, optic_prefix)
     return unprefix_optic(_outer(optic), _outer(optic_prefix))
 end
 
+"""
+    unprefix(vn::VarName, prefix::VarName)
+
+Remove a prefix from a VarName.
+
+```jldoctest
+julia> AbstractPPL.unprefix(@varname(y.x), @varname(y))
+x
+
+julia> AbstractPPL.unprefix(@varname(y.x.a), @varname(y))
+x.a
+
+julia> AbstractPPL.unprefix(@varname(y[1].x), @varname(y[1]))
+x
+
+julia> AbstractPPL.unprefix(@varname(y), @varname(n))
+ERROR: ArgumentError: could not remove prefix n from VarName y
+[...]
+```
+"""
 function unprefix(
     vn::VarName{sym_vn}, prefix::VarName{sym_prefix}
 ) where {sym_vn,sym_prefix}
@@ -1071,6 +1091,22 @@ function unprefix(
     return optic_to_vn(unprefix_optic(optic_vn, optic_prefix))
 end
 
+"""
+    prefix(vn::VarName, prefix::VarName)
+
+Add a prefix to a VarName.
+
+```jldoctest
+julia> AbstractPPL.prefix(@varname(x), @varname(y))
+y.x
+
+julia> AbstractPPL.prefix(@varname(x.a), @varname(y))
+y.x.a
+
+julia> AbstractPPL.prefix(@varname(x.a), @varname(y[1]))
+y[1].x.a
+```
+"""
 function prefix(vn::VarName{sym_vn}, prefix::VarName{sym_prefix}) where {sym_vn,sym_prefix}
     optic_vn = getoptic(vn)
     optic_prefix = getoptic(prefix)
