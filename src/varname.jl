@@ -944,9 +944,15 @@ string_to_varname(str::AbstractString) = dict_to_varname(JSON.parse(str))
 """
     _strip_identity(optic)
 
-Remove an inner layer of the identity lens from a composed optic.
+Remove identity lenses from composed optics.
 """
-_strip_identity(o::Base.ComposedFunction{Outer,typeof(identity)}) where {Outer} = o.outer
+_strip_identity(::Base.ComposedFunction{typeof(identity),typeof(identity)}) = identity
+function _strip_identity(o::Base.ComposedFunction{Outer,typeof(identity)}) where {Outer}
+    return _strip_identity(o.outer)
+end
+function _strip_identity(o::Base.ComposedFunction{typeof(identity),Inner}) where {Inner}
+    return _strip_identity(o.inner)
+end
 _strip_identity(o::Base.ComposedFunction) = o
 _strip_identity(o::Accessors.PropertyLens) = o
 _strip_identity(o::Accessors.IndexLens) = o
@@ -969,9 +975,7 @@ identity (generic function with 1 method)
 ```
 """
 _inner(o::Base.ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.inner
-function _inner(o::Base.ComposedFunction{Outer,typeof(identity)}) where {Outer}
-    return _strip_identity(o.outer)
-end
+_inner(o::Base.ComposedFunction{Outer,typeof(identity)}) where {Outer} = o.outer
 _inner(o::Accessors.PropertyLens) = o
 _inner(o::Accessors.IndexLens) = o
 _inner(o::typeof(identity)) = o
@@ -998,7 +1002,7 @@ julia> AbstractPPL._outer(Accessors.@o _)
 identity (generic function with 1 method)
 ```
 """
-_outer(o::Base.ComposedFunction{Outer,Inner}) where {Outer,Inner} = _strip_identity(o.outer)
+_outer(o::Base.ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.outer
 _outer(::Accessors.PropertyLens) = identity
 _outer(::Accessors.IndexLens) = identity
 _outer(::typeof(identity)) = identity
@@ -1049,14 +1053,16 @@ end
 unprefix_optic(o, ::typeof(identity)) = o  # Base case
 function unprefix_optic(optic, optic_prefix)
     # strip one layer of the optic and check for equality
-    inner = _inner(optic)
-    inner_prefix = _inner(optic_prefix)
+    inner = _inner(_strip_identity(optic))
+    inner_prefix = _inner(_strip_identity(optic_prefix))
     if inner != inner_prefix
         msg = "could not remove prefix $(optic_prefix) from optic $(optic)"
         throw(ArgumentError(msg))
     end
     # recurse
-    return unprefix_optic(_outer(optic), _outer(optic_prefix))
+    return unprefix_optic(
+        _outer(_strip_identity(optic)), _outer(_strip_identity(optic_prefix))
+    )
 end
 
 """
