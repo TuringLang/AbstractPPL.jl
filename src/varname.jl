@@ -1112,19 +1112,28 @@ julia> AbstractPPL.prefix(@varname(x.a), @varname(y[1]))
 y[1].x.a
 ```
 """
-function prefix(vn::VarName{sym_vn}, prefix::VarName{sym_prefix}) where {sym_vn,sym_prefix}
+function prefix(
+    vn::VarName{sym_vn,Toptic_vn}, prefix::VarName{sym_prefix,Toptic_prefix}
+) where {sym_vn,sym_prefix,Toptic_vn,Toptic_prefix}
     optic_vn = getoptic(vn)
     optic_prefix = getoptic(prefix)
-    # Special case `identity` to avoid having ComposedFunctions with identity
-    if optic_vn == identity
-        new_inner_optic_vn = PropertyLens{sym_vn}()
-    else
-        new_inner_optic_vn = optic_vn ∘ PropertyLens{sym_vn}()
-    end
-    if optic_prefix == identity
-        new_optic_vn = new_inner_optic_vn
-    else
-        new_optic_vn = new_inner_optic_vn ∘ optic_prefix
-    end
-    return VarName{sym_prefix}(new_optic_vn)
+    new_optic = (optic_vn ∘ PropertyLens{sym_vn}()) ∘ optic_prefix
+    return VarName{sym_prefix}(new_optic)
+end
+function prefix(
+    ::VarName{sym_vn,typeof(identity)}, prefix::VarName{sym_prefix,Toptic_prefix}
+) where {sym_vn,sym_prefix,Toptic_prefix}
+    new_optic = PropertyLens{sym_vn}() ∘ getoptic(prefix)
+    return VarName{sym_prefix}(new_optic)
+end
+function prefix(
+    vn::VarName{sym_vn,Toptic_vn}, ::VarName{sym_prefix,typeof(identity)}
+) where {sym_vn,sym_prefix,Toptic_vn}
+    new_optic = getoptic(vn) ∘ PropertyLens{sym_vn}()
+    return VarName{sym_prefix}(new_optic)
+end
+function prefix(
+    ::VarName{sym_vn,typeof(identity)}, ::VarName{sym_prefix,typeof(identity)}
+) where {sym_vn,sym_prefix}
+    return VarName{sym_prefix}(PropertyLens{sym_vn}())
 end
