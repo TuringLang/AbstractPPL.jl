@@ -287,6 +287,7 @@ end
             for vn1 in vns
                 for vn2 in vns
                     prefixed = prefix(vn1, vn2)
+                    @test subsumes(vn2, prefixed)
                     unprefixed = unprefix(prefixed, vn2)
                     @test unprefixed == vn1
                 end
