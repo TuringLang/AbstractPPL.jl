@@ -57,7 +57,7 @@ julia> getvalue(vals, @varname(x[1])) # different from `getindex`
 1.0
 
 julia> getvalue(vals, @varname(x[2]))
-ERROR: BoundsError: attempt to access 1-element Vector{Float64} at index [2]
+ERROR: getvalue: x[2] was not found in the values provided
 [...]
 ```
 
@@ -74,7 +74,7 @@ julia> getvalue(vals, @varname(x[1])) # different from `getindex`
 1.0
 
 julia> getvalue(vals, @varname(x[2]))
-ERROR: BoundsError: attempt to access 1-element Vector{Float64} at index [2]
+ERROR: getvalue: x[2] was not found in the values provided
 [...]
 ```
 
@@ -91,16 +91,53 @@ julia> getvalue(vals, @varname(x[1][1])) # different from `getindex`
 1.0
 
 julia> getvalue(vals, @varname(x[1][2]))
-ERROR: BoundsError: attempt to access 1-element Vector{Float64} at index [2]
+ERROR: getvalue: x[1][2] was not found in the values provided
 [...]
 
 julia> getvalue(vals, @varname(x[2][1]))
-ERROR: KeyError: key x[2][1] not found
+ERROR: getvalue: x[2][1] was not found in the values provided
 [...]
 ```
 """
-getvalue(vals::NamedTuple, vn::VarName) = get(vals, vn)
-getvalue(vals::AbstractDict, vn::VarName) = nested_getindex(vals, vn)
+function getvalue(vals::NamedTuple, vn::VarName{sym}) where {sym}
+    optic = getoptic(vn)
+    if haskey(vals, sym) && canview(optic, getproperty(vals, sym))
+        return optic(vals[sym])
+    else
+        error("getvalue: $(vn) was not found in the values provided")
+    end
+end
+# For the Dict case, it is more complicated. There are two cases:
+# 1. `vn` itself is already a key of `vals` (the easy case)
+# 2. `vn` is not a key of `vals`, but some parent of `vn` is a key of `vals`
+#    (the harder case). For example, if `vn` is `x[1][2]`, then we need to
+#    check if either `x` or `x[1]` is a key of `vals`, and if so, whether
+#    we can index into the corresponding value.
+function getvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
+    # First we check if `vn` is present as is.
+    haskey(vals, vn) && return vals[vn]
+
+    # Otherwise, we start by testing the bare `vn` (e.g., if `vn` is `x[1][2]`,
+    # we start by checking if `x` is present). We will then keep adding optics
+    # to `test_optic`, either until we find a key that is present, or until we
+    # run out of optics to test (which is determined by _inner(test_optic) ==
+    # identity).
+    test_vn = VarName{sym}()
+    test_optic = getoptic(vn)
+
+    while _inner(test_optic) != identity
+        if haskey(vals, test_vn) && canview(test_optic, vals[test_vn])
+            return test_optic(vals[test_vn])
+        else
+            # Move the innermost optic into test_vn
+            test_optic_outer = _outer(test_optic)
+            test_optic_inner = _inner(test_optic)
+            test_vn = VarName{sym}(test_optic_inner ∘ getoptic(test_vn))
+            test_optic = test_optic_outer
+        end
+    end
+    return error("getvalue: $(vn) was not found in the values provided")
+end
 
 """
     hasvalue(vals::NamedTuple, vn::VarName)
@@ -168,13 +205,6 @@ false
 function hasvalue(vals::NamedTuple, vn::VarName{sym}) where {sym}
     return haskey(vals, sym) && canview(getoptic(vn), getproperty(vals, sym))
 end
-
-# For the Dict case, it is more complicated. There are two cases:
-# 1. `vn` itself is already a key of `vals` (the easy case)
-# 2. `vn` is not a key of `vals`, but some parent of `vn` is a key of `vals`
-#    (the harder case). For example, if `vn` is `x[1][2]`, then we need to
-#    check if either `x` or `x[1]` is a key of `vals`, and if so, whether
-#    we can index into the corresponding value.
 function hasvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
     # First we check if `vn` is present as is.
     haskey(vals, vn) && return true
@@ -186,12 +216,8 @@ function hasvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
     # identity).
     test_vn = VarName{sym}()
     test_optic = getoptic(vn)
-    
+
     while _inner(test_optic) != identity
-        @show test_vn, test_optic
-        if haskey(vals, test_vn)
-            @show canview(test_optic, vals[test_vn])
-        end
         if haskey(vals, test_vn) && canview(test_optic, vals[test_vn])
             return true
         else
@@ -204,68 +230,3 @@ function hasvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
     end
     return false
 end
-# TODO(penelopeysm): Figure out tuple / namedtuple distributions, and LKJCholesky (grr)
-# function hasvalue(vals::AbstractDict, vn::VarName, dist::Distribution)
-#     @warn "`hasvalue(vals, vn, dist)` is not implemented for $(typeof(dist)); falling back to `hasvalue(vals, vn)`."
-#     return hasvalue(vals, vn)
-# end
-# hasvalue(vals::AbstractDict, vn::VarName, ::UnivariateDistribution) = hasvalue(vals, vn)
-# function hasvalue(
-#     vals::AbstractDict{<:VarName},
-#     vn::VarName{sym},
-#     dist::Union{MultivariateDistribution,MatrixDistribution},
-# ) where {sym}
-#     # If `vn` is present as-is, then we are good
-#     hasvalue(vals, vn) && return true
-#     # If not, then we need to check inside `vals` to see if a subset of
-#     # `vals` is enough to reconstruct `vn`. For example, if `vals` contains
-#     # `x[1]` and `x[2]`, and `dist` is `MvNormal(zeros(2), I)`, then we
-#     # can reconstruct `x`. If `dist` is `MvNormal(zeros(3), I)`, then we
-#     # can't.
-#     # To do this, we get the size of the distribution and iterate over all
-#     # possible indices. If every index can be found in `subsumed_keys`, then we
-#     # can return true.
-#     sz = size(dist)
-#     for idx in Iterators.product(map(Base.OneTo, sz)...)
-#         new_optic = if getoptic(vn) === identity
-#             Accessors.IndexLens(idx)
-#         else
-#             Accessors.IndexLens(idx) ∘ getoptic(vn)
-#         end
-#         new_vn = VarName{sym}(new_optic)
-#         hasvalue(vals, new_vn) || return false
-#     end
-#     return true
-# end
-
-# """
-#     nested_getindex(values::AbstractDict, vn::VarName)
-#
-# Return value corresponding to `vn` in `values` by also looking
-# in the the actual values of the dict.
-# """
-# function nested_getindex(values::AbstractDict, vn::VarName)
-#     maybeval = get(values, vn, nothing)
-#     if maybeval !== nothing
-#         return maybeval
-#     end
-#
-#     # Split the optic into the key / `parent` and the extraction optic / `child`.
-#     parent, child, issuccess = splitoptic(getoptic(vn)) do optic
-#         o = optic === nothing ? identity : optic
-#         haskey(values, VarName(vn, o))
-#     end
-#     # When combined with `VarInfo`, `nothing` is equivalent to `identity`.
-#     keyoptic = parent === nothing ? identity : parent
-#
-#     # If we found a valid split, then we can extract the value.
-#     if !issuccess
-#         # At this point we just throw an error since the key could not be found.
-#         throw(KeyError(vn))
-#     end
-#
-#     # TODO: Should we also check that we `canview` the extracted `value`
-#     # rather than just let it fail upon `get` call?
-#     value = values[VarName(vn, keyoptic)]
-#     return child(value)
-# end
