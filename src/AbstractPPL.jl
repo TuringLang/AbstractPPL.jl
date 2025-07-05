@@ -16,7 +16,9 @@ export VarName,
     varname_to_string,
     string_to_varname,
     prefix,
-    unprefix
+    unprefix,
+    getvalue,
+    hasvalue
 
 # Abstract model functions
 export AbstractProbabilisticProgram,
@@ -29,5 +31,6 @@ include("varname.jl")
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
+include("hasvalue.jl")
 
 end # module
