@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  test:
+  doctests:
     runs-on: ubuntu-latest
 
     steps:
