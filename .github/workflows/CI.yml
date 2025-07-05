@@ -17,19 +17,15 @@ jobs:
           # Current stable version
           - version: '1'
             os: ubuntu-latest
-            arch: x64
           # Minimum supported version
           - version: 'min'
             os: ubuntu-latest
-            arch: x64
           # Windows
           - version: '1'
             os: windows-latest
-            arch: x64
           # macOS
           - version: '1'
             os: macos-latest
-            arch: aarch64
 
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +33,6 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.runner.version }}
-          arch: ${{ matrix.runner.arch }}
 
       - uses: julia-actions/cache@v2
 
