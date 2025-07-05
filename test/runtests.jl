@@ -10,14 +10,21 @@ using AbstractPPL
 using Documenter
 using Test
 
+const GROUP = get(ENV, "GROUP", "All")
+
 @testset "AbstractPPL.jl" begin
-    include("deprecations.jl")
-    include("varname.jl")
-    include("abstractprobprog.jl")
-    @testset "doctests" begin
-        DocMeta.setdocmeta!(
-            AbstractPPL, :DocTestSetup, :(using AbstractPPL); recursive=true
-        )
-        doctest(AbstractPPL; manual=false)
+    if GROUP == "All" || GROUP == "Tests"
+        include("deprecations.jl")
+        include("varname.jl")
+        include("abstractprobprog.jl")
+    end
+
+    if GROUP == "All" || GROUP == "Doctests"
+        @testset "doctests" begin
+            DocMeta.setdocmeta!(
+                AbstractPPL, :DocTestSetup, :(using AbstractPPL); recursive=true
+            )
+            doctest(AbstractPPL; manual=false)
+        end
     end
 end
