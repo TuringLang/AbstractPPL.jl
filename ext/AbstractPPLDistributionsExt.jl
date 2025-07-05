@@ -1,12 +1,7 @@
 module AbstractPPLDistributionsExt
 
-if isdefined(Base, :get_extension)
-    using AbstractPPL: AbstractPPL, VarName, Accessors
-    using Distributions: Distributions
-else
-    using ..AbstractPPL: AbstractPPL, VarName, Accessors
-    using ..Distributions: Distributions
-end
+using AbstractPPL: AbstractPPL, VarName, Accessors
+using Distributions: Distributions
 
 # TODO(penelopeysm): Figure out tuple / namedtuple distributions, and LKJCholesky (grr)
 function AbstractPPL.hasvalue(
