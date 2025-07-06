@@ -32,11 +32,7 @@ function AbstractPPL.hasvalue(
     # can return true.
     sz = size(dist)
     for idx in Iterators.product(map(Base.OneTo, sz)...)
-        new_optic = if AbstractPPL.getoptic(vn) === identity
-            Accessors.IndexLens(idx)
-        else
-            Accessors.IndexLens(idx) ∘ AbstractPPL.getoptic(vn)
-        end
+        new_optic = Accessors.IndexLens(idx) ∘ AbstractPPL.getoptic(vn)
         new_vn = VarName{sym}(new_optic)
         AbstractPPL.hasvalue(vals, new_vn) || return false
     end
