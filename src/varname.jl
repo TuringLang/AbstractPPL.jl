@@ -967,8 +967,11 @@ string_to_varname(str::AbstractString) = dict_to_varname(JSON.parse(str))
 
 Get the innermost layer of an optic.
 
+For all (normalised) optics, we have that `normalise(_tail(optic) ∘
+_head(optic) == optic)`.
+
 !!! note
-    Does not perform optic normalisation. You may wish to call
+    Does not perform optic normalisation on the input. You may wish to call
     `normalise(optic)` before using this function if the optic you are passing
     was not obtained from a VarName.
 
@@ -999,8 +1002,11 @@ _head(::typeof(identity)) = identity
 
 Get everything but the innermost layer of an optic.
 
+For all (normalised) optics, we have that `normalise(_tail(optic) ∘
+_head(optic) == optic)`.
+
 !!! note
-    Does not perform optic normalisation. You may wish to call
+    Does not perform optic normalisation on the input. You may wish to call
     `normalise(optic)` before using this function if the optic you are passing
     was not obtained from a VarName.
 
@@ -1031,8 +1037,11 @@ _tail(::typeof(identity)) = identity
 
 Get the outermost layer of an optic.
 
+For all (normalised) optics, we have that `normalise(_last(optic) ∘
+_init(optic)) == optic`.
+
 !!! note
-    Does not perform optic normalisation. You may wish to call
+    Does not perform optic normalisation on the input. You may wish to call
     `normalise(optic)` before using this function if the optic you are passing
     was not obtained from a VarName.
 
@@ -1063,8 +1072,11 @@ _last(::typeof(identity)) = identity
 
 Get everything but the outermost layer of an optic.
 
+For all (normalised) optics, we have that `normalise(_last(optic) ∘
+_init(optic)) == optic`.
+
 !!! note
-    Does not perform optic normalisation. You may wish to call
+    Does not perform optic normalisation on the input. You may wish to call
     `normalise(optic)` before using this function if the optic you are passing
     was not obtained from a VarName.
 
@@ -1084,7 +1096,9 @@ identity (generic function with 1 method)
 julia> AbstractPPL._init(Accessors.@o _)
 identity (generic function with 1 method)
 """
-_init(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = _init(o.outer) ∘ o.inner
+# This one needs normalise because it's going 'against' the direction of the
+# linked list (otherwise you will end up with identities scattered throughout)
+_init(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = normalise(_init(o.outer) ∘ o.inner)
 _init(::Accessors.PropertyLens) = identity
 _init(::Accessors.IndexLens) = identity
 _init(::typeof(identity)) = identity
