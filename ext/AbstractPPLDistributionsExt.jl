@@ -80,7 +80,7 @@ end
 
 """
     hasvalue(
-        vals::AbstractDict,
+        vals::Union{AbstractDict,NamedTuple},
         vn::VarName,
         dist::Distribution;
         error_on_incomplete::Bool=false
@@ -98,6 +98,11 @@ the values needed for `vn` are present, but others are not. This may help
 to detect invalid cases where the user has provided e.g. data of the wrong
 shape.
 
+Note that this check is only possible if a Dict is passed, because the key type
+of a NamedTuple (i.e., Symbol) is not rich enough to carry indexing
+information. If this method is called with a NamedTuple, it will just defer
+to `hasvalue(vals, vn)`.
+
 For example:
 
 ```jldoctest; setup=:(using Distributions, LinearAlgebra))
@@ -114,6 +119,16 @@ ERROR: hasvalue: only partial values for `x` found in the values provided
 [...]
 ```
 """
+function AbstractPPL.hasvalue(
+    vals::NamedTuple,
+    vn::VarName,
+    dist::Distributions.Distribution;
+    error_on_incomplete::Bool=false,
+)
+    # NamedTuples can't have such complicated hierarchies, so it's safe to
+    # defer to the simpler `hasvalue(vals, vn)`.
+    return hasvalue(vals, vn)
+end
 function AbstractPPL.hasvalue(
     vals::AbstractDict,
     vn::VarName,
@@ -169,7 +184,11 @@ function AbstractPPL.hasvalue(
 end
 
 """
-    getvalue(vals::AbstractDict, vn::VarName, dist::Distribution)
+    getvalue(
+        vals::Union{AbstractDict,NamedTuple},
+        vn::VarName,
+        dist::Distribution
+    )
 
 Retrieve the value of `vn` from `vals`, using the distribution `dist` to
 reconstruct the value if necessary.
@@ -177,6 +196,11 @@ reconstruct the value if necessary.
 This is a more general version of `getvalue(vals, vn)`, in that even if `vn`
 itself is not inside `vals`, it can still reconstruct the value of `vn`
 from sub-values of `vn` that are present in `vals`.
+
+Note that this reconstruction is only possible if a Dict is passed, because the
+key type of a NamedTuple (i.e., Symbol) is not rich enough to carry indexing
+information. If this method is called with a NamedTuple, it will just defer
+to `getvalue(vals, vn)`.
 
 For example:
 
@@ -194,6 +218,13 @@ ERROR: getvalue: `x` was not found in the values provided
 [...]
 ```
 """
+function AbstractPPL.getvalue(
+    vals::NamedTuple, vn::VarName, dist::Distributions.Distribution
+)
+    # NamedTuples can't have such complicated hierarchies, so it's safe to
+    # defer to the simpler `getvalue(vals, vn)`.
+    return getvalue(vals, vn)
+end
 function AbstractPPL.getvalue(
     vals::AbstractDict, vn::VarName, dist::Distributions.Distribution;
 )
