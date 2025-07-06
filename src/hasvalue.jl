@@ -98,6 +98,33 @@ julia> getvalue(vals, @varname(x[2][1]))
 ERROR: getvalue: x[2][1] was not found in the values provided
 [...]
 ```
+
+Dictionaries can present ambiguous cases where the same variable is specified
+twice at different levels. In such a situation, `getvalue` attempts to find an
+exact match, and if that fails it returns the value with the most specific key.
+
+!!! note
+    It is the user's responsibility to avoid such cases by ensuring that the
+    dictionary passed in does not contain the same value specified multiple
+    times.
+
+```jldoctest
+julia> vals = Dict(@varname(x) => [[1.0]], @varname(x[1]) => [2.0]);
+
+julia> # Here, the `x[1]` key is not used because `x` is an exact match.
+       getvalue(vals, @varname(x))
+1-element Vector{Vector{Float64}}:
+ [1.0]
+
+julia> # Likewise, the `x` key is not used because `x[1]` is an exact match.
+       getvalue(vals, @varname(x[1]))
+1-element Vector{Float64}:
+ 2.0
+
+julia> # No exact match, so the most specific key, i.e. `x[1]`, is used.
+       getvalue(vals, @varname(x[1][1]))
+2.0
+```
 """
 function getvalue(vals::NamedTuple, vn::VarName{sym}) where {sym}
     optic = getoptic(vn)
