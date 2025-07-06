@@ -1098,7 +1098,9 @@ identity (generic function with 1 method)
 """
 # This one needs normalise because it's going 'against' the direction of the
 # linked list (otherwise you will end up with identities scattered throughout)
-_init(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = normalise(_init(o.outer) ∘ o.inner)
+function _init(o::ComposedFunction{Outer,Inner}) where {Outer,Inner}
+    return normalise(_init(o.outer) ∘ o.inner)
+end
 _init(::Accessors.PropertyLens) = identity
 _init(::Accessors.IndexLens) = identity
 _init(::typeof(identity)) = identity

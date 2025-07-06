@@ -2,23 +2,112 @@ module AbstractPPLDistributionsExt
 
 using AbstractPPL: AbstractPPL, VarName, Accessors
 using Distributions: Distributions
+using LinearAlgebra: Cholesky, LowerTriangular, UpperTriangular
+
+#=
+This section is copied from Accessors.jl's documentation:
+https://juliaobjects.github.io/Accessors.jl/stable/examples/custom_macros/
+
+It defines a wrapper that, when called with `set`, mutates the original value
+rather than returning a new value. We need this because the non-mutating optics
+don't work for triangular matrices (and hence LKJCholesky): see
+https://github.com/JuliaObjects/Accessors.jl/issues/203
+=#
+struct Lens!{L}
+    pure::L
+end
+(l::Lens!)(o) = l.pure(o)
+function Accessors.set(o, l::Lens!{<:ComposedFunction}, val)
+    o_inner = l.pure.inner(o)
+    return Accessors.set(o_inner, Lens!(l.pure.outer), val)
+end
+function Accessors.set(o, l::Lens!{Accessors.PropertyLens{prop}}, val) where {prop}
+    setproperty!(o, prop, val)
+    return o
+end
+function Accessors.set(o, l::Lens!{<:Accessors.IndexLens}, val)
+    o[l.pure.indices...] = val
+    return o
+end
+
+"""
+    get_optics(dist::MultivariateDistribution)
+    get_optics(dist::MatrixDistribution)
+    get_optics(dist::LKJCholesky)
+
+Return a complete set of optics for each element of the type returned by `rand(dist)`.
+"""
+function get_optics(
+    dist::Union{Distributions.MultivariateDistribution,Distributions.MatrixDistribution}
+)
+    indices = CartesianIndices(size(dist))
+    return map(idx -> Accessors.IndexLens(idx.I), indices)
+end
+function get_optics(dist::Distributions.LKJCholesky)
+    is_up = dist.uplo == 'U'
+    cartesian_indices = filter(CartesianIndices(size(dist))) do cartesian_index
+        i, j = cartesian_index.I
+        is_up ? i <= j : i >= j
+    end
+    # there is an additional layer as we need to access `.L` or `.U` before we
+    # can index into it
+    field_lens = is_up ? (Accessors.@o _.U) : (Accessors.@o _.L)
+    return map(idx -> Accessors.IndexLens(idx.I) ∘ field_lens, cartesian_indices)
+end
+
+"""
+    make_empty_value(dist::MultivariateDistribution)
+    make_empty_value(dist::MatrixDistribution)
+    make_empty_value(dist::LKJCholesky)
+
+Construct a fresh value filled with zeros that corresponds to the size of `dist`.
+
+For all distributions that this function accepts, it should hold that
+`o(make_empty_value(dist))` is zero for all `o` in `get_optics(dist)`.
+"""
+function make_empty_value(
+    dist::Union{Distributions.MultivariateDistribution,Distributions.MatrixDistribution}
+)
+    return zeros(size(dist))
+end
+function make_empty_value(dist::Distributions.LKJCholesky)
+    if dist.uplo == 'U'
+        return Cholesky(UpperTriangular(zeros(size(dist))))
+    else
+        return Cholesky(LowerTriangular(zeros(size(dist))))
+    end
+end
 
 # TODO(penelopeysm): Figure out tuple / namedtuple distributions, and LKJCholesky (grr)
 function AbstractPPL.hasvalue(
-    vals::AbstractDict, vn::VarName, dist::Distributions.Distribution
+    vals::AbstractDict,
+    vn::VarName,
+    dist::Distributions.Distribution;
+    error_on_incomplete::Bool=false,
 )
     @warn "`hasvalue(vals, vn, dist)` is not implemented for $(typeof(dist)); falling back to `hasvalue(vals, vn)`."
     return AbstractPPL.hasvalue(vals, vn)
 end
 function AbstractPPL.hasvalue(
-    vals::AbstractDict, vn::VarName, ::Distributions.UnivariateDistribution
+    vals::AbstractDict,
+    vn::VarName,
+    ::Distributions.UnivariateDistribution;
+    error_on_incomplete::Bool=false,
 )
+    # TODO(penelopeysm): We could also implement a check for the type to catch
+    # invalid values. Unsure if that is worth it. It may be easier to just let
+    # the user handle it.
     return AbstractPPL.hasvalue(vals, vn)
 end
 function AbstractPPL.hasvalue(
     vals::AbstractDict{<:VarName},
     vn::VarName{sym},
-    dist::Union{Distributions.MultivariateDistribution,Distributions.MatrixDistribution},
+    dist::Union{
+        Distributions.MultivariateDistribution,
+        Distributions.MatrixDistribution,
+        Distributions.LKJCholesky,
+    };
+    error_on_incomplete::Bool=false,
 ) where {sym}
     # If `vn` is present as-is, then we are good
     AbstractPPL.hasvalue(vals, vn) && return true
@@ -30,13 +119,66 @@ function AbstractPPL.hasvalue(
     # To do this, we get the size of the distribution and iterate over all
     # possible indices. If every index can be found in `subsumed_keys`, then we
     # can return true.
-    sz = size(dist)
-    for idx in Iterators.product(map(Base.OneTo, sz)...)
-        new_optic = Accessors.IndexLens(idx) ∘ AbstractPPL.getoptic(vn)
-        new_vn = VarName{sym}(new_optic)
-        AbstractPPL.hasvalue(vals, new_vn) || return false
+    optics = get_optics(dist)
+    original_optic = AbstractPPL.getoptic(vn)
+    expected_vns = map(o -> VarName{sym}(o ∘ original_optic), optics)
+    if all(sub_vn -> AbstractPPL.hasvalue(vals, sub_vn), expected_vns)
+        return true
+    else
+        if error_on_incomplete &&
+            any(sub_vn -> AbstractPPL.hasvalue(vals, sub_vn), expected_vns)
+            error("hasvalue: only partial values for `$vn` found in the values provided")
+        end
+        return false
     end
-    return true
+end
+
+function AbstractPPL.getvalue(
+    vals::AbstractDict, vn::VarName, dist::Distributions.Distribution;
+)
+    @warn "`getvalue(vals, vn, dist)` is not implemented for $(typeof(dist)); falling back to `getvalue(vals, vn)`."
+    return AbstractPPL.getvalue(vals, vn)
+end
+function AbstractPPL.getvalue(
+    vals::AbstractDict, vn::VarName, ::Distributions.UnivariateDistribution;
+)
+    # TODO(penelopeysm): We could also implement a check for the type to catch
+    # invalid values. Unsure if that is worth it. It may be easier to just let
+    # the user handle it.
+    return AbstractPPL.getvalue(vals, vn)
+end
+function AbstractPPL.getvalue(
+    vals::AbstractDict{<:VarName},
+    vn::VarName{sym},
+    dist::Union{
+        Distributions.MultivariateDistribution,
+        Distributions.MatrixDistribution,
+        Distributions.LKJCholesky,
+    };
+) where {sym}
+    # If `vn` is present as-is, then we can just return that
+    AbstractPPL.hasvalue(vals, vn) && return AbstractPPL.getvalue(vals, vn)
+    # If not, then we need to start looking inside `vals`, in exactly the
+    # same way we did for `hasvalue`.
+    optics = get_optics(dist)
+    original_optic = AbstractPPL.getoptic(vn)
+    expected_vns = map(o -> VarName{sym}(o ∘ original_optic), optics)
+    if all(sub_vn -> AbstractPPL.hasvalue(vals, sub_vn), expected_vns)
+        # Reconstruct the value index by index.
+        value = make_empty_value(dist)
+        for (o, sub_vn) in zip(optics, expected_vns)
+            # Retrieve the value of this given index
+            sub_value = AbstractPPL.getvalue(vals, sub_vn)
+            # Set it inside the value we're reconstructing.
+            # Note: `o` is normally non-mutating. We have to wrap it in `Lens!`
+            # to make it mutating, because Cholesky distributions are broken
+            # by https://github.com/JuliaObjects/Accessors.jl/issues/203.
+            Accessors.set(value, Lens!(o), sub_value)
+        end
+        return value
+    else
+        error("getvalue: $(vn) was not found in the values provided")
+    end
 end
 
 end

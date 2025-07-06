@@ -15,15 +15,17 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [weakdeps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [extensions]
-AbstractPPLDistributionsExt = ["Distributions"]
+AbstractPPLDistributionsExt = ["Distributions", "LinearAlgebra"]
 
 [compat]
 AbstractMCMC = "2, 3, 4, 5"
 Accessors = "0.1"
 DensityInterface = "0.4"
 Distributions = "0.25"
+LinearAlgebra = "<0.0.1, 1.11"
 JSON = "0.19 - 0.21"
 Random = "1.6"
 StatsBase = "0.32, 0.33, 0.34"

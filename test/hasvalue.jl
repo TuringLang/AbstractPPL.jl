@@ -126,7 +126,56 @@ end
     using Distributions
     using LinearAlgebra
 
-    d = Dict(@varname(x[1]) => 1.0, @varname(x[2]) => 2.0)
-    @test hasvalue(d, @varname(x), MvNormal(zeros(2), I))
-    @test !hasvalue(d, @varname(x), MvNormal(zeros(3), I))
+    @testset "univariate" begin
+        d = Dict(@varname(x) => 1.0, @varname(y) => [[2.0]])
+        @test hasvalue(d, @varname(x), Normal())
+        @test getvalue(d, @varname(x), Normal()) == 1.0
+        @test hasvalue(d, @varname(y[1][1]), Normal())
+        @test getvalue(d, @varname(y[1][1]), Normal()) == 2.0
+    end
+
+    @testset "multivariate + matrix" begin
+        d = Dict(@varname(x[1]) => 1.0, @varname(x[2]) => 2.0)
+        @test hasvalue(d, @varname(x), MvNormal(zeros(1), I))
+        @test getvalue(d, @varname(x), MvNormal(zeros(1), I)) == [1.0]
+        @test hasvalue(d, @varname(x), MvNormal(zeros(2), I))
+        @test getvalue(d, @varname(x), MvNormal(zeros(2), I)) == [1.0, 2.0]
+        @test !hasvalue(d, @varname(x), MvNormal(zeros(3), I))
+        @test_throws ErrorException hasvalue(
+            d, @varname(x), MvNormal(zeros(3), I); error_on_incomplete=true
+        )
+        # If none of the varnames match, it should just return false instead of erroring
+        @test !hasvalue(d, @varname(y), MvNormal(zeros(2), I); error_on_incomplete=true)
+    end
+
+    @testset "LKJCholesky :upside_down_smile:" begin
+        # yes, this isn't a valid Cholesky sample, but whatever
+        d = Dict(
+            @varname(x.L[1, 1]) => 1.0,
+            @varname(x.L[2, 1]) => 2.0,
+            @varname(x.L[2, 2]) => 3.0,
+        )
+        @test hasvalue(d, @varname(x), LKJCholesky(2, 1.0))
+        @test getvalue(d, @varname(x), LKJCholesky(2, 1.0)) ==
+            Cholesky(LowerTriangular([1.0 0.0; 2.0 3.0]))
+        @test !hasvalue(d, @varname(x), LKJCholesky(3, 1.0))
+        @test_throws ErrorException hasvalue(
+            d, @varname(x), LKJCholesky(3, 1.0); error_on_incomplete=true
+        )
+        @test !hasvalue(d, @varname(y), LKJCholesky(3, 1.0); error_on_incomplete=true)
+
+        d = Dict(
+            @varname(x.U[1, 1]) => 1.0,
+            @varname(x.U[1, 2]) => 2.0,
+            @varname(x.U[2, 2]) => 3.0,
+        )
+        @test hasvalue(d, @varname(x), LKJCholesky(2, 1.0, :U))
+        @test getvalue(d, @varname(x), LKJCholesky(2, 1.0, :U)) ==
+            Cholesky(UpperTriangular([1.0 2.0; 0.0 3.0]))
+        @test !hasvalue(d, @varname(x), LKJCholesky(3, 1.0, :U))
+        @test_throws ErrorException hasvalue(
+            d, @varname(x), LKJCholesky(3, 1.0, :U); error_on_incomplete=true
+        )
+        @test !hasvalue(d, @varname(y), LKJCholesky(3, 1.0, :U); error_on_incomplete=true)
+    end
 end
