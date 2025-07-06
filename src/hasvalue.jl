@@ -117,26 +117,27 @@ function getvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
     # First we check if `vn` is present as is.
     haskey(vals, vn) && return vals[vn]
 
-    # Otherwise, we start by testing the bare `vn` (e.g., if `vn` is `x[1][2]`,
-    # we start by checking if `x` is present). We will then keep adding optics
-    # to `test_optic`, either until we find a key that is present, or until we
-    # run out of optics to test (which is determined by _inner(test_optic) ==
-    # identity).
-    test_vn = VarName{sym}()
-    test_optic = getoptic(vn)
+    # Otherwise, we start by testing the `vn` one level up (e.g., if `vn` is
+    # `x[1][2]`, we start by checking if `x[1]` is present, then `x`). We will
+    # then keep removing optics from `test_optic`, either until we find a key
+    # that is present, or until we run out of optics to test (which happens 
+    # after getoptic(test_vn) == identity).
+    o = getoptic(vn)
+    test_vn = VarName{sym}(_init(o))
+    test_optic = _last(o)
 
-    while _inner(test_optic) != identity
+    while true
         if haskey(vals, test_vn) && canview(test_optic, vals[test_vn])
             return test_optic(vals[test_vn])
         else
-            # Move the innermost optic into test_vn
-            test_optic_outer = _outer(test_optic)
-            test_optic_inner = _inner(test_optic)
-            test_vn = VarName{sym}(test_optic_inner ∘ getoptic(test_vn))
-            test_optic = test_optic_outer
+            # Try to move the outermost optic from test_vn into test_optic.
+            # If test_vn is already an identity, we can't, so we stop.
+            o = getoptic(test_vn)
+            o == identity && error("getvalue: $(vn) was not found in the values provided")
+            test_vn = VarName{sym}(_init(o))
+            test_optic = normalise(_last(o) ∘ test_optic)
         end
     end
-    return error("getvalue: $(vn) was not found in the values provided")
 end
 
 """
@@ -209,23 +210,25 @@ function hasvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
     # First we check if `vn` is present as is.
     haskey(vals, vn) && return true
 
-    # Otherwise, we start by testing the bare `vn` (e.g., if `vn` is `x[1][2]`,
-    # we start by checking if `x` is present). We will then keep adding optics
-    # to `test_optic`, either until we find a key that is present, or until we
-    # run out of optics to test (which is determined by _inner(test_optic) ==
-    # identity).
-    test_vn = VarName{sym}()
-    test_optic = getoptic(vn)
+    # Otherwise, we start by testing the `vn` one level up (e.g., if `vn` is
+    # `x[1][2]`, we start by checking if `x[1]` is present, then `x`). We will
+    # then keep removing optics from `test_optic`, either until we find a key
+    # that is present, or until we run out of optics to test (which happens 
+    # after getoptic(test_vn) == identity).
+    o = getoptic(vn)
+    test_vn = VarName{sym}(_init(o))
+    test_optic = _last(o)
 
-    while _inner(test_optic) != identity
+    while true
         if haskey(vals, test_vn) && canview(test_optic, vals[test_vn])
             return true
         else
-            # Move the innermost optic into test_vn
-            test_optic_outer = _outer(test_optic)
-            test_optic_inner = _inner(test_optic)
-            test_vn = VarName{sym}(test_optic_inner ∘ getoptic(test_vn))
-            test_optic = test_optic_outer
+            # Try to move the outermost optic from test_vn into test_optic.
+            # If test_vn is already an identity, we can't, so we stop.
+            o = getoptic(test_vn)
+            o == identity && return false
+            test_vn = VarName{sym}(_init(o))
+            test_optic = normalise(_last(o) ∘ test_optic)
         end
     end
     return false

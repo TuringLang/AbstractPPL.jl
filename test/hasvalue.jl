@@ -1,5 +1,5 @@
 @testset "base getvalue + hasvalue" begin
-    @testset "NamedTuple" begin
+    @testset "basic NamedTuple" begin
         nt = (a=[1], b=2, c=(x=3,), d=[1.0 0.5; 0.5 1.0])
         @test hasvalue(nt, @varname(a))
         @test getvalue(nt, @varname(a)) == [1]
@@ -32,8 +32,8 @@
         @test !hasvalue(nt, @varname(d[3, :]))
     end
 
-    @testset "Dict" begin
-        # same tests as above
+    @testset "basic Dict" begin
+        # same tests as for NamedTuple
         d = Dict(
             @varname(a) => [1],
             @varname(b) => 2,
@@ -68,8 +68,9 @@
         @test !hasvalue(d, @varname(c.x[1]))
         @test !hasvalue(d, @varname(c.y))
         @test !hasvalue(d, @varname(d[1, 3]))
+    end
 
-        # extra ones since Dict can have weird keys
+    @testset "Dict with non-identity varname keys" begin
         d = Dict(
             @varname(a[1]) => [1.0, 2.0],
             @varname(b.x) => [3.0],
@@ -97,6 +98,27 @@
         @test !hasvalue(d, @varname(b.x[2]))
         @test !hasvalue(d, @varname(c[1]))
         @test !hasvalue(d, @varname(c[2].x))
+    end
+
+    @testset "Dict with redundancy" begin
+        d1 = Dict(@varname(x) => [[[[1.0]]]])
+        d2 = Dict(@varname(x[1]) => [[[2.0]]])
+        d3 = Dict(@varname(x[1][1]) => [[3.0]])
+        d4 = Dict(@varname(x[1][1][1]) => [4.0])
+        d5 = Dict(@varname(x[1][1][1][1]) => 5.0)
+
+        d = Dict{VarName,Any}()
+        for (new_dict, expected_value) in
+            zip((d1, d2, d3, d4, d5), (1.0, 2.0, 3.0, 4.0, 5.0))
+            d = merge(d, new_dict)
+            @test hasvalue(d, @varname(x[1][1][1][1]))
+            @test getvalue(d, @varname(x[1][1][1][1])) == expected_value
+            # for good measure
+            @test !hasvalue(d, @varname(x[1][1][1][2]))
+            @test !hasvalue(d, @varname(x[1][1][2][1]))
+            @test !hasvalue(d, @varname(x[1][2][1][1]))
+            @test !hasvalue(d, @varname(x[2][1][1][1]))
+        end
     end
 end
 
