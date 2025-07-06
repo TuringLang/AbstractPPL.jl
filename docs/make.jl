@@ -1,6 +1,7 @@
 using Documenter
 using AbstractPPL
-using Distributions
+# trigger DistributionsExt loading
+using Distributions, LinearAlgebra
 
 # Doctest setup
 DocMeta.setdocmeta!(AbstractPPL, :DocTestSetup, :(using AbstractPPL); recursive=true)
