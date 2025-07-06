@@ -2,6 +2,7 @@ using Accessors
 using Accessors: PropertyLens, IndexLens, DynamicIndexLens
 using JSON: JSON
 
+# nb. ComposedFunction is the same as Accessors.ComposedOptic
 const ALLOWED_OPTICS = Union{typeof(identity),PropertyLens,IndexLens,ComposedFunction}
 
 """
