@@ -114,7 +114,6 @@ ERROR: hasvalue: only partial values for `x` found in the values provided
 [...]
 ```
 """
-# TODO(penelopeysm): Figure out tuple / namedtuple distributions, and LKJCholesky (grr)
 function AbstractPPL.hasvalue(
     vals::AbstractDict,
     vn::VarName,
