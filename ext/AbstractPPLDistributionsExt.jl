@@ -78,6 +78,42 @@ function make_empty_value(dist::Distributions.LKJCholesky)
     end
 end
 
+"""
+    hasvalue(
+        vals::AbstractDict,
+        vn::VarName,
+        dist::Distribution;
+        error_on_incomplete::Bool=false
+    )
+
+Check if `vals` contains values for `vn` that is compatible with the
+distribution `dist`.
+
+This is a more general version of `hasvalue(vals, vn)`, in that even if
+`vn` itself is not inside `vals`, it further checks if `vals` contains
+sub-values of `vn` that can be used to reconstruct `vn` given `dist`.
+
+The `error_on_incomplete` flag can be used to detect cases where _some_ of
+the values needed for `vn` are present, but others are not. This may help
+to detect invalid cases where the user has provided e.g. data of the wrong
+shape.
+
+For example:
+
+```jldoctest; setup=:(using Distributions, LinearAlgebra))
+julia> d = Dict(@varname(x[1]) => 1.0, @varname(x[2]) => 2.0);
+
+julia> hasvalue(d, @varname(x), MvNormal(zeros(2), I))
+true
+
+julia> hasvalue(d, @varname(x), MvNormal(zeros(3), I))
+false
+
+julia> hasvalue(d, @varname(x), MvNormal(zeros(3), I); error_on_incomplete=true)
+ERROR: hasvalue: only partial values for `x` found in the values provided
+[...]
+```
+"""
 # TODO(penelopeysm): Figure out tuple / namedtuple distributions, and LKJCholesky (grr)
 function AbstractPPL.hasvalue(
     vals::AbstractDict,
@@ -133,6 +169,32 @@ function AbstractPPL.hasvalue(
     end
 end
 
+"""
+    getvalue(vals::AbstractDict, vn::VarName, dist::Distribution)
+
+Retrieve the value of `vn` from `vals`, using the distribution `dist` to
+reconstruct the value if necessary.
+
+This is a more general version of `getvalue(vals, vn)`, in that even if `vn`
+itself is not inside `vals`, it can still reconstruct the value of `vn`
+from sub-values of `vn` that are present in `vals`.
+
+For example:
+
+```jldoctest; setup=:(using Distributions, LinearAlgebra))
+julia> d = Dict(@varname(x[1]) => 1.0, @varname(x[2]) => 2.0);
+
+julia> getvalue(d, @varname(x), MvNormal(zeros(2), I))
+2-element Vector{Float64}:
+ 1.0
+ 2.0
+
+julia> # Use `hasvalue` to check for this case before calling `getvalue`.
+       getvalue(d, @varname(x), MvNormal(zeros(3), I))
+ERROR: getvalue: `x` was not found in the values provided
+[...]
+```
+"""
 function AbstractPPL.getvalue(
     vals::AbstractDict, vn::VarName, dist::Distributions.Distribution;
 )
