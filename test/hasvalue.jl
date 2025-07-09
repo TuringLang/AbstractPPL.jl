@@ -1,6 +1,6 @@
 @testset "base getvalue + hasvalue" begin
     @testset "basic NamedTuple" begin
-        nt = (a=[1], b=2, c=(x=3,), d=[1.0 0.5; 0.5 1.0])
+        nt = (a=[1], b=2, c=(x=3, y=[4], z=(; p=[(; q=5)])), d=[1.0 0.5; 0.5 1.0])
         @test hasvalue(nt, @varname(a))
         @test getvalue(nt, @varname(a)) == [1]
         @test hasvalue(nt, @varname(a[1]))
@@ -8,9 +8,21 @@
         @test hasvalue(nt, @varname(b))
         @test getvalue(nt, @varname(b)) == 2
         @test hasvalue(nt, @varname(c))
-        @test getvalue(nt, @varname(c)) == (x=3,)
+        @test getvalue(nt, @varname(c)) == (x=3, y=[4], z=(p = [(; q=5)]))
         @test hasvalue(nt, @varname(c.x))
         @test getvalue(nt, @varname(c.x)) == 3
+        @test hasvalue(nt, @varname(c.y))
+        @test getvalue(nt, @varname(c.y)) == [4]
+        @test hasvalue(nt, @varname(c.y[1]))
+        @test getvalue(nt, @varname(c.y[1])) == 4
+        @test hasvalue(nt, @varname(c.z))
+        @test getvalue(nt, @varname(c.z)) == (; p=[(; q=5)])
+        @test hasvalue(nt, @varname(c.z.p))
+        @test getvalue(nt, @varname(c.z.p)) == [(; q=5)]
+        @test hasvalue(nt, @varname(c.z.p[1]))
+        @test getvalue(nt, @varname(c.z.p[1])) == (; q=5)
+        @test hasvalue(nt, @varname(c.z.p[1].q))
+        @test getvalue(nt, @varname(c.z.p[1].q)) == 5
         @test hasvalue(nt, @varname(d))
         @test getvalue(nt, @varname(d)) == [1.0 0.5; 0.5 1.0]
         @test hasvalue(nt, @varname(d[1, 1]))
@@ -27,7 +39,9 @@
         @test !hasvalue(nt, @varname(a[2]))
         @test !hasvalue(nt, @varname(a[1][1]))
         @test !hasvalue(nt, @varname(c.x[1]))
-        @test !hasvalue(nt, @varname(c.y))
+        @test !hasvalue(nt, @varname(c.y[2]))
+        @test !hasvalue(nt, @varname(c.y.a))
+        @test !hasvalue(nt, @varname(c.zzzz))
         @test !hasvalue(nt, @varname(d[1, 3]))
         @test !hasvalue(nt, @varname(d[3, :]))
     end
@@ -37,7 +51,7 @@
         d = Dict(
             @varname(a) => [1],
             @varname(b) => 2,
-            @varname(c) => (x=3,),
+            @varname(c) => (x=3, y=[4], z=(; p=[(; q=5)])),
             @varname(d) => [1.0 0.5; 0.5 1.0],
         )
         @test hasvalue(d, @varname(a))
@@ -47,9 +61,21 @@
         @test hasvalue(d, @varname(b))
         @test getvalue(d, @varname(b)) == 2
         @test hasvalue(d, @varname(c))
-        @test getvalue(d, @varname(c)) == (x=3,)
+        @test getvalue(d, @varname(c)) == (x=3, y=[4], z=(p = [(; q=5)]))
         @test hasvalue(d, @varname(c.x))
         @test getvalue(d, @varname(c.x)) == 3
+        @test hasvalue(d, @varname(c.y))
+        @test getvalue(d, @varname(c.y)) == [4]
+        @test hasvalue(d, @varname(c.y[1]))
+        @test getvalue(d, @varname(c.y[1])) == 4
+        @test hasvalue(d, @varname(c.z))
+        @test getvalue(d, @varname(c.z)) == (; p=[(; q=5)])
+        @test hasvalue(d, @varname(c.z.p))
+        @test getvalue(d, @varname(c.z.p)) == [(; q=5)]
+        @test hasvalue(d, @varname(c.z.p[1]))
+        @test getvalue(d, @varname(c.z.p[1])) == (; q=5)
+        @test hasvalue(d, @varname(c.z.p[1].q))
+        @test getvalue(d, @varname(c.z.p[1].q)) == 5
         @test hasvalue(d, @varname(d))
         @test getvalue(d, @varname(d)) == [1.0 0.5; 0.5 1.0]
         @test hasvalue(d, @varname(d[1, 1]))
@@ -66,7 +92,9 @@
         @test !hasvalue(d, @varname(a[2]))
         @test !hasvalue(d, @varname(a[1][1]))
         @test !hasvalue(d, @varname(c.x[1]))
-        @test !hasvalue(d, @varname(c.y))
+        @test !hasvalue(d, @varname(c.y[2]))
+        @test !hasvalue(d, @varname(c.y.a))
+        @test !hasvalue(d, @varname(c.zzzz))
         @test !hasvalue(d, @varname(d[1, 3]))
     end
 

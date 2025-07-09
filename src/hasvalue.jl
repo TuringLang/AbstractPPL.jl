@@ -162,7 +162,7 @@ function getvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
             o = getoptic(test_vn)
             o == identity && error("getvalue: $(vn) was not found in the values provided")
             test_vn = VarName{sym}(_init(o))
-            test_optic = normalise(_last(o) ∘ test_optic)
+            test_optic = normalise(test_optic ∘ _last(o))
         end
     end
 end
@@ -255,7 +255,7 @@ function hasvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
             o = getoptic(test_vn)
             o == identity && return false
             test_vn = VarName{sym}(_init(o))
-            test_optic = normalise(_last(o) ∘ test_optic)
+            test_optic = normalise(test_optic ∘ _last(o))
         end
     end
     return false
