@@ -57,7 +57,7 @@ julia> getvalue(vals, @varname(x[1])) # different from `getindex`
 1.0
 
 julia> getvalue(vals, @varname(x[2]))
-ERROR: getvalue: x[2] was not found in the values provided
+ERROR: x[2] was not found in the NamedTuple provided
 [...]
 ```
 
@@ -74,7 +74,7 @@ julia> getvalue(vals, @varname(x[1])) # different from `getindex`
 1.0
 
 julia> getvalue(vals, @varname(x[2]))
-ERROR: getvalue: x[2] was not found in the values provided
+ERROR: x[2] was not found in the dictionary provided
 [...]
 ```
 
@@ -91,15 +91,15 @@ julia> getvalue(vals, @varname(x[1][1])) # different from `getindex`
 1.0
 
 julia> getvalue(vals, @varname(x[1][2]))
-ERROR: getvalue: x[1][2] was not found in the values provided
+ERROR: x[1][2] was not found in the dictionary provided
 [...]
 
 julia> getvalue(vals, @varname(x[2][1]))
-ERROR: getvalue: x[2][1] was not found in the values provided
+ERROR: x[2][1] was not found in the dictionary provided
 [...]
 
 julia> getvalue(vals, @varname(x))
-ERROR: getvalue: x was not found in the values provided
+ERROR: x was not found in the dictionary provided
 [...]
 ```
 

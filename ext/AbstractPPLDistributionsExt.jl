@@ -115,7 +115,7 @@ julia> hasvalue(d, @varname(x), MvNormal(zeros(3), I))
 false
 
 julia> hasvalue(d, @varname(x), MvNormal(zeros(3), I); error_on_incomplete=true)
-ERROR: hasvalue: only partial values for `x` found in the values provided
+ERROR: only partial values for `x` found in the dictionary provided
 [...]
 ```
 """
@@ -214,7 +214,7 @@ julia> getvalue(d, @varname(x), MvNormal(zeros(2), I))
 
 julia> # Use `hasvalue` to check for this case before calling `getvalue`.
        getvalue(d, @varname(x), MvNormal(zeros(3), I))
-ERROR: getvalue: `x` was not found in the values provided
+ERROR: `x` was not found in the dictionary provided
 [...]
 ```
 """
