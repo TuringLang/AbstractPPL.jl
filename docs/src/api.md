@@ -21,6 +21,13 @@ prefix
 unprefix
 ```
 
+## Extracting values corresponding to a VarName
+
+```@docs
+hasvalue
+getvalue
+```
+
 ## VarName serialisation
 
 ```@docs

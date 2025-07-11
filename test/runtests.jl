@@ -8,6 +8,7 @@ const GROUP = get(ENV, "GROUP", "All")
     if GROUP == "All" || GROUP == "Tests"
         include("varname.jl")
         include("abstractprobprog.jl")
+        include("hasvalue.jl")
     end
 
     if GROUP == "All" || GROUP == "Doctests"

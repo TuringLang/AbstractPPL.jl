@@ -252,6 +252,54 @@ end
         @test string_to_varname(varname_to_string(vn)) == vn
     end
 
+    @testset "head, tail, init, last" begin
+        @testset "specification" begin
+            @test AbstractPPL._head(@o _.a.b.c) == @o _.a
+            @test AbstractPPL._tail(@o _.a.b.c) == @o _.b.c
+            @test AbstractPPL._init(@o _.a.b.c) == @o _.a.b
+            @test AbstractPPL._last(@o _.a.b.c) == @o _.c
+
+            @test AbstractPPL._head(@o _[1][2][3]) == @o _[1]
+            @test AbstractPPL._tail(@o _[1][2][3]) == @o _[2][3]
+            @test AbstractPPL._init(@o _[1][2][3]) == @o _[1][2]
+            @test AbstractPPL._last(@o _[1][2][3]) == @o _[3]
+
+            @test AbstractPPL._head(@o _.a) == @o _.a
+            @test AbstractPPL._tail(@o _.a) == identity
+            @test AbstractPPL._init(@o _.a) == identity
+            @test AbstractPPL._last(@o _.a) == @o _.a
+
+            @test AbstractPPL._head(@o _[1]) == @o _[1]
+            @test AbstractPPL._tail(@o _[1]) == identity
+            @test AbstractPPL._init(@o _[1]) == identity
+            @test AbstractPPL._last(@o _[1]) == @o _[1]
+
+            @test AbstractPPL._head(identity) == identity
+            @test AbstractPPL._tail(identity) == identity
+            @test AbstractPPL._init(identity) == identity
+            @test AbstractPPL._last(identity) == identity
+        end
+
+        @testset "composition" begin
+            varnames = (
+                @varname(x),
+                @varname(x[1]),
+                @varname(x.a),
+                @varname(x.a.b),
+                @varname(x[1].a),
+            )
+            for vn in varnames
+                optic = getoptic(vn)
+                @test AbstractPPL.normalise(
+                    AbstractPPL._last(optic) ∘ AbstractPPL._init(optic)
+                ) == optic
+                @test AbstractPPL.normalise(
+                    AbstractPPL._tail(optic) ∘ AbstractPPL._head(optic)
+                ) == optic
+            end
+        end
+    end
+
     @testset "prefix and unprefix" begin
         @testset "basic cases" begin
             @test prefix(@varname(y), @varname(x)) == @varname(x.y)
