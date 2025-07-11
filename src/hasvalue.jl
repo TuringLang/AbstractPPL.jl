@@ -134,6 +134,7 @@ function getvalue(vals::NamedTuple, vn::VarName{sym}) where {sym}
         error("getvalue: $(vn) was not found in the values provided")
     end
 end
+
 # For the Dict case, it is more complicated. There are two cases:
 # 1. `vn` itself is already a key of `vals` (the easy case)
 # 2. `vn` is not a key of `vals`, but some parent of `vn` is a key of `vals`
