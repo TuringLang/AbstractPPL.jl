@@ -97,6 +97,10 @@ ERROR: getvalue: x[1][2] was not found in the values provided
 julia> getvalue(vals, @varname(x[2][1]))
 ERROR: getvalue: x[2][1] was not found in the values provided
 [...]
+
+julia> getvalue(vals, @varname(x))
+ERROR: getvalue: x was not found in the values provided
+[...]
 ```
 
 Dictionaries can present ambiguous cases where the same variable is specified
