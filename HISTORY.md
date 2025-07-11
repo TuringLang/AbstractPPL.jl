@@ -1,4 +1,4 @@
-## 0.12.1
+## 0.13.0
 
 Minimum compatibility has been bumped to Julia 1.10.
 
