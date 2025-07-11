@@ -8,7 +8,7 @@
         @test hasvalue(nt, @varname(b))
         @test getvalue(nt, @varname(b)) == 2
         @test hasvalue(nt, @varname(c))
-        @test getvalue(nt, @varname(c)) == (x=3, y=[4], z=(p = [(; q=5)]))
+        @test getvalue(nt, @varname(c)) == (x=3, y=[4], z=(;p = [(; q=5)]))
         @test hasvalue(nt, @varname(c.x))
         @test getvalue(nt, @varname(c.x)) == 3
         @test hasvalue(nt, @varname(c.y))
@@ -61,7 +61,7 @@
         @test hasvalue(d, @varname(b))
         @test getvalue(d, @varname(b)) == 2
         @test hasvalue(d, @varname(c))
-        @test getvalue(d, @varname(c)) == (x=3, y=[4], z=(p = [(; q=5)]))
+        @test getvalue(d, @varname(c)) == (x=3, y=[4], z=(; p = [(; q=5)]))
         @test hasvalue(d, @varname(c.x))
         @test getvalue(d, @varname(c.x)) == 3
         @test hasvalue(d, @varname(c.y))
