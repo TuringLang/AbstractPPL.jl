@@ -177,7 +177,7 @@ function AbstractPPL.hasvalue(
     else
         if error_on_incomplete &&
             any(sub_vn -> AbstractPPL.hasvalue(vals, sub_vn), expected_vns)
-            error("hasvalue: only partial values for `$vn` found in the values provided")
+            error("only partial values for `$vn` found in the dictionary provided")
         end
         return false
     end
@@ -269,7 +269,7 @@ function AbstractPPL.getvalue(
         end
         return value
     else
-        error("getvalue: $(vn) was not found in the values provided")
+        error("$(vn) was not found in the dictionary provided")
     end
 end
 

@@ -135,7 +135,7 @@ function getvalue(vals::NamedTuple, vn::VarName{sym}) where {sym}
     if haskey(vals, sym) && canview(optic, getproperty(vals, sym))
         return optic(vals[sym])
     else
-        error("getvalue: $(vn) was not found in the values provided")
+        error("$(vn) was not found in the NamedTuple provided")
     end
 end
 
@@ -165,7 +165,7 @@ function getvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
             # Try to move the outermost optic from test_vn into test_optic.
             # If test_vn is already an identity, we can't, so we stop.
             o = getoptic(test_vn)
-            o == identity && error("getvalue: $(vn) was not found in the values provided")
+            o == identity && error("$(vn) was not found in the dictionary provided")
             test_vn = VarName{sym}(_init(o))
             test_optic = normalise(test_optic ∘ _last(o))
         end
