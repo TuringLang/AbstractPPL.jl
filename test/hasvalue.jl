@@ -5,6 +5,8 @@
         @test getvalue(nt, @varname(a)) == [1]
         @test hasvalue(nt, @varname(a[1]))
         @test getvalue(nt, @varname(a[1])) == 1
+        @test hasvalue(nt, @varname(a[:]))
+        @test getvalue(nt, @varname(a[:])) == [1]
         @test hasvalue(nt, @varname(b))
         @test getvalue(nt, @varname(b)) == 2
         @test hasvalue(nt, @varname(c))
@@ -35,6 +37,8 @@
         @test getvalue(nt, @varname(d[2, 2])) == 1.0
         @test hasvalue(nt, @varname(d[3]))  # linear indexing works....
         @test getvalue(nt, @varname(d[3])) == 0.5
+        @test hasvalue(nt, @varname(d[:]))
+        @test getvalue(nt, @varname(d[:])) == [1.0, 0.5, 0.5, 1.0]
         @test !hasvalue(nt, @varname(nope))
         @test !hasvalue(nt, @varname(a[2]))
         @test !hasvalue(nt, @varname(a[1][1]))
@@ -58,6 +62,8 @@
         @test getvalue(d, @varname(a)) == [1]
         @test hasvalue(d, @varname(a[1]))
         @test getvalue(d, @varname(a[1])) == 1
+        @test hasvalue(d, @varname(a[:]))
+        @test getvalue(d, @varname(a[:])) == [1]
         @test hasvalue(d, @varname(b))
         @test getvalue(d, @varname(b)) == 2
         @test hasvalue(d, @varname(c))
@@ -88,6 +94,8 @@
         @test getvalue(d, @varname(d[2, 2])) == 1.0
         @test hasvalue(d, @varname(d[3]))  # linear indexing works....
         @test getvalue(d, @varname(d[3])) == 0.5
+        @test hasvalue(d, @varname(d[:]))
+        @test getvalue(d, @varname(d[:])) == [1.0, 0.5, 0.5, 1.0]
         @test !hasvalue(d, @varname(nope))
         @test !hasvalue(d, @varname(a[2]))
         @test !hasvalue(d, @varname(a[1][1]))
