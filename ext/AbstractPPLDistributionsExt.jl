@@ -1,3 +1,52 @@
+"""
+AbstractPPLDistributionsExt
+
+This extension provides extra methods for `hasvalue` and `getvalue`,
+specifically, to deal with cases where a dictionary may not have mappings for
+*complete* variables (e.g. `x` where `x` is a vector or matrix), but may have
+mappings for *individual elements* of that variable.
+
+In such a case, it is necessary to verify that all elements of that variable
+are present in the dictionary. Doing this requires some knowledge of the shape
+of `x`, which in this extension, is inferred from the distribution that `x` is
+to be sampled from, leading to these two methods:
+
+    getvalue(vals, vn, dist)
+    hasvalue(vals, vn, dist)
+
+The functionality in this extension should, in general, not be used unless
+absolutely necessary. For example, if the dictionary was provided by a user,
+the user should be expected to provide a single value for `x` rather than
+individual elements. To accomplish this, the original two-argument
+implementations
+
+    getvalue(vals, vn)
+    hasvalue(vals, vn)
+
+should be used.
+
+This extension primarily exists because in MCMCChains.jl, each individual
+element of `x` will be stored separately. Information about the original shape
+of `x` is lost once a `Chains` object has been created. Thus, reconstructing
+the original values of `x` requires the use of the three-argument methods in
+this extension.
+
+Rather than placing this functionality in MCMCChains.jl (e.g. in an
+MCMCChainsAbstractPPLExt), it is placed here for several reasons:
+
+1. So that it is close to the original implementation of `hasvalue` and
+   `getvalue`.
+
+2. It is possible that other packages (potentially yet to be created) may also
+   contain lossy methods of storing variable information, and thus may also
+   need this functionality.
+
+3. AbstractPPL is probably the most natural place to host this functionality,
+   since these methods work purely on `VarName` objects.
+
+This decision may be revisited in the future.
+"""
+
 module AbstractPPLDistributionsExt
 
 using AbstractPPL: AbstractPPL, VarName, Accessors
