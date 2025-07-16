@@ -963,69 +963,147 @@ string_to_varname(str::AbstractString) = dict_to_varname(JSON.parse(str))
 ### Prefixing and unprefixing
 
 """
-    _strip_identity(optic)
+    _head(optic)
 
-Remove identity lenses from composed optics.
-"""
-_strip_identity(::Base.ComposedFunction{typeof(identity),typeof(identity)}) = identity
-function _strip_identity(o::Base.ComposedFunction{Outer,typeof(identity)}) where {Outer}
-    return _strip_identity(o.outer)
-end
-function _strip_identity(o::Base.ComposedFunction{typeof(identity),Inner}) where {Inner}
-    return _strip_identity(o.inner)
-end
-_strip_identity(o::Base.ComposedFunction) = o
-_strip_identity(o::Accessors.PropertyLens) = o
-_strip_identity(o::Accessors.IndexLens) = o
-_strip_identity(o::typeof(identity)) = o
+Get the innermost layer of an optic.
 
-"""
-    _inner(optic)
+For all (normalised) optics, we have that `normalise(_tail(optic) ∘
+_head(optic) == optic)`.
 
-Get the innermost (non-identity) layer of an optic.
+!!! note
+    Does not perform optic normalisation on the input. You may wish to call
+    `normalise(optic)` before using this function if the optic you are passing
+    was not obtained from a VarName.
 
 ```jldoctest; setup=:(using Accessors)
-julia> AbstractPPL._inner(Accessors.@o _.a.b.c)
+julia> AbstractPPL._head(Accessors.@o _.a.b.c)
 (@o _.a)
 
-julia> AbstractPPL._inner(Accessors.@o _[1][2][3])
+julia> AbstractPPL._head(Accessors.@o _[1][2][3])
 (@o _[1])
 
-julia> AbstractPPL._inner(Accessors.@o _)
+julia> AbstractPPL._head(Accessors.@o _.a)
+(@o _.a)
+
+julia> AbstractPPL._head(Accessors.@o _[1])
+(@o _[1])
+
+julia> AbstractPPL._head(Accessors.@o _)
 identity (generic function with 1 method)
 ```
 """
-_inner(o::Base.ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.inner
-_inner(o::Accessors.PropertyLens) = o
-_inner(o::Accessors.IndexLens) = o
-_inner(o::typeof(identity)) = o
+_head(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.inner
+_head(o::Accessors.PropertyLens) = o
+_head(o::Accessors.IndexLens) = o
+_head(::typeof(identity)) = identity
 
 """
-    _outer(optic)
+    _tail(optic)
 
-Get the outer layer of an optic.
+Get everything but the innermost layer of an optic.
+
+For all (normalised) optics, we have that `normalise(_tail(optic) ∘
+_head(optic) == optic)`.
+
+!!! note
+    Does not perform optic normalisation on the input. You may wish to call
+    `normalise(optic)` before using this function if the optic you are passing
+    was not obtained from a VarName.
 
 ```jldoctest; setup=:(using Accessors)
-julia> AbstractPPL._outer(Accessors.@o _.a.b.c)
+julia> AbstractPPL._tail(Accessors.@o _.a.b.c)
 (@o _.b.c)
 
-julia> AbstractPPL._outer(Accessors.@o _[1][2][3])
+julia> AbstractPPL._tail(Accessors.@o _[1][2][3])
 (@o _[2][3])
 
-julia> AbstractPPL._outer(Accessors.@o _.a)
+julia> AbstractPPL._tail(Accessors.@o _.a)
 identity (generic function with 1 method)
 
-julia> AbstractPPL._outer(Accessors.@o _[1])
+julia> AbstractPPL._tail(Accessors.@o _[1])
 identity (generic function with 1 method)
 
-julia> AbstractPPL._outer(Accessors.@o _)
+julia> AbstractPPL._tail(Accessors.@o _)
 identity (generic function with 1 method)
 ```
 """
-_outer(o::Base.ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.outer
-_outer(::Accessors.PropertyLens) = identity
-_outer(::Accessors.IndexLens) = identity
-_outer(::typeof(identity)) = identity
+_tail(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.outer
+_tail(::Accessors.PropertyLens) = identity
+_tail(::Accessors.IndexLens) = identity
+_tail(::typeof(identity)) = identity
+
+"""
+    _last(optic)
+
+Get the outermost layer of an optic.
+
+For all (normalised) optics, we have that `normalise(_last(optic) ∘
+_init(optic)) == optic`.
+
+!!! note
+    Does not perform optic normalisation on the input. You may wish to call
+    `normalise(optic)` before using this function if the optic you are passing
+    was not obtained from a VarName.
+
+```jldoctest; setup=:(using Accessors)
+julia> AbstractPPL._last(Accessors.@o _.a.b.c)
+(@o _.c)
+
+julia> AbstractPPL._last(Accessors.@o _[1][2][3])
+(@o _[3])
+
+julia> AbstractPPL._last(Accessors.@o _.a)
+(@o _.a)
+
+julia> AbstractPPL._last(Accessors.@o _[1])
+(@o _[1])
+
+julia> AbstractPPL._last(Accessors.@o _)
+identity (generic function with 1 method)
+```
+"""
+_last(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = _last(o.outer)
+_last(o::Accessors.PropertyLens) = o
+_last(o::Accessors.IndexLens) = o
+_last(::typeof(identity)) = identity
+
+"""
+    _init(optic)
+
+Get everything but the outermost layer of an optic.
+
+For all (normalised) optics, we have that `normalise(_last(optic) ∘
+_init(optic)) == optic`.
+
+!!! note
+    Does not perform optic normalisation on the input. You may wish to call
+    `normalise(optic)` before using this function if the optic you are passing
+    was not obtained from a VarName.
+
+```jldoctest; setup=:(using Accessors)
+julia> AbstractPPL._init(Accessors.@o _.a.b.c)
+(@o _.a.b)
+
+julia> AbstractPPL._init(Accessors.@o _[1][2][3])
+(@o _[1][2])
+
+julia> AbstractPPL._init(Accessors.@o _.a)
+identity (generic function with 1 method)
+
+julia> AbstractPPL._init(Accessors.@o _[1])
+identity (generic function with 1 method)
+
+julia> AbstractPPL._init(Accessors.@o _)
+identity (generic function with 1 method)
+"""
+# This one needs normalise because it's going 'against' the direction of the
+# linked list (otherwise you will end up with identities scattered throughout)
+function _init(o::ComposedFunction{Outer,Inner}) where {Outer,Inner}
+    return normalise(_init(o.outer) ∘ o.inner)
+end
+_init(::Accessors.PropertyLens) = identity
+_init(::Accessors.IndexLens) = identity
+_init(::typeof(identity)) = identity
 
 """
     optic_to_vn(optic)
@@ -1058,11 +1136,11 @@ function optic_to_vn(::Accessors.PropertyLens{sym}) where {sym}
     return VarName{sym}()
 end
 function optic_to_vn(
-    o::Base.ComposedFunction{Outer,Accessors.PropertyLens{sym}}
+    o::ComposedFunction{Outer,Accessors.PropertyLens{sym}}
 ) where {Outer,sym}
     return VarName{sym}(o.outer)
 end
-optic_to_vn(o::Base.ComposedFunction) = optic_to_vn(normalise(o))
+optic_to_vn(o::ComposedFunction) = optic_to_vn(normalise(o))
 function optic_to_vn(@nospecialize(o))
     msg = "optic_to_vn: could not convert optic `$o` to a VarName"
     throw(ArgumentError(msg))
@@ -1077,14 +1155,14 @@ function unprefix_optic(optic, optic_prefix)
     optic = normalise(optic)
     optic_prefix = normalise(optic_prefix)
     # strip one layer of the optic and check for equality
-    inner = _inner(optic)
-    inner_prefix = _inner(optic_prefix)
-    if inner != inner_prefix
+    head = _head(optic)
+    head_prefix = _head(optic_prefix)
+    if head != head_prefix
         msg = "could not remove prefix $(optic_prefix) from optic $(optic)"
         throw(ArgumentError(msg))
     end
     # recurse
-    return unprefix_optic(_outer(optic), _outer(optic_prefix))
+    return unprefix_optic(_tail(optic), _tail(optic_prefix))
 end
 
 """
