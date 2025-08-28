@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>AbstractModelTrace Interface · AbstractPPL</title><meta name="title" content="AbstractModelTrace Interface · AbstractPPL"/><meta property="og:title" content="AbstractModelTrace Interface · AbstractPPL"/><meta property="twitter:title" content="AbstractModelTrace Interface · AbstractPPL"/><meta name="description" content="Documentation for AbstractPPL."/><meta property="og:description" content="Documentation for AbstractPPL."/><meta property="twitter:description" content="Documentation for AbstractPPL."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body>
+<!-- NAVBAR START -->
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro&display=swap');
+
+    /* Documenter.jl CSS Overrides */
+    html {
+        scroll-padding-top: calc(var(--navbar-height) + 1rem);
+    }
+    .docs-sidebar, #documenter {
+        margin-top: var(--navbar-height);
+    }
+    .docs-version-selector {
+        margin-bottom: 60px !important;
+    }
+    @media screen and (max-width: 1056px) {
+        .docs-version-selector {
+            margin-bottom: 60px !important;
+        }
+        .docs-sidebar {
+            margin-top: 0 !important;
+        }
+    }
+    /* End of Documenter.jl Tweaks */
+
+    /* Color and Font Variables */
+    :root {
+        --heading-color: #6c757d;
+        --item-color: rgb(165, 165, 165);
+        --primary-bg: white;
+        --hover-color: #8faad2;
+        --deprecated-bg: #ff4d4d;
+        --deprecated-text: white;
+        --icon-color: #6c757d;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+        --dropdown-hover-bg: #e9ecef;
+        
+        /* Typography */
+        --font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        --nav-link-font-size: 1.0625rem;
+        --turing-title-font-size: 21.25px;
+        --icon-font-size: 1.25rem;
+        --dropdown-arrow-font-size: 0.6875rem;
+        --badge-font-size: 0.75rem;
+
+        /* Sizing and Spacing */
+        --navbar-height: 3.75rem;
+        --logo-height: 31.18px;
+        --logo-width: 52.47px;
+        --logo-padding-top: 7px;
+        --logo-margin-left: 0.3rem;
+        --title-margin-left: 0.4px;
+        --title-nav-spacing: 1.7rem;
+        --nav-item-margin-left: 1.3rem;
+        --icon-margin-left: 1rem;
+        --dropdown-padding: 1.875rem;
+        --dropdown-item-width: 12.5rem;
+        --dropdown-subitem-width: 15.625rem;
+        --dropdown-subitem-padding: 0.125rem 0.625rem;
+    }
+
+    /* Dark Theme Variable Overrides */
+    html.theme--documenter-dark {
+        --heading-color: #e0e0e0;
+        --item-color: #bdbdbd;
+        --primary-bg: #1f2424;
+        --hover-color: #ffffff;
+        --icon-color: #e0e0e0;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #424242;
+    }
+
+    /* Catppuccin Theme Overrides */
+    html.theme--catppuccin-latte {
+        --heading-color: #4c4f69;
+        --primary-bg: #eff1f5;
+        --icon-color: #4c4f69;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+        --dropdown-hover-bg: #e6e9ef;
+    }
+    html.theme--catppuccin-frappe {
+        --heading-color: #c6d0f5;
+        --primary-bg: #303446;
+        --icon-color: #c6d0f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #51576d;
+    }
+    html.theme--catppuccin-macchiato {
+        --heading-color: #cad3f5;
+        --primary-bg: #24273a;
+        --icon-color: #cad3f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #494d64;
+    }
+    html.theme--catppuccin-mocha {
+        --heading-color: #cad3f5;
+        --primary-bg: #1e1e2e;
+        --icon-color: #cad3f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #45475a;
+    }
+
+
+    /* Main Navigation Bar */
+    .ext-navigation {
+        font-family: var(--font-family);
+        position: fixed;
+        height: var(--navbar-height);
+        top: 0;
+        width: 100%;
+        background-color: var(--primary-bg);
+        z-index: 1000;
+        box-shadow: 0 2px 4px var(--shadow-color);
+        display: flex;
+        align-items: center;
+        padding: 0 1.0625rem;
+        transition: transform 0.3s, background-color 0.3s;
+    }
+
+    nav.ext-navigation .ext-navbar-logo {
+        margin-left: var(--logo-margin-left);
+        height: var(--logo-height);
+        width: var(--logo-width);
+        padding-top: var(--logo-padding-top);
+    }
+    
+    .ext-navbar-title {
+        color: var(--heading-color) !important;
+        font-size: var(--turing-title-font-size) !important;
+        margin-left: var(--title-margin-left);
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    
+    .ext-navbar-title:hover {
+        color: var(--hover-color) !important;
+    }
+
+    .ext-nav-links {
+        display: flex;
+        align-items: center;
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        flex-grow: 1;
+        margin-left: var(--title-nav-spacing);
+    }
+
+    .ext-nav-links li:first-child {
+        margin-left: 0 !important;
+    }
+
+    .ext-nav-links li {
+        margin-left: var(--nav-item-margin-left) !important;
+    }
+
+    .ext-nav-link {
+        color: var(--heading-color) !important;
+        text-decoration: none;
+        font-size: var(--nav-link-font-size) !important;
+        transition: color 0.2s ease;
+        cursor: pointer;
+    }
+
+    .ext-nav-link:hover,
+    .ext-navbar-item-single a:hover,
+    .ext-navbar-icons a:hover {
+        color: var(--hover-color) !important;
+    }
+
+    .ext-navbar-item-single a {
+        color: var(--heading-color) !important;
+    }
+    
+    .ext-navbar-icons {
+        display: flex;
+        align-items: center;
+    }
+
+    .ext-navbar-icons a {
+        color: var(--icon-color) !important;
+        font-size: var(--icon-font-size) !important;
+        transition: color 0.2s ease;
+        margin-left: var(--icon-margin-left);
+    }
+
+    .ext-menu-toggle {
+        display: none;
+        font-size: 1.5rem;
+        color: var(--heading-color);
+        cursor: pointer;
+    }
+
+    .ext-dropdown {
+        display: none;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        padding: var(--dropdown-padding);
+        position: absolute;
+        top: var(--navbar-height);
+        width: 100%;
+        left: 0;
+        background-color: var(--primary-bg);
+        line-height: 1.875rem;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, background-color 0.3s;
+        transform: translateY(-0.625rem);
+        box-shadow: 0 4px 6px var(--shadow-color);
+    }
+
+    #library-handler::after {
+        content: "▼";
+        font-size: var(--dropdown-arrow-font-size);
+        margin-left: 0.3125rem;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    #library-handler.open::after {
+        content: "▲";
+    }
+
+    .ext-dropdown.show {
+        display: grid;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .ext-dropdown ul {
+        width: var(--dropdown-item-width);
+        margin-bottom: 1.25rem;
+    }
+
+    .ext-dropdown ul li {
+        text-align: left;
+        display: flex;
+        align-items: center;
+    }
+
+    .ext-dropdown ul a li {
+        color: var(--item-color);
+        width: var(--dropdown-subitem-width);
+        border-radius: 3px;
+        padding: var(--dropdown-subitem-padding);
+        transition: background-color 0.2s ease;
+    }
+
+    .ext-dropdown ul a li:hover {
+        background-color: var(--dropdown-hover-bg);
+    }
+
+    .ext-dropdown-item-heading {
+        color: var(--heading-color);
+        text-align: center;
+    }
+
+    .deprecated-badge {
+        background-color: var(--deprecated-bg);
+        color: var(--deprecated-text);
+        font-size: var(--badge-font-size);
+        padding: .1rem;
+        border-radius: 3px;
+        margin-left: 0.5rem;
+        line-height: 1;
+    }
+
+    @media (max-width: 966px) {
+        .ext-dropdown {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .ext-nav-links {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            background-color: var(--primary-bg);
+            position: absolute;
+            top: var(--navbar-height);
+            left: 0;
+            padding: 0.625rem 0;
+            height: auto;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px var(--shadow-color);
+            margin-left: 0;
+        }
+
+        .ext-nav-links.show {
+            display: flex;
+        }
+
+        .ext-nav-links li {
+            margin: 0.625rem 0 !important;
+            text-align: center;
+        }
+        
+        .ext-menu-toggle {
+            display: block;
+            margin-left: auto;
+        }
+
+        .ext-navigation.hide {
+            transform: translateY(calc(-1 * var(--navbar-height)));
+        }
+
+        .ext-dropdown {
+            position: static;
+            display: block;
+            opacity: 1;
+            transform: none;
+            box-shadow: none;
+            grid-template-columns: 1fr;
+            padding: 0.625rem;
+            text-align: center;
+        }
+
+        .ext-dropdown ul {
+            width: auto;
+            display: inline-block;
+            margin: 0 auto 0.3125rem;
+            text-align: left;
+        }
+    }
+</style>
+<nav class="ext-navigation">
+    <a href="https://turinglang.org/">
+        <img src="https://turinglang.org/assets/images/turing-logo.svg" alt="Turing Logo" class="ext-navbar-logo">
+    </a>
+    <a class="ext-navbar-title" href="https://turinglang.org/">Turing.jl</a>
+    
+    <ul class="ext-nav-links">
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/getting-started/">Get Started</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/tutorials/">Tutorials</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/faq/">FAQ</a></li>
+        <li>
+            <p class="ext-nav-link" id="library-handler">Libraries</p>
+            <div class="ext-dropdown" id="ext-dropdown-items">
+                <ul>
+                    <li class="ext-dropdown-item-heading">Modelling Languages</li>
+                    <a href="https://turinglang.org/DynamicPPL.jl/"><li>DynamicPPL</li></a>
+                    <a href="https://turinglang.org/JuliaBUGS.jl/"><li>JuliaBUGS</li></a>
+                    <a href="https://turinglang.org/TuringGLM.jl/"><li>TuringGLM</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">MCMC</li>
+                    <a href="https://turinglang.org/AdvancedHMC.jl/"><li>AdvancedHMC</li></a>
+                    <a href="https://turinglang.org/AbstractMCMC.jl/"><li>AbstractMCMC</li></a>
+                    <a href="https://github.com/theogf/ThermodynamicIntegration.jl"><li>ThermodynamicIntegration</li></a>
+                    <a href="https://turinglang.org/AdvancedPS.jl/"><li>AdvancedPS</li></a>
+                    <a href="https://turinglang.org/SliceSampling.jl/"><li>SliceSampling</li></a>
+                    <a href="https://turinglang.org/EllipticalSliceSampling.jl/"><li>EllipticalSliceSampling</li></a>
+                    <a href="https://turinglang.org/NestedSamplers.jl/"><li>NestedSamplers</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Diagnostics</li>
+                    <a href="https://turinglang.org/MCMCChains.jl/"><li>MCMCChains</li></a>
+                    <a href="https://turinglang.org/MCMCDiagnosticTools.jl/"><li>MCMCDiagnosticTools</li></a>
+                    <a href="https://turinglang.org/ParetoSmooth.jl/"><li>ParetoSmooth</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Gaussian Processes</li>
+                    <a href="https://juliagaussianprocesses.github.io/AbstractGPs.jl/"><li>AbstractGPs</li></a>
+                    <a href="https://juliagaussianprocesses.github.io/KernelFunctions.jl/"><li>KernelFunctions</li></a>
+                    <a href="https://juliagaussianprocesses.github.io/ApproximateGPs.jl/"><li>ApproximateGPs</li></a>
+                </ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/Bijectors.jl/">Bijectors</a></li></ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/TuringCallbacks.jl/">TuringCallbacks</a></li></ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/Deprecated/TuringBenchmarking/">TuringBenchmarking</a><span class="deprecated-badge">Deprecated</span></li></ul>
+            </div>
+        </li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/news/">News</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/team/">Team</a></li>
+    </ul>
+
+    <div class="ext-navbar-icons">
+        <a href="https://x.com/TuringLang" aria-label="Turing on X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="https://discourse.julialang.org/c/domain/probprog/48" aria-label="Turing on Discourse"><i class="fa-brands fa-discourse"></i></a>
+        <a href="https://julialang.slack.com/archives/CCYDC34A0" aria-label="Turing on Slack"><i class="fa-brands fa-slack"></i></a>
+        <a href="https://github.com/TuringLang/" aria-label="Turing.jl on GitHub"><i class="fa-brands fa-github"></i></a>
+    </div>
+
+    <span class="ext-menu-toggle"><i class="fa-solid fa-bars"></i></span>
+</nav>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuToggle = document.querySelector(".ext-menu-toggle");
+        const navLinks = document.querySelector(".ext-nav-links");
+        const nav = document.querySelector(".ext-navigation");
+        const libraryHandler = document.getElementById("library-handler");
+        const dropdownContainer = document.getElementById("ext-dropdown-items");
+        let lastScrollY = window.scrollY;
+
+        function closeDropdown() {
+            if (dropdownContainer.classList.contains("show")) {
+                libraryHandler.classList.remove("open");
+                dropdownContainer.classList.remove("show");
+                setTimeout(() => {
+                    if (!dropdownContainer.classList.contains("show")) {
+                        dropdownContainer.style.display = "none";
+                    }
+                }, 300);
+            }
+        }
+
+        function openDropdown() {
+            dropdownContainer.style.display = "grid";
+            libraryHandler.classList.add("open");
+            setTimeout(() => {
+                dropdownContainer.classList.add("show");
+            }, 10);
+        }
+
+        function setAppropriateHeight() {
+            if (window.innerWidth <= 768) {
+                const viewportHeight = window.innerHeight;
+                const navHeight = nav.offsetHeight;
+                navLinks.style.maxHeight = `${viewportHeight - navHeight}px`;
+                navLinks.style.overflowY = "auto";
+            } else {
+                navLinks.style.maxHeight = "";
+                navLinks.style.overflowY = "";
+            }
+        }
+
+        menuToggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            navLinks.classList.toggle("show");
+            if (navLinks.classList.contains("show")) {
+                setAppropriateHeight();
+                closeDropdown();
+                dropdownContainer.style.display = "none";
+            }
+        });
+
+        libraryHandler.addEventListener("click", (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            if (dropdownContainer.classList.contains("show")) {
+                closeDropdown();
+            } else {
+                openDropdown();
+            }
+            setAppropriateHeight();
+        });
+
+        // Close all menus if a click is registered outside the navigation bar.
+        document.addEventListener("click", (event) => {
+            if (!nav.contains(event.target)) {
+                navLinks.classList.remove("show");
+                closeDropdown();
+            }
+        });
+
+        // Hide navigation bar on scroll down in mobile view.
+        window.addEventListener("scroll", () => {
+            if (window.innerWidth <= 768) {
+                if (window.scrollY > lastScrollY && window.scrollY > nav.offsetHeight){
+                    nav.classList.add("hide");
+                } else {
+                    nav.classList.remove("hide");
+                }
+                lastScrollY = window.scrollY;
+            }
+        });
+
+        window.addEventListener("resize", setAppropriateHeight);
+    });
+</script>
+<!-- NAVBAR END -->
+
+<div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">AbstractPPL</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><span class="tocitem">Design Documentation</span><ul><li><a class="tocitem" href="../abstractprobabilisticprogram/">AbstractProbabilisticProgram Interface</a></li><li class="is-active"><a class="tocitem" href>AbstractModelTrace Interface</a><ul class="internal"><li><a class="tocitem" href="#Background"><span>Background</span></a></li><li><a class="tocitem" href="#Property-interface"><span>Property interface</span></a></li><li><a class="tocitem" href="#Transformations/Bijectors"><span>Transformations/Bijectors</span></a></li><li><a class="tocitem" href="#Linearization"><span>Linearization</span></a></li></ul></li><li><a class="tocitem" href="../varname_axioms/">VarName Axioms</a></li></ul></li><li><a class="tocitem" href="../api/">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Design Documentation</a></li><li class="is-active"><a href>AbstractModelTrace Interface</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>AbstractModelTrace Interface</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/TuringLang/AbstractPPL.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/TuringLang/AbstractPPL.jl/blob/main/docs/src/abstractmodeltrace.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="AbstractModelTrace/VarInfo-interface-draft"><a class="docs-heading-anchor" href="#AbstractModelTrace/VarInfo-interface-draft"><code>AbstractModelTrace</code>/<code>VarInfo</code> interface draft</a><a id="AbstractModelTrace/VarInfo-interface-draft-1"></a><a class="docs-heading-anchor-permalink" href="#AbstractModelTrace/VarInfo-interface-draft" title="Permalink"></a></h1><p><strong>This part is even draftier than the above – we&#39;ll try out things in DynamicPPL.jl first</strong></p><h2 id="Background"><a class="docs-heading-anchor" href="#Background">Background</a><a id="Background-1"></a><a class="docs-heading-anchor-permalink" href="#Background" title="Permalink"></a></h2><h3 id="Why-do-we-do-this?"><a class="docs-heading-anchor" href="#Why-do-we-do-this?">Why do we do this?</a><a id="Why-do-we-do-this?-1"></a><a class="docs-heading-anchor-permalink" href="#Why-do-we-do-this?" title="Permalink"></a></h3><p>As I have said before:</p><blockquote><p>There are many aspects that make VarInfo a very complex data structure.</p></blockquote><p>Currently, there is an insane amount of complexity and implementation details in DynamicPPL.jl&#39;s <code>varinfo.jl</code>, which has been rewritten multiple times with different concerns in mind – most times to improve concrete needs of Turing.jl, such as type stability, or requirements of specific samplers.</p><p>This unfortunately makes <code>VarInfo</code> extremely opaque: it is hard to refactor without breaking anything (nobody really dares touching it), and a lot of knowledge about Turing.jl/DynamicPPL.jl internals is needed in order to judge the effects of changes.</p><h3 id="Design-choices"><a class="docs-heading-anchor" href="#Design-choices">Design choices</a><a id="Design-choices-1"></a><a class="docs-heading-anchor-permalink" href="#Design-choices" title="Permalink"></a></h3><p>Recently, @torfjelde <a href="https://github.com/TuringLang/DynamicPPL.jl/pull/267/files">has shown</a> that a much simpler implementation is feasible – basically, just a wrapped <code>NamedTuple</code> with a minimal interface.</p><p>The purpose of this proposal is twofold: first, to think about what a sufficient interface for <code>AbstractModelTrace</code>, the abstract supertype of <code>VarInfo</code>, should be, to allow multiple specialized variants and refactor the existing ones (typed/untyped and simple).  Second, to view the problem as the design of an abstract data type: the specification of construction and modification mechanisms for a dictionary-like structure.</p><p>Related previous discussions:</p><ul><li><a href="https://github.com/TuringLang/AbstractPPL.jl/discussions/7">Discussion about <code>VarName</code></a></li><li><a href="https://github.com/TuringLang/AbstractPPL.jl/discussions/5"><code>AbstractVarInfo</code> representation</a></li></ul><p>Additionally (but closely related), the second part tries to formalize the &quot;subsumption&quot; mechanism of <code>VarName</code>s, and its interaction with using <code>VarName</code>s as keys/indices.</p><p>Our discussions take place in what is a bit of a fuzzy zone between the part that is really &quot;abstract&quot;, and meant for the wider purpuse of AbstractPPL.jl – the implementation of probabilistic programming systems in general – and our concrete needs within DPPL.  I hope to always stay abstract and reusable; and there are already a couple of candidates for APPL clients other than DPPL, which will hopefully keep us focused: simulation based calibration, SimplePPL (a BUGS-like frontend), and ParetoSmoothing.jl.</p><h3 id="What-is-going-to-change?"><a class="docs-heading-anchor" href="#What-is-going-to-change?">What is going to change?</a><a id="What-is-going-to-change?-1"></a><a class="docs-heading-anchor-permalink" href="#What-is-going-to-change?" title="Permalink"></a></h3><ul><li>For the end user of Turing.jl: nothing.  You usually don&#39;t use <code>VarInfo</code>, or the raw evaluator interface, anyways.  (Although if the newer data structures are more user-friendly, they might occur in more places in the future?)</li><li>For people having a look into code using <code>VarInfo</code>, or starting to hack on Turing.jl/DPPL.jl: a huge reduction in cognitive complexity.  <code>VarInfo</code> implementations should be readable on their own, and the implemented functions layed out somewhere.  Its usages should look like for any other nice, normal data structure.</li><li>For core DPPL.jl implementors: same as the previous, plus: a standard against which to improve and test <code>VarInfo</code>, and a clearly defined design space for new data structures.</li><li>For AbstractPPL.jl clients/PPL implementors: an interface to program against (as with the rest of APPL), and an existing set of well-specified, flexible trace data types with different characteristics.</li></ul><p>And in terms of implementation work in DPPL.jl: once the interface is fixed (or even during fixing it), varinfo.jl will undergo a heavy refactoring – which should make it <em>simpler</em>! (No three different getter functions with slightly different semantics, etc…).</p><h2 id="Property-interface"><a class="docs-heading-anchor" href="#Property-interface">Property interface</a><a id="Property-interface-1"></a><a class="docs-heading-anchor-permalink" href="#Property-interface" title="Permalink"></a></h2><p>The basic idea is for all <code>VarInfo</code>s to behave like ordered dictionaries with <code>VarName</code> keys – all common operations should just work.  There are two things that make them more special, though:</p><ol><li><p>&quot;Fancy indexing&quot;: since <code>VarName</code>s are structured themselves, the <code>VarInfo</code> should be have a bit like a trie, in the sense that all prefixes of stored keys should be retrievable.  Also, subsumption of <code>VarName</code>s should be respected (see end of this document):</p><pre><code class="language-julia hljs">vi[@varname(x.a)] = [1, 2, 3]
+vi[@varname(x.b)] = [4, 5, 6]
+vi[@varname(x.a[2])] == 2
+vi[@varname(x)] == (; a=[1, 2, 3], b=[4, 5, 6])</code></pre><p>Generalizations that go beyond simple cases (those that you can imagine by storing individual <code>setfield!</code>s in a tree) need not be implemented in the beginning; e.g.,</p><pre><code class="language-julia hljs">vi[@varname(x[1])] = 1
+vi[@varname(x[2])] = 2
+keys(vi) == [x[1], x[2]]
+
+vi[@varname(x)] = [1, 2]
+keys(vi) == [x]</code></pre></li><li><p>(<em>This has to be discussed further.</em>)  Information other than the sampled values, such as flags, metadata, pointwise likelihoods, etc., can in principle be stored in multiple of these &quot;<code>VarInfo</code> dicts&quot; with parallel structure.  For efficiency, it is thinkable to devise a design such that multiple fields can be stored under the same indexing structure.</p><pre><code class="language-julia hljs">vi[@varname(x[1])] == 1
+vi[@varname(x[1])].meta[&quot;bla&quot;] == false</code></pre><p>or something in that direction.</p><p>(This is logically equivalent to a dictionary with named tuple values.  Maybe we can do what <a href="https://github.com/JuliaData/TypedTables.jl/blob/main/src/DictTable.jl"><code>DictTable</code></a> does?)</p><p>The old <code>order</code> field, indicating at which position in the evaluator function a variable has been added (essentially a counter of insertions) can actually be left out completely, since the dictionary is specified to be ordered by insertion.</p><p>The important question here is: should the &quot;joint data structure&quot; behave like a dictionary of <code>NamedTuple</code>s (<code>eltype(vi) == @NamedTuple{value::T, ℓ::Float64, meta}</code>), or like a struct of dicts with shared keys (<code>eltype(vi.value) &lt;: T</code>, <code>eltype(vi.ℓ) &lt;: Float64</code>, …)?</p></li></ol><p>The required dictionary functions are about the following:</p><ul><li><p>Pure functions:</p><ul><li><code>iterate</code>, yielding pairs of <code>VarName</code> and the stored value</li><li><code>IteratorEltype == HasEltype()</code>, <code>IteratorSize = HasLength()</code></li><li><code>keys</code>, <code>values</code>, <code>pairs</code>, <code>length</code> consistent with <code>iterate</code></li><li><code>eltype</code>, <code>keytype</code>, <code>valuetype</code></li><li><code>get</code>, <code>getindex</code>, <code>haskey</code> for indexing by <code>VarName</code></li><li><code>merge</code> to join two <code>VarInfo</code>s</li></ul></li><li><p>Mutating functions:</p><ul><li><code>insert!!</code>, <code>set!!</code></li><li><code>merge!!</code> to add and join elements (TODO: think about <code>merge</code>)</li><li><code>setindex!!</code></li><li><code>empty!!</code>, <code>delete!!</code>, <code>unset!!</code> (<em>Are these really used anywhere? Not having them makes persistent implementations much easier!</em>)</li></ul></li></ul><p>I believe that adopting the interface of <a href="https://github.com/andyferris/Dictionaries.jl">Dictionaries.jl</a>, not <code>Base.AbstractDict</code>, would be ideal, since their approach make key sharing and certain operations naturally easy (particularly &quot;broadcast-style&quot;, i.e., transformations on the values, but not the keys).</p><p>Other <code>Base</code> functions, like <code>enumerate</code>, should follow from the above.</p><p><code>length</code> might appear weird – but it should definitely be consistent with the iterator.</p><p>It would be really cool if <code>merge</code> supported the combination of distinct types of implementations, e.g., a dynamic and a tuple-based part.</p><p>To support both mutable and immutable/persistent implementations, let&#39;s require consistent BangBang.jl style mutators throughout.</p><h2 id="Transformations/Bijectors"><a class="docs-heading-anchor" href="#Transformations/Bijectors">Transformations/Bijectors</a><a id="Transformations/Bijectors-1"></a><a class="docs-heading-anchor-permalink" href="#Transformations/Bijectors" title="Permalink"></a></h2><p>Transformations should ideally be handled explicitely and from outside: automatically by the compiler macro, or at the places required by samplers.</p><p>Implementation-wise, they can probably be expressed as folds?</p><pre><code class="language-julia hljs">map(v -&gt; link(v.dist, v.value), vi)</code></pre><h2 id="Linearization"><a class="docs-heading-anchor" href="#Linearization">Linearization</a><a id="Linearization-1"></a><a class="docs-heading-anchor-permalink" href="#Linearization" title="Permalink"></a></h2><p>There are multiple possible approaches to handle this:</p><ol><li>As a special case of conversion: <code>Vector(vi)</code></li><li><code>copy!(vals_array, vi)</code>.</li><li>As a fold: <code>mapreduce(v -&gt; vec(v.value), append!, vi, init=Float64[])</code></li></ol><p>Also here, I think that the best implementation would be through a fold.  Variants (1) or (2) might additionally be provided as syntactic sugar.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../abstractprobabilisticprogram/">« AbstractProbabilisticProgram Interface</a><a class="docs-footer-nextpage" href="../varname_axioms/">VarName Axioms »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Thursday 28 August 2025 00:31">Thursday 28 August 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
