@@ -3,13 +3,10 @@ using Documenter
 using Test
 
 const GROUP = get(ENV, "GROUP", "All")
-const AQUA = get(ENV, "AQUA", "true") == "true"
 
 @testset "AbstractPPL.jl" begin
     if GROUP == "All" || GROUP == "Tests"
-        if AQUA
-            include("Aqua.jl")
-        end
+        include("Aqua.jl")
         include("varname.jl")
         include("abstractprobprog.jl")
         include("hasvalue.jl")
