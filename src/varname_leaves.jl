@@ -1,3 +1,5 @@
+using LinearAlgebra: LinearAlgebra
+
 """
     varname_leaves(vn::VarName, val)
 
@@ -214,7 +216,7 @@ function varname_and_value_leaves_inner(vn::VarName, val::NamedTuple)
     return Iterators.flatten(iter)
 end
 # Special types.
-function varname_and_value_leaves_inner(vn::VarName, x::Cholesky)
+function varname_and_value_leaves_inner(vn::VarName, x::LinearAlgebra.Cholesky)
     # TODO: Or do we use `PDMat` here?
     return if x.uplo == 'L'
         varname_and_value_leaves_inner(Accessors.PropertyLens{:L}() ∘ vn, x.L)
