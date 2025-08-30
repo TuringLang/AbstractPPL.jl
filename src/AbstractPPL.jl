@@ -18,7 +18,9 @@ export VarName,
     prefix,
     unprefix,
     getvalue,
-    hasvalue
+    hasvalue,
+    varname_leaves,
+    varname_and_value_leaves
 
 # Abstract model functions
 export AbstractProbabilisticProgram,

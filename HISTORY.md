@@ -1,3 +1,8 @@
+## 0.14.0
+
+Moved the functions `varname_leaves` and `varname_and_value_leaves` to AbstractPPL.
+They are now part of the public API of AbstractPPL.
+
 ## 0.13.0
 
 Minimum compatibility has been bumped to Julia 1.10.
