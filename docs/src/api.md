@@ -28,6 +28,13 @@ hasvalue
 getvalue
 ```
 
+## Splitting VarNames up into components
+
+```@docs
+varname_leaves
+varname_and_value_leaves
+```
+
 ## VarName serialisation
 
 ```@docs

@@ -122,8 +122,11 @@ See also: [`varname_and_value_leaves(vn::VarName, x)`](@ref).
 ```jldoctest varname-and-value-leaves-container
 julia> using AbstractPPL: varname_and_value_leaves
 
-julia> # With an `AbstractDict`
-       dict = Dict(@varname(y) => 1, @varname(z) => [[2.0], [3.0]]);
+julia> using OrderedCollections: OrderedDict
+
+julia> # With an `AbstractDict` (we use `OrderedDict` here
+       # to ensure consistent ordering in doctests)
+       dict = OrderedDict(@varname(y) => 1, @varname(z) => [[2.0], [3.0]]);
 
 julia> foreach(println, varname_and_value_leaves(dict))
 (y, 1)
