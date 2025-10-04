@@ -29,11 +29,14 @@ export AbstractProbabilisticProgram,
 # Abstract traces
 export AbstractModelTrace
 
-include("varname.jl")
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
-include("varname_leaves.jl")
-include("hasvalue.jl")
+include("varname/varname.jl")
+include("varname/subsumes.jl")
+include("varname/hasvalue.jl")
+include("varname/leaves.jl")
+include("varname/prefix.jl")
+include("varname/serialize.jl")
 
 end # module
