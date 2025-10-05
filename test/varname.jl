@@ -81,7 +81,7 @@ end
         @test @varname(A[1].b[i]) == @varname(A[1].b[1:10])
         @test @varname(A[j]) == @varname(A[2:2:5])
 
-        @test @varname(A[:, 1][1 + 1]) == @varname(A[:, 1][2])
+        @test @varname(A[:, 1][1+1]) == @varname(A[:, 1][2])
         @test(@varname(A[:, 1][2]) == VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])))
 
         # concretization
@@ -92,7 +92,7 @@ end
         @test test_equal(@varname(y[:], true), @varname(y[1:100]))
         @test test_equal(@varname(y[:, begin], true), @varname(y[1:10, 1]))
         @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
-            AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
+              AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
         @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3, 2][1:3]))
     end
 
@@ -349,19 +349,24 @@ end
             x = 1.0
             @test Set(varname_leaves(@varname(x), x)) == Set([@varname(x)])
             @test Set(collect(varname_and_value_leaves(@varname(x), x))) ==
-                Set([(@varname(x), x)])
+                  Set([(@varname(x), x)])
             x = 2
             @test Set(varname_leaves(@varname(x), x)) == Set([@varname(x)])
             @test Set(collect(varname_and_value_leaves(@varname(x), x))) ==
-                Set([(@varname(x), x)])
+                  Set([(@varname(x), x)])
         end
 
         @testset "Vector" begin
             x = randn(2)
             @test Set(varname_leaves(@varname(x), x)) ==
-                Set([@varname(x[1]), @varname(x[2])])
+                  Set([@varname(x[1]), @varname(x[2])])
             @test Set(collect(varname_and_value_leaves(@varname(x), x))) ==
-                Set([(@varname(x[1]), x[1]), (@varname(x[2]), x[2])])
+                  Set([(@varname(x[1]), x[1]), (@varname(x[2]), x[2])])
+            x = [(; a=1), (; b=2)]
+            @test Set(varname_leaves(@varname(x), x)) ==
+                  Set([@varname(x[1].a), @varname(x[2].b)])
+            @test Set(collect(varname_and_value_leaves(@varname(x), x))) ==
+                  Set([(@varname(x[1].a), x[1].a), (@varname(x[2].b), x[2].b)])
         end
 
         @testset "Matrix" begin
@@ -381,7 +386,7 @@ end
             x = randn(2, 2)
             xl = LowerTriangular(x)
             @test Set(varname_leaves(@varname(x), xl)) ==
-                Set([@varname(x[1, 1]), @varname(x[2, 1]), @varname(x[2, 2])])
+                  Set([@varname(x[1, 1]), @varname(x[2, 1]), @varname(x[2, 2])])
             @test Set(collect(varname_and_value_leaves(@varname(x), xl))) == Set([
                 (@varname(x[1, 1]), x[1, 1]),
                 (@varname(x[2, 1]), x[2, 1]),
@@ -389,7 +394,7 @@ end
             ])
             xu = UpperTriangular(x)
             @test Set(varname_leaves(@varname(x), xu)) ==
-                Set([@varname(x[1, 1]), @varname(x[1, 2]), @varname(x[2, 2])])
+                  Set([@varname(x[1, 1]), @varname(x[1, 2]), @varname(x[2, 2])])
             @test Set(collect(varname_and_value_leaves(@varname(x), xu))) == Set([
                 (@varname(x[1, 1]), x[1, 1]),
                 (@varname(x[1, 2]), x[1, 2]),
@@ -398,16 +403,16 @@ end
         end
 
         @testset "NamedTuple" begin
-            x = (a=1.0, b=2.0)
-            @test Set(varname_leaves(@varname(x), x)) == Set([@varname(x.a), @varname(x.b)])
+            x = (a=1.0, b=[2.0, 3.0])
+            @test Set(varname_leaves(@varname(x), x)) == Set([@varname(x.a), @varname(x.b[1]), @varname(x.b[2])])
             @test Set(collect(varname_and_value_leaves(@varname(x), x))) ==
-                Set([(@varname(x.a), x.a), (@varname(x.b), x.b)])
+                  Set([(@varname(x.a), x.a), (@varname(x.b[1]), x.b[1]), (@varname(x.b[2]), x.b[2])])
         end
 
         @testset "Cholesky" begin
             x = cholesky([1.0 0.5; 0.5 1.0])
             @test Set(varname_leaves(@varname(x), x)) ==
-                Set([@varname(x.U[1, 1]), @varname(x.U[1, 2]), @varname(x.U[2, 2])])
+                  Set([@varname(x.U[1, 1]), @varname(x.U[1, 2]), @varname(x.U[2, 2])])
             @test Set(collect(varname_and_value_leaves(@varname(x), x))) == Set([
                 (@varname(x.U[1, 1]), x.U[1, 1]),
                 (@varname(x.U[1, 2]), x.U[1, 2]),
