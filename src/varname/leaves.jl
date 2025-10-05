@@ -46,6 +46,25 @@ function varname_leaves(vn::VarName, val::NamedTuple)
     end
     return Iterators.flatten(iter)
 end
+function varname_leaves(vn::VarName, val::LinearAlgebra.Cholesky)
+    return if val.uplo == 'L'
+        optic = Accessors.PropertyLens{:L}()
+        varname_leaves(VarName{getsym(vn)}(optic ∘ getoptic(vn)), val.L)
+    else
+        optic = Accessors.PropertyLens{:U}()
+        varname_leaves(VarName{getsym(vn)}(optic ∘ getoptic(vn)), val.U)
+    end
+end
+function varname_leaves(vn::VarName, x::LinearAlgebra.LowerTriangular)
+    return Iterators.map(Iterators.filter(I -> I[1] >= I[2], CartesianIndices(x))) do I
+        VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn))
+    end
+end
+function varname_leaves(vn::VarName, x::LinearAlgebra.UpperTriangular)
+    return Iterators.map(Iterators.filter(I -> I[1] <= I[2], CartesianIndices(x))) do I
+        VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn))
+    end
+end
 
 """
     varname_and_value_leaves(vn::VarName, val)
@@ -220,7 +239,6 @@ function varname_and_value_leaves_inner(vn::VarName, val::NamedTuple)
 end
 # Special types.
 function varname_and_value_leaves_inner(vn::VarName, x::LinearAlgebra.Cholesky)
-    # TODO: Or do we use `PDMat` here?
     return if x.uplo == 'L'
         varname_and_value_leaves_inner(Accessors.PropertyLens{:L}() ∘ vn, x.L)
     else
