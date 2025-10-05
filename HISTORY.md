@@ -1,3 +1,7 @@
+## 0.13.2
+
+Implemented `varname_leaves` for `LinearAlgebra.Cholesky`.
+
 ## 0.13.1
 
 Moved the functions `varname_leaves` and `varname_and_value_leaves` to AbstractPPL.
