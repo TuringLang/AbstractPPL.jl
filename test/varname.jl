@@ -126,7 +126,9 @@ end
         @test @varname(x) ≍ @varname(y)
         @test @varname(x.a) ≍ @varname(y.a)
         @test @varname(a.x) ≍ @varname(a.y)
+        @test @varname(a.x[1]) ≍ @varname(a.x.z)
         @test @varname(x[1]) ≍ @varname(y[1])
+        @test @varname(x[1]) ≍ @varname(x.y)
 
         # x ∘ ℓ ⊑ x
         @test_strict_subsumption x.a x

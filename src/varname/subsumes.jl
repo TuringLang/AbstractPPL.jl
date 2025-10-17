@@ -103,6 +103,10 @@ subsumes(t::PropertyLens{name}, u::PropertyLens{name}) where {name} = true
 # Otherwise they represent different properties, and thus are not the same.
 subsumes(t::PropertyLens, u::PropertyLens) = false
 
+# PropertyLens and IndexLens can't subsume each other
+subsumes(::PropertyLens, ::IndexLens) = false
+subsumes(::IndexLens, ::PropertyLens) = false
+
 # Indices subsumes if they are subindices, i.e. we just call `_issubindex`.
 # FIXME: Does not support `DynamicIndexLens`.
 # FIXME: Does not correctly handle cases such as `subsumes(x, x[:])`

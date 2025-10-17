@@ -1,3 +1,7 @@
+## 0.13.4
+
+Added missing methods for `subsumes(::IndexLens, ::PropertyLens)` and vice versa.
+
 ## 0.13.3
 
 Bumped compatibility for JSON.jl to include v1.
