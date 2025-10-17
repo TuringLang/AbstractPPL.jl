@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>API · AbstractPPL</title><meta name="title" content="API · AbstractPPL"/><meta property="og:title" content="API · AbstractPPL"/><meta property="twitter:title" content="API · AbstractPPL"/><meta name="description" content="Documentation for AbstractPPL."/><meta property="og:description" content="Documentation for AbstractPPL."/><meta property="twitter:description" content="Documentation for AbstractPPL."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body>
+<!-- NAVBAR START -->
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro&display=swap');
+
+    /* Documenter.jl CSS Overrides */
+    html {
+        scroll-padding-top: calc(var(--navbar-height) + 1rem);
+    }
+    .docs-sidebar, #documenter {
+        margin-top: var(--navbar-height);
+    }
+    .docs-version-selector {
+        margin-bottom: 60px !important;
+    }
+    @media screen and (max-width: 1056px) {
+        .docs-version-selector {
+            margin-bottom: 60px !important;
+        }
+        .docs-sidebar {
+            margin-top: 0 !important;
+        }
+    }
+    /* End of Documenter.jl Tweaks */
+
+    /* Color and Font Variables */
+    :root {
+        --heading-color: #6c757d;
+        --item-color: rgb(165, 165, 165);
+        --primary-bg: white;
+        --hover-color: #8faad2;
+        --deprecated-bg: #ff4d4d;
+        --deprecated-text: white;
+        --icon-color: #6c757d;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+        --dropdown-hover-bg: #e9ecef;
+        
+        /* Typography */
+        --font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        --nav-link-font-size: 1.0625rem;
+        --turing-title-font-size: 21.25px;
+        --icon-font-size: 1.25rem;
+        --dropdown-arrow-font-size: 0.6875rem;
+        --badge-font-size: 0.75rem;
+
+        /* Sizing and Spacing */
+        --navbar-height: 3.75rem;
+        --logo-height: 31.18px;
+        --logo-width: 52.47px;
+        --logo-padding-top: 7px;
+        --logo-margin-left: 0.3rem;
+        --title-margin-left: 0.4px;
+        --title-nav-spacing: 1.7rem;
+        --nav-item-margin-left: 1.3rem;
+        --icon-margin-left: 1rem;
+        --dropdown-padding: 1.875rem;
+        --dropdown-item-width: 12.5rem;
+        --dropdown-subitem-width: 15.625rem;
+        --dropdown-subitem-padding: 0.125rem 0.625rem;
+    }
+
+    /* Dark Theme Variable Overrides */
+    html.theme--documenter-dark {
+        --heading-color: #e0e0e0;
+        --item-color: #bdbdbd;
+        --primary-bg: #1f2424;
+        --hover-color: #ffffff;
+        --icon-color: #e0e0e0;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #424242;
+    }
+
+    /* Catppuccin Theme Overrides */
+    html.theme--catppuccin-latte {
+        --heading-color: #4c4f69;
+        --primary-bg: #eff1f5;
+        --icon-color: #4c4f69;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+        --dropdown-hover-bg: #e6e9ef;
+    }
+    html.theme--catppuccin-frappe {
+        --heading-color: #c6d0f5;
+        --primary-bg: #303446;
+        --icon-color: #c6d0f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #51576d;
+    }
+    html.theme--catppuccin-macchiato {
+        --heading-color: #cad3f5;
+        --primary-bg: #24273a;
+        --icon-color: #cad3f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #494d64;
+    }
+    html.theme--catppuccin-mocha {
+        --heading-color: #cad3f5;
+        --primary-bg: #1e1e2e;
+        --icon-color: #cad3f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #45475a;
+    }
+
+
+    /* Main Navigation Bar */
+    .ext-navigation {
+        font-family: var(--font-family);
+        position: fixed;
+        height: var(--navbar-height);
+        top: 0;
+        width: 100%;
+        background-color: var(--primary-bg);
+        z-index: 1000;
+        box-shadow: 0 2px 4px var(--shadow-color);
+        display: flex;
+        align-items: center;
+        padding: 0 1.0625rem;
+        transition: transform 0.3s, background-color 0.3s;
+    }
+
+    nav.ext-navigation .ext-navbar-logo {
+        margin-left: var(--logo-margin-left);
+        height: var(--logo-height);
+        width: var(--logo-width);
+        padding-top: var(--logo-padding-top);
+    }
+    
+    .ext-navbar-title {
+        color: var(--heading-color) !important;
+        font-size: var(--turing-title-font-size) !important;
+        margin-left: var(--title-margin-left);
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    
+    .ext-navbar-title:hover {
+        color: var(--hover-color) !important;
+    }
+
+    .ext-nav-links {
+        display: flex;
+        align-items: center;
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        flex-grow: 1;
+        margin-left: var(--title-nav-spacing);
+    }
+
+    .ext-nav-links li:first-child {
+        margin-left: 0 !important;
+    }
+
+    .ext-nav-links li {
+        margin-left: var(--nav-item-margin-left) !important;
+    }
+
+    .ext-nav-link {
+        color: var(--heading-color) !important;
+        text-decoration: none;
+        font-size: var(--nav-link-font-size) !important;
+        transition: color 0.2s ease;
+        cursor: pointer;
+    }
+
+    .ext-nav-link:hover,
+    .ext-navbar-item-single a:hover,
+    .ext-navbar-icons a:hover {
+        color: var(--hover-color) !important;
+    }
+
+    .ext-navbar-item-single a {
+        color: var(--heading-color) !important;
+    }
+    
+    .ext-navbar-icons {
+        display: flex;
+        align-items: center;
+    }
+
+    .ext-navbar-icons a {
+        color: var(--icon-color) !important;
+        font-size: var(--icon-font-size) !important;
+        transition: color 0.2s ease;
+        margin-left: var(--icon-margin-left);
+    }
+
+    .ext-menu-toggle {
+        display: none;
+        font-size: 1.5rem;
+        color: var(--heading-color);
+        cursor: pointer;
+    }
+
+    .ext-dropdown {
+        display: none;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        padding: var(--dropdown-padding);
+        position: absolute;
+        top: var(--navbar-height);
+        width: 100%;
+        left: 0;
+        background-color: var(--primary-bg);
+        line-height: 1.875rem;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, background-color 0.3s;
+        transform: translateY(-0.625rem);
+        box-shadow: 0 4px 6px var(--shadow-color);
+    }
+
+    #library-handler::after {
+        content: "▼";
+        font-size: var(--dropdown-arrow-font-size);
+        margin-left: 0.3125rem;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    #library-handler.open::after {
+        content: "▲";
+    }
+
+    .ext-dropdown.show {
+        display: grid;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .ext-dropdown ul {
+        width: var(--dropdown-item-width);
+        margin-bottom: 1.25rem;
+    }
+
+    .ext-dropdown ul li {
+        text-align: left;
+        display: flex;
+        align-items: center;
+    }
+
+    .ext-dropdown ul a li {
+        color: var(--item-color);
+        width: var(--dropdown-subitem-width);
+        border-radius: 3px;
+        padding: var(--dropdown-subitem-padding);
+        transition: background-color 0.2s ease;
+    }
+
+    .ext-dropdown ul a li:hover {
+        background-color: var(--dropdown-hover-bg);
+    }
+
+    .ext-dropdown-item-heading {
+        color: var(--heading-color);
+        text-align: center;
+    }
+
+    .deprecated-badge {
+        background-color: var(--deprecated-bg);
+        color: var(--deprecated-text);
+        font-size: var(--badge-font-size);
+        padding: .1rem;
+        border-radius: 3px;
+        margin-left: 0.5rem;
+        line-height: 1;
+    }
+
+    @media (max-width: 966px) {
+        .ext-dropdown {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .ext-nav-links {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            background-color: var(--primary-bg);
+            position: absolute;
+            top: var(--navbar-height);
+            left: 0;
+            padding: 0.625rem 0;
+            height: auto;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px var(--shadow-color);
+            margin-left: 0;
+        }
+
+        .ext-nav-links.show {
+            display: flex;
+        }
+
+        .ext-nav-links li {
+            margin: 0.625rem 0 !important;
+            text-align: center;
+        }
+        
+        .ext-menu-toggle {
+            display: block;
+            margin-left: auto;
+        }
+
+        .ext-navigation.hide {
+            transform: translateY(calc(-1 * var(--navbar-height)));
+        }
+
+        .ext-dropdown {
+            position: static;
+            display: block;
+            opacity: 1;
+            transform: none;
+            box-shadow: none;
+            grid-template-columns: 1fr;
+            padding: 0.625rem;
+            text-align: center;
+        }
+
+        .ext-dropdown ul {
+            width: auto;
+            display: inline-block;
+            margin: 0 auto 0.3125rem;
+            text-align: left;
+        }
+    }
+</style>
+<nav class="ext-navigation">
+    <a href="https://turinglang.org/">
+        <img src="https://turinglang.org/assets/images/turing-logo.svg" alt="Turing Logo" class="ext-navbar-logo">
+    </a>
+    <a class="ext-navbar-title" href="https://turinglang.org/">Turing.jl</a>
+    
+    <ul class="ext-nav-links">
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/getting-started/">Get Started</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/tutorials/">Tutorials</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/faq/">FAQ</a></li>
+        <li>
+            <p class="ext-nav-link" id="library-handler">Libraries</p>
+            <div class="ext-dropdown" id="ext-dropdown-items">
+                <ul>
+                    <li class="ext-dropdown-item-heading">Modelling Languages</li>
+                    <a href="https://turinglang.org/DynamicPPL.jl/"><li>DynamicPPL</li></a>
+                    <a href="https://turinglang.org/JuliaBUGS.jl/"><li>JuliaBUGS</li></a>
+                    <a href="https://turinglang.org/TuringGLM.jl/"><li>TuringGLM</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">MCMC</li>
+                    <a href="https://turinglang.org/AdvancedHMC.jl/"><li>AdvancedHMC</li></a>
+                    <a href="https://turinglang.org/AbstractMCMC.jl/"><li>AbstractMCMC</li></a>
+                    <a href="https://github.com/theogf/ThermodynamicIntegration.jl"><li>ThermodynamicIntegration</li></a>
+                    <a href="https://turinglang.org/AdvancedPS.jl/"><li>AdvancedPS</li></a>
+                    <a href="https://turinglang.org/SliceSampling.jl/"><li>SliceSampling</li></a>
+                    <a href="https://turinglang.org/EllipticalSliceSampling.jl/"><li>EllipticalSliceSampling</li></a>
+                    <a href="https://turinglang.org/NestedSamplers.jl/"><li>NestedSamplers</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Diagnostics</li>
+                    <a href="https://turinglang.org/MCMCChains.jl/"><li>MCMCChains</li></a>
+                    <a href="https://turinglang.org/MCMCDiagnosticTools.jl/"><li>MCMCDiagnosticTools</li></a>
+                    <a href="https://turinglang.org/ParetoSmooth.jl/"><li>ParetoSmooth</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Gaussian Processes</li>
+                    <a href="https://juliagaussianprocesses.github.io/AbstractGPs.jl/"><li>AbstractGPs</li></a>
+                    <a href="https://juliagaussianprocesses.github.io/KernelFunctions.jl/"><li>KernelFunctions</li></a>
+                    <a href="https://juliagaussianprocesses.github.io/ApproximateGPs.jl/"><li>ApproximateGPs</li></a>
+                </ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/Bijectors.jl/">Bijectors</a></li></ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/TuringCallbacks.jl/">TuringCallbacks</a></li></ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/Deprecated/TuringBenchmarking/">TuringBenchmarking</a><span class="deprecated-badge">Deprecated</span></li></ul>
+            </div>
+        </li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/news/">News</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/team/">Team</a></li>
+    </ul>
+
+    <div class="ext-navbar-icons">
+        <a href="https://x.com/TuringLang" aria-label="Turing on X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="https://discourse.julialang.org/c/domain/probprog/48" aria-label="Turing on Discourse"><i class="fa-brands fa-discourse"></i></a>
+        <a href="https://julialang.slack.com/archives/CCYDC34A0" aria-label="Turing on Slack"><i class="fa-brands fa-slack"></i></a>
+        <a href="https://github.com/TuringLang/" aria-label="Turing.jl on GitHub"><i class="fa-brands fa-github"></i></a>
+    </div>
+
+    <span class="ext-menu-toggle"><i class="fa-solid fa-bars"></i></span>
+</nav>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuToggle = document.querySelector(".ext-menu-toggle");
+        const navLinks = document.querySelector(".ext-nav-links");
+        const nav = document.querySelector(".ext-navigation");
+        const libraryHandler = document.getElementById("library-handler");
+        const dropdownContainer = document.getElementById("ext-dropdown-items");
+        let lastScrollY = window.scrollY;
+
+        function closeDropdown() {
+            if (dropdownContainer.classList.contains("show")) {
+                libraryHandler.classList.remove("open");
+                dropdownContainer.classList.remove("show");
+                setTimeout(() => {
+                    if (!dropdownContainer.classList.contains("show")) {
+                        dropdownContainer.style.display = "none";
+                    }
+                }, 300);
+            }
+        }
+
+        function openDropdown() {
+            dropdownContainer.style.display = "grid";
+            libraryHandler.classList.add("open");
+            setTimeout(() => {
+                dropdownContainer.classList.add("show");
+            }, 10);
+        }
+
+        function setAppropriateHeight() {
+            if (window.innerWidth <= 768) {
+                const viewportHeight = window.innerHeight;
+                const navHeight = nav.offsetHeight;
+                navLinks.style.maxHeight = `${viewportHeight - navHeight}px`;
+                navLinks.style.overflowY = "auto";
+            } else {
+                navLinks.style.maxHeight = "";
+                navLinks.style.overflowY = "";
+            }
+        }
+
+        menuToggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            navLinks.classList.toggle("show");
+            if (navLinks.classList.contains("show")) {
+                setAppropriateHeight();
+                closeDropdown();
+                dropdownContainer.style.display = "none";
+            }
+        });
+
+        libraryHandler.addEventListener("click", (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            if (dropdownContainer.classList.contains("show")) {
+                closeDropdown();
+            } else {
+                openDropdown();
+            }
+            setAppropriateHeight();
+        });
+
+        // Close all menus if a click is registered outside the navigation bar.
+        document.addEventListener("click", (event) => {
+            if (!nav.contains(event.target)) {
+                navLinks.classList.remove("show");
+                closeDropdown();
+            }
+        });
+
+        // Hide navigation bar on scroll down in mobile view.
+        window.addEventListener("scroll", () => {
+            if (window.innerWidth <= 768) {
+                if (window.scrollY > lastScrollY && window.scrollY > nav.offsetHeight){
+                    nav.classList.add("hide");
+                } else {
+                    nav.classList.remove("hide");
+                }
+                lastScrollY = window.scrollY;
+            }
+        });
+
+        window.addEventListener("resize", setAppropriateHeight);
+    });
+</script>
+<!-- NAVBAR END -->
+
+<div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">AbstractPPL</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>API</a><ul class="internal"><li><a class="tocitem" href="#VarNames"><span>VarNames</span></a></li><li><a class="tocitem" href="#VarName-prefixing-and-unprefixing"><span>VarName prefixing and unprefixing</span></a></li><li><a class="tocitem" href="#Extracting-values-corresponding-to-a-VarName"><span>Extracting values corresponding to a VarName</span></a></li><li><a class="tocitem" href="#Splitting-VarNames-up-into-components"><span>Splitting VarNames up into components</span></a></li><li><a class="tocitem" href="#VarName-serialisation"><span>VarName serialisation</span></a></li><li><a class="tocitem" href="#Abstract-model-functions"><span>Abstract model functions</span></a></li><li><a class="tocitem" href="#Abstract-traces"><span>Abstract traces</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>API</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>API</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/TuringLang/AbstractPPL.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/TuringLang/AbstractPPL.jl/blob/main/docs/src/api.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="API"><a class="docs-heading-anchor" href="#API">API</a><a id="API-1"></a><a class="docs-heading-anchor-permalink" href="#API" title="Permalink"></a></h1><h2 id="VarNames"><a class="docs-heading-anchor" href="#VarNames">VarNames</a><a id="VarNames-1"></a><a class="docs-heading-anchor-permalink" href="#VarNames" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.VarName" href="#AbstractPPL.VarName"><code>AbstractPPL.VarName</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">VarName{sym}(optic=identity)</code></pre><p>A variable identifier for a symbol <code>sym</code> and optic <code>optic</code>.</p><p>The Julia variable in the model corresponding to <code>sym</code> can refer to a single value or to a hierarchical array structure of univariate, multivariate or matrix variables. The field <code>lens</code> stores the indices requires to access the random variable from the Julia variable indicated by <code>sym</code> as a tuple of tuples. Each element of the tuple thereby contains the indices of one optic operation.</p><p><code>VarName</code>s can be manually constructed using the <code>VarName{sym}(optic)</code> constructor, or from an optic expression through the <a href="#AbstractPPL.@varname"><code>@varname</code></a> convenience macro.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; vn = VarName{:x}(Accessors.IndexLens((Colon(), 1)) ⨟ Accessors.IndexLens((2, )))
+x[:, 1][2]
+
+julia&gt; getoptic(vn)
+(@o _[Colon(), 1][2])
+
+julia&gt; @varname x[:, 1][1+1]
+x[:, 1][2]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/varname.jl#L7-L33">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.getsym" href="#AbstractPPL.getsym"><code>AbstractPPL.getsym</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">getsym(vn::VarName)</code></pre><p>Return the symbol of the Julia variable used to generate <code>vn</code>.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; getsym(@varname(x[1][2:3]))
+:x
+
+julia&gt; getsym(@varname(y))
+:y</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/varname.jl#L120-L134">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.getoptic" href="#AbstractPPL.getoptic"><code>AbstractPPL.getoptic</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">getoptic(vn::VarName)</code></pre><p>Return the optic of the Julia variable used to generate <code>vn</code>.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; getoptic(@varname(x[1][2:3]))
+(@o _[1][2:3])
+
+julia&gt; getoptic(@varname(y))
+identity (generic function with 1 method)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/varname.jl#L137-L151">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.inspace" href="#AbstractPPL.inspace"><code>AbstractPPL.inspace</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">inspace(vn::Union{VarName, Symbol}, space::Tuple)</code></pre><p>Check whether <code>vn</code>&#39;s variable symbol is in <code>space</code>.  The empty tuple counts as the &quot;universal space&quot; containing all variables. Subsumption (see <a href="#AbstractPPL.subsumes"><code>subsumes</code></a>) is respected.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; inspace(@varname(x[1][2:3]), ())
+true
+
+julia&gt; inspace(@varname(x[1][2:3]), (:x,))
+true
+
+julia&gt; inspace(@varname(x[1][2:3]), (@varname(x),))
+true
+
+julia&gt; inspace(@varname(x[1][2:3]), (@varname(x[1:10]), :y))
+true
+
+julia&gt; inspace(@varname(x[1][2:3]), (@varname(x[:][2:4]), :y))
+true
+
+julia&gt; inspace(@varname(x[1][2:3]), (@varname(x[1:10]),))
+true</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/subsumes.jl#L1-L28">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.subsumes" href="#AbstractPPL.subsumes"><code>AbstractPPL.subsumes</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">subsumes(u::VarName, v::VarName)</code></pre><p>Check whether the variable name <code>v</code> describes a sub-range of the variable <code>u</code>.  Supported indexing:</p><ul><li>Scalar:</li></ul><p>```jldoctest   julia&gt; subsumes(@varname(x), @varname(x[1, 2]))   true</p><p>julia&gt; subsumes(@varname(x[1, 2]), @varname(x[1, 2][3]))   true   ```</p><ul><li>Array of scalar: basically everything that fulfills <code>issubset</code>.</li></ul><p>```jldoctest   julia&gt; subsumes(@varname(x[[1, 2], 3]), @varname(x[1, 3]))   true</p><p>julia&gt; subsumes(@varname(x[1:3]), @varname(x[2][1]))   true   ```</p><ul><li>Slices:</li></ul><p><code>jldoctest   julia&gt; subsumes(@varname(x[2, :]), @varname(x[2, 10][1]))   true</code></p><p>Currently <em>not</em> supported are: </p><ul><li>Boolean indexing, literal <code>CartesianIndex</code> (these could be added, though)</li><li>Linear indexing of multidimensional arrays: <code>x[4]</code> does not subsume <code>x[2, 2]</code> for a matrix <code>x</code></li><li>Trailing ones: <code>x[2, 1]</code> does not subsume <code>x[2]</code> for a vector <code>x</code></li></ul></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/subsumes.jl#L37-L75">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.subsumedby" href="#AbstractPPL.subsumedby"><code>AbstractPPL.subsumedby</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">subsumedby(t, u)</code></pre><p>True if <code>t</code> is subsumed by <code>u</code>, i.e., if <code>subsumes(u, t)</code> is true.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/subsumes.jl#L121-L125">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.vsym" href="#AbstractPPL.vsym"><code>AbstractPPL.vsym</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">vsym(expr)</code></pre><p>Return name part of the <a href="#AbstractPPL.@varname"><code>@varname</code></a>-compatible expression <code>expr</code> as a symbol for input of the <a href="#AbstractPPL.VarName"><code>VarName</code></a> constructor.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/varname.jl#L535-L540">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.@varname" href="#AbstractPPL.@varname"><code>AbstractPPL.@varname</code></a> — <span class="docstring-category">Macro</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">@varname(expr, concretize=false)</code></pre><p>A macro that returns an instance of <a href="#AbstractPPL.VarName"><code>VarName</code></a> given a symbol or indexing expression <code>expr</code>.</p><p>If <code>concretize</code> is <code>true</code>, the resulting expression will be wrapped in a <code>concretize()</code> call.</p><p>Note that expressions involving dynamic indexing, i.e. <code>begin</code> and/or <code>end</code>, will always need to be concretized as <code>VarName</code> only supports non-dynamic indexing as determined by <code>is_static_optic</code>. See examples below.</p><p><strong>Examples</strong></p><p><strong>Dynamic indexing</strong></p><pre><code class="language-julia-repl hljs">julia&gt; x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
+
+julia&gt; @varname(x.a[1:end, end][:], true)
+x.a[1:3, 2][:]
+
+julia&gt; @varname(x.a[end], false)  # disable concretization
+ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
+[...]
+
+julia&gt; @varname(x.a[end])  # concretization occurs by default if deemed necessary
+x.a[6]
+
+julia&gt; # Note that &quot;dynamic&quot; here refers to usage of `begin` and/or `end`,
+       # _not_ &quot;information only available at runtime&quot;, i.e. the following works.
+       [@varname(x.a[i]) for i = 1:length(x.a)][end]
+x.a[6]
+
+julia&gt; # Potentially surprising behaviour, but this is equivalent to what Base does:
+       @varname(x[2:2:5]), 2:2:5
+(x[2:2:4], 2:2:4)</code></pre><p><strong>General indexing</strong></p><p>Under the hood <code>optic</code>s are used for the indexing:</p><pre><code class="language-julia-repl hljs">julia&gt; getoptic(@varname(x))
+identity (generic function with 1 method)
+
+julia&gt; getoptic(@varname(x[1]))
+(@o _[1])
+
+julia&gt; getoptic(@varname(x[:, 1]))
+(@o _[Colon(), 1])
+
+julia&gt; getoptic(@varname(x[:, 1][2]))
+(@o _[Colon(), 1][2])
+
+julia&gt; getoptic(@varname(x[1,2][1+5][45][3]))
+(@o _[1, 2][6][45][3])</code></pre><p>This also means that we support property access:</p><pre><code class="language-julia-repl hljs">julia&gt; getoptic(@varname(x.a))
+(@o _.a)
+
+julia&gt; getoptic(@varname(x.a[1]))
+(@o _.a[1])
+
+julia&gt; x = (a = [(b = rand(2), )], ); getoptic(@varname(x.a[1].b[end], true))
+(@o _.a[1].b[2])</code></pre><p>Interpolation can be used for variable names, or array name, but not the lhs of a <code>.</code> expression. Variables within indices are always evaluated in the calling scope.</p><pre><code class="language-julia-repl hljs">julia&gt; name, i = :a, 10;
+
+julia&gt; @varname(x.$name[i, i+1])
+x.a[10, 11]
+
+julia&gt; @varname($name)
+a
+
+julia&gt; @varname($name[1])
+a[1]
+
+julia&gt; @varname($name.x[1])
+a.x[1]
+
+julia&gt; @varname(b.$name.x[1])
+b.a.x[1]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/varname.jl#L321-L413">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.@vsym" href="#AbstractPPL.@vsym"><code>AbstractPPL.@vsym</code></a> — <span class="docstring-category">Macro</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">@vsym(expr)</code></pre><p>A macro that returns the variable symbol given the input variable expression <code>expr</code>. For example, <code>@vsym x[1]</code> returns <code>:x</code>.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; @vsym x
+:x
+
+julia&gt; @vsym x[1,1][2,3]
+:x
+
+julia&gt; @vsym x[end]
+:x</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/varname.jl#L512-L530">source</a></section></article><h2 id="VarName-prefixing-and-unprefixing"><a class="docs-heading-anchor" href="#VarName-prefixing-and-unprefixing">VarName prefixing and unprefixing</a><a id="VarName-prefixing-and-unprefixing-1"></a><a class="docs-heading-anchor-permalink" href="#VarName-prefixing-and-unprefixing" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.prefix" href="#AbstractPPL.prefix"><code>AbstractPPL.prefix</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">prefix(vn::VarName, prefix::VarName)</code></pre><p>Add a prefix to a VarName.</p><pre><code class="language-julia-repl hljs">julia&gt; AbstractPPL.prefix(@varname(x), @varname(y))
+y.x
+
+julia&gt; AbstractPPL.prefix(@varname(x.a), @varname(y))
+y.x.a
+
+julia&gt; AbstractPPL.prefix(@varname(x.a), @varname(y[1]))
+y[1].x.a</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/prefix.jl#L95-L110">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.unprefix" href="#AbstractPPL.unprefix"><code>AbstractPPL.unprefix</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">unprefix(vn::VarName, prefix::VarName)</code></pre><p>Remove a prefix from a VarName.</p><pre><code class="language-julia-repl hljs">julia&gt; AbstractPPL.unprefix(@varname(y.x), @varname(y))
+x
+
+julia&gt; AbstractPPL.unprefix(@varname(y.x.a), @varname(y))
+x.a
+
+julia&gt; AbstractPPL.unprefix(@varname(y[1].x), @varname(y[1]))
+x
+
+julia&gt; AbstractPPL.unprefix(@varname(y), @varname(n))
+ERROR: ArgumentError: could not remove prefix n from VarName y
+[...]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/prefix.jl#L63-L82">source</a></section></article><h2 id="Extracting-values-corresponding-to-a-VarName"><a class="docs-heading-anchor" href="#Extracting-values-corresponding-to-a-VarName">Extracting values corresponding to a VarName</a><a id="Extracting-values-corresponding-to-a-VarName-1"></a><a class="docs-heading-anchor-permalink" href="#Extracting-values-corresponding-to-a-VarName" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.hasvalue" href="#AbstractPPL.hasvalue"><code>AbstractPPL.hasvalue</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">hasvalue(
+    vals::Union{AbstractDict,NamedTuple},
+    vn::VarName,
+    dist::Distribution;
+    error_on_incomplete::Bool=false
+)</code></pre><p>Check if <code>vals</code> contains values for <code>vn</code> that is compatible with the distribution <code>dist</code>.</p><p>This is a more general version of <code>hasvalue(vals, vn)</code>, in that even if <code>vn</code> itself is not inside <code>vals</code>, it further checks if <code>vals</code> contains sub-values of <code>vn</code> that can be used to reconstruct <code>vn</code> given <code>dist</code>.</p><p>The <code>error_on_incomplete</code> flag can be used to detect cases where <em>some</em> of the values needed for <code>vn</code> are present, but others are not. This may help to detect invalid cases where the user has provided e.g. data of the wrong shape.</p><p>Note that this check is only possible if a Dict is passed, because the key type of a NamedTuple (i.e., Symbol) is not rich enough to carry indexing information. If this method is called with a NamedTuple, it will just defer to <code>hasvalue(vals, vn)</code>.</p><p>For example:</p><pre><code class="language-julia-repl hljs">julia&gt; d = Dict(@varname(x[1]) =&gt; 1.0, @varname(x[2]) =&gt; 2.0);
+
+julia&gt; hasvalue(d, @varname(x), MvNormal(zeros(2), I))
+true
+
+julia&gt; hasvalue(d, @varname(x), MvNormal(zeros(3), I))
+false
+
+julia&gt; hasvalue(d, @varname(x), MvNormal(zeros(3), I); error_on_incomplete=true)
+ERROR: only partial values for `x` found in the dictionary provided
+[...]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/ext/AbstractPPLDistributionsExt.jl#L130-L170">source</a></section><section><div><pre><code class="language-julia hljs">hasvalue(vals::NamedTuple, vn::VarName)
+hasvalue(vals::AbstractDict{&lt;:VarName}, vn::VarName)</code></pre><p>Determine whether <code>vals</code> contains a value for a given <code>vn</code>.</p><p><strong>Examples</strong></p><p>With <code>x</code> as a <code>NamedTuple</code>:</p><pre><code class="language-julia-repl hljs">julia&gt; hasvalue((x = 1.0, ), @varname(x))
+true
+
+julia&gt; hasvalue((x = 1.0, ), @varname(x[1]))
+false
+
+julia&gt; hasvalue((x = [1.0],), @varname(x))
+true
+
+julia&gt; hasvalue((x = [1.0],), @varname(x[1]))
+true
+
+julia&gt; hasvalue((x = [1.0],), @varname(x[2]))
+false</code></pre><p>With <code>x</code> as a <code>AbstractDict</code>:</p><pre><code class="language-julia-repl hljs">julia&gt; hasvalue(Dict(@varname(x) =&gt; 1.0, ), @varname(x))
+true
+
+julia&gt; hasvalue(Dict(@varname(x) =&gt; 1.0, ), @varname(x[1]))
+false
+
+julia&gt; hasvalue(Dict(@varname(x) =&gt; [1.0]), @varname(x))
+true
+
+julia&gt; hasvalue(Dict(@varname(x) =&gt; [1.0]), @varname(x[1]))
+true
+
+julia&gt; hasvalue(Dict(@varname(x) =&gt; [1.0]), @varname(x[2]))
+false</code></pre><p>In the <code>AbstractDict</code> case we can also have keys such as <code>v[1]</code>:</p><pre><code class="language-julia-repl hljs">julia&gt; vals = Dict(@varname(x[1]) =&gt; [1.0,]);
+
+julia&gt; hasvalue(vals, @varname(x[1])) # same as `haskey`
+true
+
+julia&gt; hasvalue(vals, @varname(x[1][1])) # different from `haskey`
+true
+
+julia&gt; hasvalue(vals, @varname(x[1][2]))
+false
+
+julia&gt; hasvalue(vals, @varname(x[2][1]))
+false</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/hasvalue.jl#L175-L237">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.getvalue" href="#AbstractPPL.getvalue"><code>AbstractPPL.getvalue</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">getvalue(
+    vals::Union{AbstractDict,NamedTuple},
+    vn::VarName,
+    dist::Distribution
+)</code></pre><p>Retrieve the value of <code>vn</code> from <code>vals</code>, using the distribution <code>dist</code> to reconstruct the value if necessary.</p><p>This is a more general version of <code>getvalue(vals, vn)</code>, in that even if <code>vn</code> itself is not inside <code>vals</code>, it can still reconstruct the value of <code>vn</code> from sub-values of <code>vn</code> that are present in <code>vals</code>.</p><p>Note that this reconstruction is only possible if a Dict is passed, because the key type of a NamedTuple (i.e., Symbol) is not rich enough to carry indexing information. If this method is called with a NamedTuple, it will just defer to <code>getvalue(vals, vn)</code>.</p><p>For example:</p><pre><code class="language-julia-repl hljs">julia&gt; d = Dict(@varname(x[1]) =&gt; 1.0, @varname(x[2]) =&gt; 2.0);
+
+julia&gt; getvalue(d, @varname(x), MvNormal(zeros(2), I))
+2-element Vector{Float64}:
+ 1.0
+ 2.0
+
+julia&gt; # Use `hasvalue` to check for this case before calling `getvalue`.
+       getvalue(d, @varname(x), MvNormal(zeros(3), I))
+ERROR: `x` was not found in the dictionary provided
+[...]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/ext/AbstractPPLDistributionsExt.jl#L235-L269">source</a></section><section><div><pre><code class="language-julia hljs">getvalue(vals::NamedTuple, vn::VarName)
+getvalue(vals::AbstractDict{&lt;:VarName}, vn::VarName)</code></pre><p>Return the value(s) in <code>vals</code> represented by <code>vn</code>.</p><p><strong>Examples</strong></p><p>For <code>NamedTuple</code>:</p><pre><code class="language-julia-repl hljs">julia&gt; vals = (x = [1.0],);
+
+julia&gt; getvalue(vals, @varname(x)) # same as `getindex`
+1-element Vector{Float64}:
+ 1.0
+
+julia&gt; getvalue(vals, @varname(x[1])) # different from `getindex`
+1.0
+
+julia&gt; getvalue(vals, @varname(x[2]))
+ERROR: x[2] was not found in the NamedTuple provided
+[...]</code></pre><p>For <code>AbstractDict</code>:</p><pre><code class="language-julia-repl hljs">julia&gt; vals = Dict(@varname(x) =&gt; [1.0]);
+
+julia&gt; getvalue(vals, @varname(x)) # same as `getindex`
+1-element Vector{Float64}:
+ 1.0
+
+julia&gt; getvalue(vals, @varname(x[1])) # different from `getindex`
+1.0
+
+julia&gt; getvalue(vals, @varname(x[2]))
+ERROR: x[2] was not found in the dictionary provided
+[...]</code></pre><p>In the <code>AbstractDict</code> case we can also have keys such as <code>v[1]</code>:</p><pre><code class="language-julia-repl hljs">julia&gt; vals = Dict(@varname(x[1]) =&gt; [1.0,]);
+
+julia&gt; getvalue(vals, @varname(x[1])) # same as `getindex`
+1-element Vector{Float64}:
+ 1.0
+
+julia&gt; getvalue(vals, @varname(x[1][1])) # different from `getindex`
+1.0
+
+julia&gt; getvalue(vals, @varname(x[1][2]))
+ERROR: x[1][2] was not found in the dictionary provided
+[...]
+
+julia&gt; getvalue(vals, @varname(x[2][1]))
+ERROR: x[2][1] was not found in the dictionary provided
+[...]
+
+julia&gt; getvalue(vals, @varname(x))
+ERROR: x was not found in the dictionary provided
+[...]</code></pre><p>Dictionaries can present ambiguous cases where the same variable is specified twice at different levels. In such a situation, <code>getvalue</code> attempts to find an exact match, and if that fails it returns the value with the most specific key.</p><div class="admonition is-info" id="Note-5be487322c4a9ae0"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-5be487322c4a9ae0" title="Permalink"></a></header><div class="admonition-body"><p>It is the user&#39;s responsibility to avoid such cases by ensuring that the dictionary passed in does not contain the same value specified multiple times.</p></div></div><pre><code class="language-julia-repl hljs">julia&gt; vals = Dict(@varname(x) =&gt; [[1.0]], @varname(x[1]) =&gt; [2.0]);
+
+julia&gt; # Here, the `x[1]` key is not used because `x` is an exact match.
+       getvalue(vals, @varname(x))
+1-element Vector{Vector{Float64}}:
+ [1.0]
+
+julia&gt; # Likewise, the `x` key is not used because `x[1]` is an exact match.
+       getvalue(vals, @varname(x[1]))
+1-element Vector{Float64}:
+ 2.0
+
+julia&gt; # No exact match, so the most specific key, i.e. `x[1]`, is used.
+       getvalue(vals, @varname(x[1][1]))
+2.0</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/hasvalue.jl#L39-L132">source</a></section></article><h2 id="Splitting-VarNames-up-into-components"><a class="docs-heading-anchor" href="#Splitting-VarNames-up-into-components">Splitting VarNames up into components</a><a id="Splitting-VarNames-up-into-components-1"></a><a class="docs-heading-anchor-permalink" href="#Splitting-VarNames-up-into-components" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.varname_leaves" href="#AbstractPPL.varname_leaves"><code>AbstractPPL.varname_leaves</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">varname_leaves(vn::VarName, val)</code></pre><p>Return an iterator over all varnames that are represented by <code>vn</code> on <code>val</code>.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; using AbstractPPL: varname_leaves
+
+julia&gt; foreach(println, varname_leaves(@varname(x), rand(2)))
+x[1]
+x[2]
+
+julia&gt; foreach(println, varname_leaves(@varname(x[1:2]), rand(2)))
+x[1:2][1]
+x[1:2][2]
+
+julia&gt; x = (y = 1, z = [[2.0], [3.0]]);
+
+julia&gt; foreach(println, varname_leaves(@varname(x), x))
+x.y
+x.z[1][1]
+x.z[2][1]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/leaves.jl#L3-L27">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.varname_and_value_leaves" href="#AbstractPPL.varname_and_value_leaves"><code>AbstractPPL.varname_and_value_leaves</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">varname_and_value_leaves(vn::VarName, val)</code></pre><p>Return an iterator over all varname-value pairs that are represented by <code>vn</code> on <code>val</code>.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; using AbstractPPL: varname_and_value_leaves
+
+julia&gt; foreach(println, varname_and_value_leaves(@varname(x), 1:2))
+(x[1], 1)
+(x[2], 2)
+
+julia&gt; foreach(println, varname_and_value_leaves(@varname(x[1:2]), 1:2))
+(x[1:2][1], 1)
+(x[1:2][2], 2)
+
+julia&gt; x = (y = 1, z = [[2.0], [3.0]]);
+
+julia&gt; foreach(println, varname_and_value_leaves(@varname(x), x))
+(x.y, 1)
+(x.z[1][1], 2.0)
+(x.z[2][1], 3.0)</code></pre><p>There is also some special handling for certain types:</p><pre><code class="language-julia-repl hljs">julia&gt; using LinearAlgebra
+
+julia&gt; x = reshape(1:4, 2, 2);
+
+julia&gt; # `LowerTriangular`
+       foreach(println, varname_and_value_leaves(@varname(x), LowerTriangular(x)))
+(x[1, 1], 1)
+(x[2, 1], 2)
+(x[2, 2], 4)
+
+julia&gt; # `UpperTriangular`
+       foreach(println, varname_and_value_leaves(@varname(x), UpperTriangular(x)))
+(x[1, 1], 1)
+(x[1, 2], 3)
+(x[2, 2], 4)
+
+julia&gt; # `Cholesky` with lower-triangular
+       foreach(println, varname_and_value_leaves(@varname(x), Cholesky([1.0 0.0; 0.0 1.0], &#39;L&#39;, 0)))
+(x.L[1, 1], 1.0)
+(x.L[2, 1], 0.0)
+(x.L[2, 2], 1.0)
+
+julia&gt; # `Cholesky` with upper-triangular
+       foreach(println, varname_and_value_leaves(@varname(x), Cholesky([1.0 0.0; 0.0 1.0], &#39;U&#39;, 0)))
+(x.U[1, 1], 1.0)
+(x.U[1, 2], 0.0)
+(x.U[2, 2], 1.0)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/leaves.jl#L69-L125">source</a></section><section><div><pre><code class="language-julia hljs">varname_and_value_leaves(container)</code></pre><p>Return an iterator over all varname-value pairs that are represented by <code>container</code>.</p><p>This is the same as <a href="#AbstractPPL.varname_and_value_leaves"><code>varname_and_value_leaves(vn::VarName, x)</code></a> but over a container containing multiple varnames.</p><p>See also: <a href="#AbstractPPL.varname_and_value_leaves"><code>varname_and_value_leaves(vn::VarName, x)</code></a>.</p><p><strong>Examples</strong></p><pre><code class="language-julia-repl hljs">julia&gt; using AbstractPPL: varname_and_value_leaves
+
+julia&gt; using OrderedCollections: OrderedDict
+
+julia&gt; # With an `AbstractDict` (we use `OrderedDict` here
+       # to ensure consistent ordering in doctests)
+       dict = OrderedDict(@varname(y) =&gt; 1, @varname(z) =&gt; [[2.0], [3.0]]);
+
+julia&gt; foreach(println, varname_and_value_leaves(dict))
+(y, 1)
+(z[1][1], 2.0)
+(z[2][1], 3.0)
+
+julia&gt; # With a `NamedTuple`
+       nt = (y = 1, z = [[2.0], [3.0]]);
+
+julia&gt; foreach(println, varname_and_value_leaves(nt))
+(y, 1)
+(z[1][1], 2.0)
+(z[2][1], 3.0)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/leaves.jl#L130-L163">source</a></section></article><h2 id="VarName-serialisation"><a class="docs-heading-anchor" href="#VarName-serialisation">VarName serialisation</a><a id="VarName-serialisation-1"></a><a class="docs-heading-anchor-permalink" href="#VarName-serialisation" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.index_to_dict" href="#AbstractPPL.index_to_dict"><code>AbstractPPL.index_to_dict</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">index_to_dict(::Integer)
+index_to_dict(::AbstractVector{Int})
+index_to_dict(::UnitRange)
+index_to_dict(::StepRange)
+index_to_dict(::Colon)
+index_to_dict(::ConcretizedSlice{T, Base.OneTo{I}}) where {T, I}
+index_to_dict(::Tuple)</code></pre><p>Convert an index <code>i</code> to a dictionary representation.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/serialize.jl#L16-L26">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.dict_to_index" href="#AbstractPPL.dict_to_index"><code>AbstractPPL.dict_to_index</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">dict_to_index(dict)
+dict_to_index(symbol_val, dict)</code></pre><p>Convert a dictionary representation of an index <code>dict</code> to an index.</p><p>Users can extend the functionality of <code>dict_to_index</code> (and hence <code>VarName</code> de/serialisation) by extending this method along with <a href="#AbstractPPL.index_to_dict"><code>index_to_dict</code></a>. Specifically, suppose you have a custom index type <code>MyIndexType</code> and you want to be able to de/serialise a <code>VarName</code> containing this index type. You should then implement the following two methods:</p><ol><li><p><code>AbstractPPL.index_to_dict(i::MyModule.MyIndexType)</code> should return a dictionary representation of the index <code>i</code>. This dictionary must contain the key <code>&quot;type&quot;</code>, and the corresponding value must be a string that uniquely identifies the index type. Generally, it makes sense to use the name of the type (perhaps prefixed with module qualifiers) as this value to avoid clashes. The remainder of the dictionary can have any structure you like.</p></li><li><p>Suppose the value of <code>index_to_dict(i)[&quot;type&quot;]</code> is <code>&quot;MyModule.MyIndexType&quot;</code>. You should then implement the corresponding method <code>AbstractPPL.dict_to_index(::Val{Symbol(&quot;MyModule.MyIndexType&quot;)}, dict)</code>, which should take the dictionary representation as the second argument and return the original <code>MyIndexType</code> object.</p></li></ol><p>To see an example of this in action, you can look in the the AbstractPPL test suite, which contains a test for serialising OffsetArrays.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/serialize.jl#L51-L78">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.varname_to_string" href="#AbstractPPL.varname_to_string"><code>AbstractPPL.varname_to_string</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">varname_to_string(vn::VarName)</code></pre><p>Convert a <code>VarName</code> as a string, via an intermediate dictionary. This differs from <code>string(vn)</code> in that concretised slices are faithfully represented (rather than being pretty-printed as colons).</p><p>For <code>VarName</code>s which index into an array, this function will only work if the indices can be serialised. This is true for all standard Julia index types, but if you are using custom index types, you will need to implement the <code>index_to_dict</code> and <code>dict_to_index</code> methods for those types. See the documentation of <a href="#AbstractPPL.dict_to_index"><code>dict_to_index</code></a> for instructions on how to do this.</p><pre><code class="language-julia-repl hljs">julia&gt; varname_to_string(@varname(x))
+&quot;{\&quot;optic\&quot;:{\&quot;type\&quot;:\&quot;identity\&quot;},\&quot;sym\&quot;:\&quot;x\&quot;}&quot;
+
+julia&gt; varname_to_string(@varname(x.a))
+&quot;{\&quot;optic\&quot;:{\&quot;field\&quot;:\&quot;a\&quot;,\&quot;type\&quot;:\&quot;property\&quot;},\&quot;sym\&quot;:\&quot;x\&quot;}&quot;
+
+julia&gt; y = ones(2); varname_to_string(@varname(y[:]))
+&quot;{\&quot;optic\&quot;:{\&quot;indices\&quot;:{\&quot;values\&quot;:[{\&quot;type\&quot;:\&quot;Base.Colon\&quot;}],\&quot;type\&quot;:\&quot;Base.Tuple\&quot;},\&quot;type\&quot;:\&quot;index\&quot;},\&quot;sym\&quot;:\&quot;y\&quot;}&quot;
+
+julia&gt; y = ones(2); varname_to_string(@varname(y[:], true))
+&quot;{\&quot;optic\&quot;:{\&quot;indices\&quot;:{\&quot;values\&quot;:[{\&quot;range\&quot;:{\&quot;stop\&quot;:2,\&quot;type\&quot;:\&quot;Base.OneTo\&quot;},\&quot;type\&quot;:\&quot;AbstractPPL.ConcretizedSlice\&quot;}],\&quot;type\&quot;:\&quot;Base.Tuple\&quot;},\&quot;type\&quot;:\&quot;index\&quot;},\&quot;sym\&quot;:\&quot;y\&quot;}&quot;</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/serialize.jl#L139-L165">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.string_to_varname" href="#AbstractPPL.string_to_varname"><code>AbstractPPL.string_to_varname</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">string_to_varname(str::AbstractString)</code></pre><p>Convert a string representation of a <code>VarName</code> back to a <code>VarName</code>. The string should have been generated by <code>varname_to_string</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/varname/serialize.jl#L168-L173">source</a></section></article><h2 id="Abstract-model-functions"><a class="docs-heading-anchor" href="#Abstract-model-functions">Abstract model functions</a><a id="Abstract-model-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Abstract-model-functions" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.AbstractProbabilisticProgram" href="#AbstractPPL.AbstractProbabilisticProgram"><code>AbstractPPL.AbstractProbabilisticProgram</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">AbstractProbabilisticProgram</code></pre><p>Common base type for models expressed as probabilistic programs.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/abstractprobprog.jl#L6-L10">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.condition" href="#AbstractPPL.condition"><code>AbstractPPL.condition</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">condition(model, observations)</code></pre><p>Condition the generative model <code>model</code> on some observed data, creating a new model of the (possibly unnormalized) posterior distribution over them.</p><p><code>observations</code> can be of any supported internal trace type, or a fixed probability expression.</p><p>The invariant </p><pre><code class="language-julia hljs">m = decondition(condition(m, obs))</code></pre><p>should hold for generative models <code>m</code> and arbitrary <code>obs</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/abstractprobprog.jl#L44-L59">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.decondition" href="#AbstractPPL.decondition"><code>AbstractPPL.decondition</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">decondition(conditioned_model)</code></pre><p>Remove the conditioning (i.e., observation data) from <code>conditioned_model</code>, turning it into a generative model over prior and observed variables.</p><p>The invariant </p><pre><code class="language-julia hljs">m == condition(decondition(m), obs)</code></pre><p>should hold for models <code>m</code> with conditioned variables <code>obs</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/abstractprobprog.jl#L28-L41">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.fix" href="#AbstractPPL.fix"><code>AbstractPPL.fix</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">fix(model, params)</code></pre><p>Fix the values of parameters specified in <code>params</code> within the probabilistic model <code>model</code>.  This operation is equivalent to treating the fixed parameters as being drawn from a point mass  distribution centered at the values specified in <code>params</code>. Thus these parameters no longer contribute to the accumulated log density. </p><p>Conceptually, this is similar to Pearl&#39;s do-operator in causal inference, where we intervene  on variables by setting them to specific values, effectively cutting off their dependencies  on their usual causes in the model.</p><p>The invariant</p><pre><code class="language-julia hljs">m == unfix(fix(m, params))</code></pre><p>should hold for any model <code>m</code> and parameters <code>params</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/abstractprobprog.jl#L62-L81">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.unfix" href="#AbstractPPL.unfix"><code>AbstractPPL.unfix</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">unfix(model)</code></pre><p>Remove any fixed parameters from the model <code>model</code>, returning a new model without the fixed parameters.</p><p>This function reverses the effect of <code>fix</code> by removing parameter constraints that were previously set. It returns a new model where all previously fixed parameters are allowed to vary according to their  original distributions in the model.</p><p>The invariant</p><pre><code class="language-julia hljs">m == unfix(fix(m, params))</code></pre><p>should hold for any model <code>m</code> and parameters <code>params</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/abstractprobprog.jl#L84-L100">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="DensityInterface.logdensityof" href="#DensityInterface.logdensityof"><code>DensityInterface.logdensityof</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">logdensityof(model, trace)</code></pre><p>Evaluate the (possibly unnormalized) density of the model specified by the probabilistic program in <code>model</code>, at specific values for the random variables given through <code>trace</code>.</p><p><code>trace</code> can be of any supported internal trace type, or a fixed probability expression.</p><p><code>logdensityof</code> should interact with conditioning and deconditioning in the way required by probability theory.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/abstractprobprog.jl#L15-L25">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.AbstractContext" href="#AbstractPPL.AbstractContext"><code>AbstractPPL.AbstractContext</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">AbstractContext</code></pre><p>Common base type for evaluation contexts.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/evaluate.jl#L1-L6">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.evaluate!!" href="#AbstractPPL.evaluate!!"><code>AbstractPPL.evaluate!!</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>evaluate!!</p><p>General API for model operations, e.g. prior evaluation, log density, log joint etc.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/evaluate.jl#L8-L13">source</a></section></article><h2 id="Abstract-traces"><a class="docs-heading-anchor" href="#Abstract-traces">Abstract traces</a><a id="Abstract-traces-1"></a><a class="docs-heading-anchor-permalink" href="#Abstract-traces" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="AbstractPPL.AbstractModelTrace" href="#AbstractPPL.AbstractModelTrace"><code>AbstractPPL.AbstractModelTrace</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">AbstractModelTrace</code></pre><p>Common base class for various trace or &quot;variable info&quot; types.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/TuringLang/AbstractPPL.jl/blob/5d2819f2c9815af0b12958edf655d1278be50080/src/abstractmodeltrace.jl#L1-L5">source</a></section></article></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Friday 17 October 2025 11:19">Friday 17 October 2025</span>. Using Julia version 1.12.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
