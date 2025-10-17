@@ -1,3 +1,7 @@
+## 0.13.3
+
+Bumped compatibility for JSON.jl to include v1.
+
 ## 0.13.2
 
 Implemented `varname_leaves` for `LinearAlgebra.Cholesky`.
