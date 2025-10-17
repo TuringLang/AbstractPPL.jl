@@ -248,8 +248,9 @@ end
             "parent" => AbstractPPL.index_to_dict(o.parent),
             "offset" => o.offset,
         )
-        AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) =
-            OffsetArrays.IdOffsetRange(AbstractPPL.dict_to_index(d["parent"]), d["offset"])
+        AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) = OffsetArrays.IdOffsetRange(
+            AbstractPPL.dict_to_index(d["parent"]), d["offset"]
+        )
 
         # Serialisation should now work
         @test string_to_varname(varname_to_string(vn)) == vn
