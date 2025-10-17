@@ -1,10 +1,13 @@
 name: JuliaPre
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  workflow_dispatch:
+  # JuliaPre is currently disabled because 'pre' resolves to 1.12. Re-enable
+  # when 1.13 prerelease is available.
+  # push:
+  #   branches:
+  #     - main
+  # pull_request:
 
 # needed to allow julia-actions/cache to delete old caches that it has created
 permissions:
