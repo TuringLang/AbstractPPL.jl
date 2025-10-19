@@ -65,6 +65,8 @@ function varname_leaves(vn::VarName, x::LinearAlgebra.UpperTriangular)
         VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn))
     end
 end
+# This is a default fallback for types that we don't know how to handle.
+varname_leaves(vn::VarName, @nospecialize(::Any)) = [vn]
 
 """
     varname_and_value_leaves(vn::VarName, val)
@@ -259,3 +261,5 @@ function varname_and_value_leaves_inner(vn::VarName, x::LinearAlgebra.UpperTrian
         for I in CartesianIndices(x) if I[1] <= I[2]
     )
 end
+# This is a default fallback for types that we don't know how to handle.
+varname_and_value_leaves_inner(vn::VarName, @nospecialize(x::Any)) = [Leaf(vn, x)]

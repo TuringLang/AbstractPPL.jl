@@ -423,5 +423,16 @@ end
                 (@varname(x.U[2, 2]), x.U[2, 2]),
             ])
         end
+
+        @testset "fallback on other types, e.g. string" begin
+            x = "a string"
+            @test Set(varname_leaves(@varname(x), x)) == Set([@varname(x)])
+            @test Set(collect(varname_and_value_leaves(@varname(x), x))) ==
+                Set([(@varname(x), x)])
+            x = 2
+            @test Set(varname_leaves(@varname(x), x)) == Set([@varname(x)])
+            @test Set(collect(varname_and_value_leaves(@varname(x), x))) ==
+                Set([(@varname(x), x)])
+        end
     end
 end

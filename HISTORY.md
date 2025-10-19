@@ -1,3 +1,7 @@
+## 0.13.5
+
+Implemented a generic `varname_leaves` and `varname_and_value_leaves` for other unsupported types.
+
 ## 0.13.4
 
 Added missing methods for `subsumes(::IndexLens, ::PropertyLens)` and vice versa.
