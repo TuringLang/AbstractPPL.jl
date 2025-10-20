@@ -15,18 +15,24 @@ jobs:
       matrix:
         package:
           - {user: TuringLang, repo: DynamicPPL.jl}
+
     steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v5
+
+      - uses: julia-actions/setup-julia@v2
         with:
           version: 1
-          arch: x64
-      - uses: julia-actions/julia-buildpkg@latest
+
+      - uses: julia-actions/cache@v2
+
+      - uses: julia-actions/julia-buildpkg@v1
+
       - name: Clone Downstream
-        uses: actions/checkout@v2
+        uses: actions/checkout@v5
         with:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
+
       - name: Load this and run the downstream tests
         shell: julia --color=yes --project=downstream {0}
         run: |

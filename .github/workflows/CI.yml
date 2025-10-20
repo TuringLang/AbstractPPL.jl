@@ -20,6 +20,9 @@ jobs:
           # Minimum supported version
           - version: 'min'
             os: ubuntu-latest
+          # 1.11
+          - version: '1.11'
+            os: ubuntu-latest
           # Windows
           - version: '1'
             os: windows-latest
@@ -28,7 +31,7 @@ jobs:
             os: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: julia-actions/setup-julia@v2
         with:
@@ -49,8 +52,3 @@ jobs:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
-
-      - uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: lcov.info

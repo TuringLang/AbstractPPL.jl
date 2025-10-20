@@ -1,3 +1,24 @@
+## 0.13.5
+
+Implemented a generic `varname_leaves` and `varname_and_value_leaves` for other unsupported types.
+
+## 0.13.4
+
+Added missing methods for `subsumes(::IndexLens, ::PropertyLens)` and vice versa.
+
+## 0.13.3
+
+Bumped compatibility for JSON.jl to include v1.
+
+## 0.13.2
+
+Implemented `varname_leaves` for `LinearAlgebra.Cholesky`.
+
+## 0.13.1
+
+Moved the functions `varname_leaves` and `varname_and_value_leaves` to AbstractPPL.
+They are now part of the public API of AbstractPPL.
+
 ## 0.13.0
 
 Minimum compatibility has been bumped to Julia 1.10.
