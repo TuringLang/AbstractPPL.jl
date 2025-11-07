@@ -176,7 +176,7 @@ function AbstractPPL.hasvalue(
 )
     # NamedTuples can't have such complicated hierarchies, so it's safe to
     # defer to the simpler `hasvalue(vals, vn)`.
-    return hasvalue(vals, vn)
+    return AbstractPPL.hasvalue(vals, vn)
 end
 function AbstractPPL.hasvalue(
     vals::AbstractDict,
@@ -272,7 +272,7 @@ function AbstractPPL.getvalue(
 )
     # NamedTuples can't have such complicated hierarchies, so it's safe to
     # defer to the simpler `getvalue(vals, vn)`.
-    return getvalue(vals, vn)
+    return AbstractPPL.getvalue(vals, vn)
 end
 function AbstractPPL.getvalue(
     vals::AbstractDict, vn::VarName, dist::Distributions.Distribution;
