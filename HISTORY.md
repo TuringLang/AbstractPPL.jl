@@ -26,15 +26,24 @@ However, there are some differences:
   - Previously, AbstractPPL would refuse to allow you to construct unconcretized versions of `begin` and `end`. This is no longer the case; you can now create such VarNames in their unconcretized forms.
     This is useful, for example, when indexing into a chain that contains `x` as a variable-length vector. This change allows you to write `chain[@varname(x[end])]` without having AbstractPPL throw an error.
 
-**Interface**
+**Keyword arguments to `getindex`**
+
+VarNames can now be constructed with keyword arguments in `Index` optics, for example `@varname(x[i=1])`.
+This is specifically implemented to support DimensionalData.jl's DimArrays.
+
+**Other interface functions**
 
 The `vsym` function (and `@vsym`) has been removed; you should use `getsym(vn)` instead.
 
-The `Base.get` and `Base.set!` methods for VarNames have been removed (these were responsible for method ambiguities).
+The `Base.get` and `Accessors.set` methods for VarNames have been removed (these were responsible for method ambiguities).
+Instead of using these methods you can first convert the `VarName` to an optic using `varname_to_optic(vn)`, and then use the getter and setter methods on the optics.
 
-VarNames cannot be composed with optics now (you need to compose the optics yourself).
+VarNames cannot be composed with optics now (compose the optics yourself).
 
-The `inspace` function has been removed (it used to be relevant for Turing's old Gibbs sampler; but now it no longer serves any use).
+The `inspace` function has been removed.
+It used to be relevant for Turing's old Gibbs sampler; but now it no longer serves any use.
+
+`ConcretizedSlice` has been removed (since colons are no longer concretized).
 
 ## 0.13.6
 
