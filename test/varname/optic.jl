@@ -3,7 +3,7 @@ module OpticTests
 using Test
 using AbstractPPL
 
-@testset verbose = true "varname/optic.jl" begin
+@testset "varname/optic.jl" verbose = true begin
     # Note that much of the functionality in optic.jl is tested by varname.jl (for example,
     # pretty-printing VarNames essentially boils down to pretty-printing optics). So, this
     # file focuses on tests that are specific to optics.

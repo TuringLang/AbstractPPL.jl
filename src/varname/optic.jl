@@ -51,18 +51,19 @@ When parsing VarNames, we convert such indices into subtypes of `DynamicIndex`, 
 mark them as requiring concretisation.
 """
 abstract type DynamicIndex end
+abstract type DynamicSingleIndex <: DynamicIndex end
 _is_dynamic_idx(::DynamicIndex) = true
 _is_dynamic_idx(::Any) = false
 # Fallback for all other indices
 concretize(@nospecialize(ix::Any), ::Any, ::Any) = ix
 _pretty_print_index(x::Any) = string(x)
 
-struct DynamicBegin <: DynamicIndex end
+struct DynamicBegin <: DynamicSingleIndex end
 concretize(::DynamicBegin, val, dim::Nothing) = Base.firstindex(val)
 concretize(::DynamicBegin, val, dim) = Base.firstindex(val, dim)
 _pretty_print_index(::DynamicBegin) = "begin"
 
-struct DynamicEnd <: DynamicIndex end
+struct DynamicEnd <: DynamicSingleIndex end
 concretize(::DynamicEnd, val, dim::Nothing) = Base.lastindex(val)
 concretize(::DynamicEnd, val, dim) = Base.lastindex(val, dim)
 _pretty_print_index(::DynamicEnd) = "end"
@@ -72,7 +73,9 @@ concretize(::DynamicColon, val, dim::Nothing) = Base.firstindex(val):Base.lastin
 concretize(::DynamicColon, val, dim) = Base.firstindex(val, dim):Base.lastindex(val, dim)
 _pretty_print_index(::DynamicColon) = ":"
 
-struct DynamicRange{T1,T2} <: DynamicIndex
+struct DynamicRange{
+    T1<:Union{Real,DynamicSingleIndex},T2<:Union{Real,DynamicSingleIndex}
+} <: DynamicIndex
     start::T1
     stop::T2
 end
@@ -95,8 +98,10 @@ property access after this indexing operation.
 struct Index{I<:Tuple,C<:AbstractOptic} <: AbstractOptic
     ix::I
     child::C
+    function Index(ix::Tuple, child::C=Iden()) where {C<:AbstractOptic}
+        return new{typeof(ix),C}(ix, child)
+    end
 end
-Index(ix::Tuple, child::C=Iden()) where {C<:AbstractOptic} = Index{typeof(ix),C}(ix, child)
 
 Base.:(==)(a::Index, b::Index) = a.ix == b.ix && a.child == b.child
 Base.isequal(a::Index, b::Index) = a == b

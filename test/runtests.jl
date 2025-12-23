@@ -9,6 +9,7 @@ const GROUP = get(ENV, "GROUP", "All")
         include("Aqua.jl")
         include("abstractprobprog.jl")
         include("varname/optic.jl")
+        include("varname/varname.jl")
         # include("varname.jl")
         # include("hasvalue.jl")
     end

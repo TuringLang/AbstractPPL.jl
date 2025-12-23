@@ -101,7 +101,7 @@ An exception thrown when a variable name expression cannot be parsed by the
 [`@varname`](@ref) macro.
 """
 struct VarNameParseException <: Exception
-    expr::Expr
+    expr
 end
 function Base.showerror(io::IO, e::VarNameParseException)
     return print(io, "malformed variable name `$(e.expr)`")
@@ -223,6 +223,10 @@ macro varname(expr, concretize::Bool=false)
     else
         unconcretized_vn
     end
+end
+function _varname(@nospecialize(expr::Any), ::Any)
+    # fallback: it's not a variable!
+    throw(VarNameParseException(expr))
 end
 function _varname(sym::Symbol, inner_expr)
     return :($VarName{$(QuoteNode(sym))}($inner_expr)), sym
