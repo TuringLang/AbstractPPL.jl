@@ -101,6 +101,27 @@ optic = @opticof(_.a[1])
 @opticof
 ```
 
+## Getting and setting
+
+Optics are callable structs, and when passed a value will extract the relevant part of that
+value.
+
+```@example vn
+data = (a=[10, 20, 30], b="hello")
+optic = @opticof(_.a[2])
+optic(data)
+```
+
+You can set values using `Accessors.set` (which AbstractPPL re-exports).
+Note, though, that this will not mutate the original value.
+Furthermore, you cannot use the handy macros like `Accessors.@set`, since those will use the
+optics from Accessors.jl.
+
+```@example vn
+new_data = set(data, optic, 99)
+new_data, data
+```
+
 ## Composing and decomposing optics
 
 If you have two optics, you can compose them using the `∘` operator:

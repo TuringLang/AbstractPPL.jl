@@ -1,25 +1,5 @@
 module AbstractPPL
 
-# Optics
-export AbstractOptic,
-    Iden,
-    Index,
-    Property,
-    ohead,
-    otail,
-    olast,
-    oinit,
-    # VarName
-    VarName,
-    getsym,
-    getoptic,
-    concretize,
-    is_dynamic,
-    @varname,
-    @opticof,
-    varname_to_optic,
-    optic_to_varname
-
 # subsumes,
 # subsumedby,
 # index_to_dict,
@@ -50,5 +30,28 @@ include("varname/varname.jl")
 # include("varname/leaves.jl")
 # include("varname/prefix.jl")
 # include("varname/serialize.jl")
+
+# Optics
+export AbstractOptic,
+    Iden,
+    Index,
+    Property,
+    ohead,
+    otail,
+    olast,
+    oinit,
+    # VarName
+    VarName,
+    getsym,
+    getoptic,
+    concretize,
+    is_dynamic,
+    @varname,
+    @opticof,
+    varname_to_optic,
+    optic_to_varname
+
+using Accessors: set
+export set
 
 end # module

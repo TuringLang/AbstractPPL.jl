@@ -7,22 +7,6 @@ using MacroTools: MacroTools
 An abstract type that represents the non-symbol part of a VarName, i.e., the section of the
 variable that is of interest. For example, in `x.a[1][2]`, the `AbstractOptic` represents
 the `.a[1][2]` part.
-
-# Public interface
-
-TODO
-
-- Base.show
-- Base.:(==), Base.isequal
-- Base.:(∘) (composition)
-- ohead, otail, olast, oinit (decomposition)
-
-- to_accessors(optic) -> Accessors.Lens (recovering the old representation)
-- is_dynamic(optic) -> Bool (whether the optic contains any dynamic indices)
-- concretize(optic, val) -> AbstractOptic (resolving any dynamic indices given the value)
-
-We probably want to introduce getters and setters. See e.g.
-https://juliaobjects.github.io/Accessors.jl/stable/examples/custom_macros/
 """
 abstract type AbstractOptic end
 function Base.show(io::IO, optic::AbstractOptic)
@@ -39,9 +23,10 @@ It is also the base case for composing optics.
 """
 struct Iden <: AbstractOptic end
 _pretty_print_optic(::IO, ::Iden) = nothing
-to_accessors(::Iden) = identity
 is_dynamic(::Iden) = false
 concretize(i::Iden, ::Any) = i
+(::Iden)(obj) = obj
+Accessors.set(obj::Any, ::Iden, val) = Accessors.set(obj, identity, val)
 
 """
     DynamicIndex
@@ -59,7 +44,7 @@ For example:
 - the index `begin` is turned into `DynamicIndex(:begin, (val) -> Base.firstindex(val))`.
 - the index `1:end` is turned into `DynamicIndex(:(1:end), (val) -> 1:Base.lastindex(val))`.
 
-# Stored `Expr`
+# The stored `Expr`
 
 The `expr` field stores the original expression and is used both for pretty-printing as well
 as comparisons.
@@ -177,19 +162,23 @@ function _pretty_print_optic(io::IO, idx::Index)
     print(io, "[$(ixs)]")
     return _pretty_print_optic(io, idx.child)
 end
-function to_accessors(idx::Index)
-    ilens = Accessors.IndexLens(idx.ix)
-    return if idx.child isa Iden
-        ilens
-    else
-        Base.ComposedFunction(to_accessors(idx.child), ilens)
-    end
-end
 is_dynamic(idx::Index) = any(ix -> ix isa DynamicIndex, idx.ix) || is_dynamic(idx.child)
 function concretize(idx::Index, val)
-    concretized_indices = map(Base.Fix2(_concretize_index, val), idx.ix)
-    inner_concretized = concretize(idx.child, view(val, concretized_indices...))
-    return Index((concretized_indices...,), inner_concretized)
+    concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
+    inner_concretized = concretize(idx.child, val[concretized_indices...])
+    return Index(concretized_indices, inner_concretized)
+end
+function (idx::Index)(obj)
+    cidx = concretize(idx, obj)
+    return cidx.child(obj[cidx.ix...])
+end
+function Accessors.set(obj, idx::Index, newval)
+    cidx = concretize(idx, obj)
+    inner_obj = obj[cidx.ix...]
+    inner_newval = Accessors.set(inner_obj, idx.child, newval)
+    # Defer to Accessors' implementation, so that we don't have to reinvent the wheel
+    # (well, not more than what we have already done...)
+    return Accessors.set(obj, Accessors.IndexLens(cidx.ix), inner_newval)
 end
 
 """
@@ -212,18 +201,19 @@ function _pretty_print_optic(io::IO, prop::Property{sym}) where {sym}
     print(io, ".$(sym)")
     return _pretty_print_optic(io, prop.child)
 end
-function to_accessors(prop::Property{sym}) where {sym}
-    plens = Accessors.PropertyLens{sym}()
-    return if prop.child isa Iden
-        plens
-    else
-        Base.ComposedFunction(to_accessors(prop.child), plens)
-    end
-end
 is_dynamic(prop::Property) = is_dynamic(prop.child)
 function concretize(prop::Property{sym}, val) where {sym}
     inner_concretized = concretize(prop.child, getproperty(val, sym))
     return Property{sym}(inner_concretized)
+end
+function (prop::Property{sym})(obj) where {sym}
+    return prop.child(getproperty(obj, sym))
+end
+function Accessors.set(obj, prop::Property{sym}, newval) where {sym}
+    inner_obj = getproperty(obj, sym)
+    inner_newval = Accessors.set(inner_obj, prop.child, newval)
+    # Defer to Accessors' implementation again.
+    return Accessors.set(obj, Accessors.PropertyLens{sym}(), inner_newval)
 end
 
 """

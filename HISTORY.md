@@ -8,7 +8,7 @@ Much of the external API for traversing and manipulating `VarName`s has been pre
 The `optic` field of VarName now uses our hand-rolled optic types, which are subtypes of `AbstractPPL.AbstractOptic`.
 Previously these were optics from Accessors.jl.
 
-This change was made for two reasons: firstly, it is easier to provide custom behaviour for VarNames as we avoid running into possible type piracy issues, and secondly, the linked-list data structure used in `AbstractOptic` is easier to work with than Accessors.jl, which used `Base.ComposedFunction` to represent optic compositions and required a lot of care to avoid issues with associativity and identity optics.
+This change was made for two reasons: firstly, it is easier to provide custom behaviour for VarNames as we avoid running into possible type piracy issues, and secondly, the linked-list data structure used in `AbstractOptic` is easier to work with than Accessors.jl, which used `Base.ComposedFunction` to represent optic compositions and required a lot of care to avoid a litany of issues with associativity and identity optics (see e.g. https://github.com/JuliaLang/julia/pull/54877).
 
 To construct an optic, the easiest way is to use the `@opticof` macro, which superficially behaves similarly to `Accessors.@optic` (for example, you can write `@opticof _[1].y.z`), but also supports automatic concretization by passing a second parameter (just like `@varname`).
 
