@@ -9,17 +9,19 @@ the `.a[1][2]` part.
 
 # Public interface
 
-This is WIP.
+TODO
 
 - Base.show
 - Base.:(==), Base.isequal
 - Base.:(∘) (composition)
 - ohead, otail, olast, oinit (decomposition)
+
 - to_accessors(optic) -> Accessors.Lens (recovering the old representation)
 - is_dynamic(optic) -> Bool (whether the optic contains any dynamic indices)
 - concretize(optic, val) -> AbstractOptic (resolving any dynamic indices given the value)
 
-Not sure if we want to introduce getters and setters and BangBang-style stuff.
+We probably want to introduce getters and setters. See e.g.
+https://juliaobjects.github.io/Accessors.jl/stable/examples/custom_macros/
 """
 abstract type AbstractOptic end
 function Base.show(io::IO, optic::AbstractOptic)

@@ -7,7 +7,6 @@ using AbstractPPL
     # Note that much of the functionality in optic.jl is tested by varname.jl (for example,
     # pretty-printing VarNames essentially boils down to pretty-printing optics). So, this
     # file focuses on tests that are specific to optics.
-
     @testset "composition" begin
         @testset "with identity" begin
             i = AbstractPPL.Iden()
