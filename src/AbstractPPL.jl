@@ -1,26 +1,21 @@
 module AbstractPPL
 
-# VarName
-export VarName,
-    getsym,
-    getoptic,
-    inspace,
-    subsumes,
-    subsumedby,
-    varname,
-    vsym,
-    @varname,
-    @vsym,
-    index_to_dict,
-    dict_to_index,
-    varname_to_string,
-    string_to_varname,
-    prefix,
-    unprefix,
-    getvalue,
-    hasvalue,
-    varname_leaves,
-    varname_and_value_leaves
+# VarName and Optic functions
+export VarName, getsym, getoptic, concretize, is_dynamic, @varname, @opticof
+export AbstractOptic, Iden, Index, Property, DynamicIndex, ohead, otail, olast, oinit
+
+# subsumes,
+# subsumedby,
+# index_to_dict,
+# dict_to_index,
+# varname_to_string,
+# string_to_varname,
+# prefix,
+# unprefix,
+# getvalue,
+# hasvalue,
+# varname_leaves,
+# varname_and_value_leaves
 
 # Abstract model functions
 export AbstractProbabilisticProgram,

@@ -1,4 +1,5 @@
 using Accessors: Accessors
+using MacroTools: MacroTools
 
 """
     AbstractOptic
@@ -47,46 +48,68 @@ concretize(i::Iden, ::Any) = i
 
 An abstract type representing dynamic indices such as `begin`, `end`, and `:`. These indices
 are things which cannot be resolved until we provide the value that is being indexed into.
-When parsing VarNames, we convert such indices into subtypes of `DynamicIndex`, and we later
-mark them as requiring concretisation.
+When parsing VarNames, we convert such indices into subtypes of `DynamicIndex`.
+
+Because a `DynamicIndex` cannot be resolved until we have the value being indexed into, it
+is actually a wrapper around a function that, when called on the value, returns the concrete
+index.
+
+For example:
+
+- the index `begin` is turned into `DynamicIndex(:begin, (val) -> Base.firstindex(val))`.
+- the index `1:end` is turned into `DynamicIndex(:(1:end), (val) -> 1:Base.lastindex(val))`.
+
+The `expr` field stores the original expression solely for pretty-printing purposes.
 """
-abstract type DynamicIndex end
-abstract type DynamicSingleIndex <: DynamicIndex end
-_is_dynamic_idx(::DynamicIndex) = true
-_is_dynamic_idx(::Any) = false
-# Fallback for all other indices
-concretize(@nospecialize(ix::Any), ::Any, ::Any) = ix
-_pretty_print_index(x::Any) = string(x)
-
-struct DynamicBegin <: DynamicSingleIndex end
-concretize(::DynamicBegin, val, dim::Nothing) = Base.firstindex(val)
-concretize(::DynamicBegin, val, dim) = Base.firstindex(val, dim)
-_pretty_print_index(::DynamicBegin) = "begin"
-
-struct DynamicEnd <: DynamicSingleIndex end
-concretize(::DynamicEnd, val, dim::Nothing) = Base.lastindex(val)
-concretize(::DynamicEnd, val, dim) = Base.lastindex(val, dim)
-_pretty_print_index(::DynamicEnd) = "end"
-
-struct DynamicColon <: DynamicIndex end
-concretize(::DynamicColon, val, dim::Nothing) = Base.firstindex(val):Base.lastindex(val)
-concretize(::DynamicColon, val, dim) = Base.firstindex(val, dim):Base.lastindex(val, dim)
-_pretty_print_index(::DynamicColon) = ":"
-
-struct DynamicRange{
-    T1<:Union{Real,DynamicSingleIndex},T2<:Union{Real,DynamicSingleIndex}
-} <: DynamicIndex
-    start::T1
-    stop::T2
+struct DynamicIndex{E<:Union{Expr,Symbol},F}
+    expr::E
+    f::F
 end
-function concretize(dr::DynamicRange, axis, dim)
-    start = dr.start isa DynamicIndex ? concretize(dr.start, axis, dim) : dr.start
-    stop = dr.stop isa DynamicIndex ? concretize(dr.stop, axis, dim) : dr.stop
-    return start:stop
+function _make_dynamicindex_expr(symbol::Symbol, dim::Union{Nothing,Int})
+    # NOTE(penelopeysm): We could just use `:end` instead of Symbol(:end), but the former
+    # messes up syntax highlighting with Treesitter
+    # https://github.com/tree-sitter/tree-sitter-julia/issues/104
+    if symbol === Symbol(:begin)
+        func = dim === nothing ? :(Base.firstindex) : :(Base.Fix2(firstindex, $dim))
+        return :(DynamicIndex($(QuoteNode(symbol)), $func))
+    elseif symbol === Symbol(:end)
+        func = dim === nothing ? :(Base.lastindex) : :(Base.Fix2(lastindex, $dim))
+        return :(DynamicIndex($(QuoteNode(symbol)), $func))
+    else
+        # Just a variable.
+        return symbol
+    end
 end
-function _pretty_print_index(dr::DynamicRange)
-    return "$(_pretty_print_index(dr.start)):$(_pretty_print_index(dr.stop))"
+function _make_dynamicindex_expr(expr::Expr, dim::Union{Nothing,Int})
+    @gensym val
+    replaced_expr = MacroTools.postwalk(x -> replace_begin_and_end(x, val, dim), expr)
+    return if replaced_expr == expr
+        # Nothing to replace, just use the original expr.
+        expr
+    else
+        :(DynamicIndex($(QuoteNode(expr)), $val -> $replaced_expr))
+    end
 end
+
+# Replace all instances of `begin` in `expr` with `_firstindex_dim(val, dim)` and
+# all instances of `end` with `_lastindex_dim(val, dim)`.
+replace_begin_and_end(x, ::Any, ::Any) = x
+function replace_begin_and_end(x::Symbol, val_sym, dim)
+    return if (x === :begin)
+        dim === nothing ? :(Base.firstindex($val_sym)) : :(Base.firstindex($val_sym, $dim))
+    elseif (x === :end)
+        dim === nothing ? :(Base.lastindex($val_sym)) : :(Base.lastindex($val_sym, $dim))
+    else
+        # It's some other symbol; we need to escape it to allow interpolation.
+        esc(x)
+    end
+end
+_pretty_string_index(ix) = string(ix)
+_pretty_string_index(::Colon) = ":"
+_pretty_string_index(di::DynamicIndex) = "DynamicIndex($(di.expr))"
+
+_concretize_index(idx::Any, ::Any) = idx
+_concretize_index(idx::DynamicIndex, val) = idx.f(val)
 
 """
     Index(ix, child=Iden())
@@ -106,7 +129,7 @@ end
 Base.:(==)(a::Index, b::Index) = a.ix == b.ix && a.child == b.child
 Base.isequal(a::Index, b::Index) = a == b
 function _pretty_print_optic(io::IO, idx::Index)
-    ixs = join(map(_pretty_print_index, idx.ix), ", ")
+    ixs = join(map(_pretty_string_index, idx.ix), ", ")
     print(io, "[$(ixs)]")
     return _pretty_print_optic(io, idx.child)
 end
@@ -118,19 +141,9 @@ function to_accessors(idx::Index)
         Base.ComposedFunction(to_accessors(idx.child), ilens)
     end
 end
-is_dynamic(idx::Index) = any(_is_dynamic_idx, idx.ix) || is_dynamic(idx.child)
+is_dynamic(idx::Index) = any(ix -> ix isa DynamicIndex, idx.ix) || is_dynamic(idx.child)
 function concretize(idx::Index, val)
-    concretized_indices = if length(idx.ix) == 0
-        []
-    elseif length(idx.ix) == 1
-        # If there's only one index, it's linear indexing. This code is mostly lifted from
-        # Accessors.jl.
-        [concretize(only(idx.ix), val, nothing)]
-    else
-        # If there are multiple indices, then each index corresponds to a different
-        # dimension.
-        [concretize(ix, val, dim) for (dim, ix) in enumerate(idx.ix)]
-    end
+    concretized_indices = map(Base.Fix2(_concretize_index, val), idx.ix)
     inner_concretized = concretize(idx.child, view(val, concretized_indices...))
     return Index((concretized_indices...,), inner_concretized)
 end

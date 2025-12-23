@@ -108,6 +108,31 @@ function Base.showerror(io::IO, e::VarNameParseException)
 end
 
 """
+    VarNameConcretizationException()
+
+When constructing a `VarName` using [`@varname`](@ref) (or [`@opticof`](@ref)), we allow
+for interpolation of the top-level symbol, e.g. using `name = :x; @varname(\$name)`. However,
+if this is done, it is not possible to automatically concretize the resulting `VarName` by
+passing `true` as the second argument to `@varname`.
+
+Because macros are confusing, this is probably worth more explanation. For example, consider
+the user input `name = :x; @varname(\$name, true)`.
+
+Without concretization, we can easily handle this as `VarName{name}(Iden())`. `name` is then
+resolved outside the macro to produce `VarName{:x}(Iden())`. However, to correctly
+concretize this, we would need to generate the output `concretize(VarName{name}(), x)`;
+i.e., we need to know at macro-expansion time that `name` evaluates to `:x`. This is not
+possible given the expression `\$name` alone, which is why this error is thrown.
+"""
+struct VarNameConcretizationException <: Exception end
+function Base.showerror(io::IO, ::VarNameConcretizationException)
+    return print(
+        io,
+        "cannot automatically concretize VarName with interpolated top-level symbol; call `concretize(vn, val)` manually instead",
+    )
+end
+
+"""
     @varname(expr, concretize=false)
 
 Create a [`VarName`](@ref) given an expression `expr` representing a variable or part of it
@@ -134,28 +159,25 @@ x.a[1:3].b[2]
 
 # Dynamic indices
 
-Some expressions may involve dynamic indices, e.g., `begin`, `end`, and `:`. These indices
+Some expressions may involve dynamic indices, specifically, `begin`, `end`. These indices
 cannot be resolved, or 'concretized', until the value being indexed into is known. By
-default, `@varname(...)` will not automatically concretize these expressions, and thus
-the resulting `VarName` will contain markers for these.
+default, `@varname(...)` will not automatically concretize these expressions, and thus the
+resulting `VarName` will contain markers for these.
+
+Note that colons are not considered dynamic.
 
 ```jldoctest
-julia> # VarNames are pretty-printed, so at first glance, it's not special...
-       vn = @varname(x[end])
-x[end]
+julia> vn = @varname(x[end])
+x[DynamicIndex(end)]
 
-julia> # But if you look under the hood, you can see that the index is dynamic.
-       vn = @varname(x[end]); getoptic(vn).ix
-(DynamicEnd(),)
-
-julia> vn = @varname(x[1:end, end]); getoptic(vn).ix
-(DynamicRange{Int64, DynamicEnd}(1, DynamicEnd()), DynamicEnd())
+julia> vn = @varname(x[1, end-1])
+x[1, DynamicIndex(end - 1)]
 ```
 
 You can detect whether a `VarName` contains any dynamic indices using `is_dynamic(vn)`:
 
 ```jldoctest
-julia> vn = @varname(x[1:end, end]); is_dynamic(vn)
+julia> vn = @varname(x[1, end-1]); AbstractPPL.is_dynamic(vn)
 true
 ```
 
@@ -165,13 +187,13 @@ To concretize such expressions, you can call `concretize(vn, val)` on the result
 ```jldoctest
 julia> x = randn(2, 3);
 
-julia> vn = @varname(x[1:end, end]); vn2 = concretize(vn, x)
-x[1:2, 3][1:2]
+julia> vn = @varname(x[1, end-1]); vn2 = AbstractPPL.concretize(vn, x)
+x[1, 2]
 
-julia> getoptic(vn2).ix
-((1:2), 3)
+julia> getoptic(vn2).ix  # Just an ordinary tuple.
+(1, 2)
 
-julia> is_dynamic(vn2)
+julia> AbstractPPL.is_dynamic(vn2)
 false
 ```
 
@@ -183,7 +205,7 @@ top-level symbol to look up the value used for concretization.
 julia> x = randn(2, 3);
 
 julia> @varname(x[1:end, end][:], true)
-x[1:2, 3][1:2]
+x[1:2, 3][:]
 ```
 
 # Interpolation
@@ -208,17 +230,20 @@ For indices, you don't need to use `\$` to interpolate, just use the variable di
 julia> ix = 2; @varname(x[ix])
 x[2]
 ```
+
+However, if the top-level symbol is interpolated, automatic concretization is not
+possible:
+
+```jldoctest
+julia> name = :x; @varname(\$name[1:end], true)
+ERROR: LoadError: cannot automatically concretize VarName with interpolated top-level symbol; call `concretize(vn, val)` manually instead
+[...]
+```
 """
 macro varname(expr, concretize::Bool=false)
     unconcretized_vn, sym = _varname(expr, :(Iden()))
     return if concretize
-        if sym === nothing
-            throw(
-                ArgumentError(
-                    "cannot automatically concretize VarName with interpolated top-level symbol; call `concretize(vn, val)` manually instead",
-                ),
-            )
-        end
+        sym === nothing && throw(VarNameConcretizationException())
         :(concretize($unconcretized_vn, $(esc(sym))))
     else
         unconcretized_vn
@@ -237,13 +262,6 @@ function _varname(expr::Expr, inner_expr)
         # it means that there are no further property/indexing accesses (because otherwise
         # expr.head would be :ref or :.) Thus we don't need to recurse further, and we can
         # just return `inner_expr` as-is.
-        # TODO(penelopeysm): Is there a way to make auto-concretisation work here? To 
-        # be clear, what we want is something like the following to work:
-        #    name = :hello; hello = rand(3); @varname($name[:], true)
-        # I've tried every combination of `esc`, `QuoteNode`, and `$` I can think of, but
-        # with no success yet. It didn't work with old AbstractPPL either ("syntax:
-        # all-underscore identifiers are write-only and their values cannot be used in
-        # expressions"); at least now we give a more sensible error message.
         sym_expr = expr.args[1]
         return :($VarName{$(sym_expr)}($inner_expr)), nothing
     else
@@ -251,12 +269,11 @@ function _varname(expr::Expr, inner_expr)
             sym = _handle_property(expr.args[2], expr)
             :(Property{$(sym)}($inner_expr))
         elseif expr.head == :ref
-            ixs = map(first ∘ _handle_index, expr.args[2:end])
-            # TODO(penelopeysm): Technically, here we could track whether any of the indices are
-            # dynamic, and store this for later use.
-            #     isdyn = any(last, ixs_and_isdyn)
-            # What we do now (generate the dynamic VarName first, and then later check whether
-            # it needs concretization) is slightly inefficient.
+            original_ixs = expr.args[2:end]
+            is_single_index = length(original_ixs) == 1
+            ixs = map(enumerate(original_ixs)) do (dim, ix)
+                _handle_index(ix, is_single_index ? nothing : dim)
+            end
             :(Index(tuple($(ixs...)), $inner_expr))
         else
             # some other expression we can't parse
@@ -285,36 +302,46 @@ function _handle_property(::Any, original_expr)
     throw(VarNameParseException(original_expr))
 end
 
-_handle_index(ix::Int) = ix, false
-function _handle_index(ix::Symbol)
-    # NOTE(penelopeysm): We could just use `:end` instead of Symbol(:end), but the former
-    # messes up syntax highlighting with Treesitter
-    # https://github.com/tree-sitter/tree-sitter-julia/issues/104
-    if ix == Symbol(:end)
-        return :(DynamicEnd()), true
-    elseif ix == Symbol(:begin)
-        return :(DynamicBegin()), true
-    elseif ix == :(:)
-        return :(DynamicColon()), true
+_handle_index(ix::Int, ::Any) = ix
+_handle_index(ix::Symbol, dim) = _make_dynamicindex_expr(ix, dim)
+_handle_index(ix::Expr, dim) = _make_dynamicindex_expr(ix, dim)
+
+"""
+    @opticof(expr, concretize=false)
+
+Extract the optic from `@varname(expr, concretize)`. This is a thin wrapper around
+`getoptic(@varname(...))`.
+
+If you don't need to concretize, you should use `_` as the top-level symbol to
+indicate that it is not relevant:
+
+```jldoctest
+julia> AbstractPPL.@opticof(_.a.b)
+Optic(.a.b)
+```
+
+Only if you need to concretize should you provide a real variable name (in which case
+it is then used to look up the value for concretization):
+
+```jldoctest
+julia> x = randn(3, 4); AbstractPPL.@opticof(x[1:end, end], true)
+Optic([1:3, 4])
+```
+
+Note that concretization with `@opticof` has the same limitations as with `@varname`,
+specifically, if the top-level symbol is interpolated, automatic concretization is not
+possible.
+"""
+macro opticof(expr, concretize::Bool=false)
+    # This implementation is a bit ugly, as it copies the logic from `@varname`. However,
+    # getting the output of `@varname` and then processing it is a bit tricky, specifically
+    # when concretization is involved (because the top-level value must be escaped, but not
+    # anything else!). So it's easier to just duplicate the logic here.
+    unconcretized_vn, sym = _varname(expr, :(Iden()))
+    return if concretize
+        sym === nothing && throw(VarNameConcretizationException())
+        :(getoptic(concretize($unconcretized_vn, $(esc(sym)))))
     else
-        # an interpolated symbol
-        return ix, false
-    end
-end
-function _handle_index(ix::Expr)
-    if Meta.isexpr(ix, :call, 3) && ix.args[1] == :(:)
-        # This is a range
-        start, isdyn = _handle_index(ix.args[2])
-        stop, isdyn2 = _handle_index(ix.args[3])
-        if isdyn || isdyn2
-            return :(DynamicRange($start, $stop)), true
-        else
-            return :(($start):($stop)), false
-        end
-    else
-        # Some other expression. We don't want to parse this any further, but we also don't
-        # want to error, because it may well be an expression that evaluates to a valid
-        # index.
-        return ix, false
+        :(getoptic($unconcretized_vn))
     end
 end
