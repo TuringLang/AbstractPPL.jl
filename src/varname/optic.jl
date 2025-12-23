@@ -82,28 +82,45 @@ function _make_dynamicindex_expr(symbol::Symbol, dim::Union{Nothing,Int})
 end
 function _make_dynamicindex_expr(expr::Expr, dim::Union{Nothing,Int})
     @gensym val
-    replaced_expr = MacroTools.postwalk(x -> replace_begin_and_end(x, val, dim), expr)
-    return if replaced_expr == expr
-        # Nothing to replace, just use the original expr.
-        expr
+    if has_begin_or_end(expr)
+        replaced_expr = MacroTools.postwalk(x -> _make_dynamicindex_expr(x, val, dim), expr)
+        return :(DynamicIndex($(QuoteNode(expr)), $val -> $replaced_expr))
     else
-        :(DynamicIndex($(QuoteNode(expr)), $val -> $replaced_expr))
+        return esc(expr)
     end
+end
+function _make_dynamicindex_expr(symbol::Symbol, val_sym::Symbol, dim::Union{Nothing,Int})
+    # NOTE(penelopeysm): We could just use `:end` instead of Symbol(:end), but the former
+    # messes up syntax highlighting with Treesitter
+    # https://github.com/tree-sitter/tree-sitter-julia/issues/104
+    if symbol === Symbol(:begin)
+        return if dim === nothing
+            :(Base.firstindex($val_sym))
+        else
+            :(Base.Fix2(firstindex, $dim)($val_sym))
+        end
+    elseif symbol === Symbol(:end)
+        return if dim === nothing
+            :(Base.lastindex($val_sym))
+        else
+            :(Base.Fix2(lastindex, $dim)($val_sym))
+        end
+    else
+        # Just a variable; but we need to escape it to allow interpolation.
+        return esc(symbol)
+    end
+end
+function _make_dynamicindex_expr(i::Any, ::Symbol, ::Union{Nothing,Int})
+    return i
 end
 
-# Replace all instances of `begin` in `expr` with `_firstindex_dim(val, dim)` and
-# all instances of `end` with `_lastindex_dim(val, dim)`.
-replace_begin_and_end(x, ::Any, ::Any) = x
-function replace_begin_and_end(x::Symbol, val_sym, dim)
-    return if (x === :begin)
-        dim === nothing ? :(Base.firstindex($val_sym)) : :(Base.firstindex($val_sym, $dim))
-    elseif (x === :end)
-        dim === nothing ? :(Base.lastindex($val_sym)) : :(Base.lastindex($val_sym, $dim))
-    else
-        # It's some other symbol; we need to escape it to allow interpolation.
-        esc(x)
-    end
+has_begin_or_end(expr::Expr) = has_begin_or_end_inner(expr, false)
+function has_begin_or_end_inner(x, found::Bool)
+    return found ||
+           x ∈ (:end, :begin, Expr(:end), Expr(:begin)) ||
+           (x isa Expr && any(arg -> has_begin_or_end_inner(arg, found), x.args))
 end
+
 _pretty_string_index(ix) = string(ix)
 _pretty_string_index(::Colon) = ":"
 _pretty_string_index(di::DynamicIndex) = "DynamicIndex($(di.expr))"
