@@ -189,3 +189,18 @@ This can be achieved with:
 varname_to_optic
 optic_to_varname
 ```
+
+## Subsumption
+
+Sometimes, we want to check whether one VarName 'subsumes' another; that is, whether a VarName refers to a part of another VarName.
+This is done using the [`subsumes`](@ref) function:
+
+```@example vn
+vn1 = @varname(x.a)
+vn2 = @varname(x.a[1])
+subsumes(vn1, vn2)
+```
+
+```@docs
+subsumes
+```

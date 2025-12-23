@@ -1,7 +1,7 @@
 ## 0.14.0
 
 This release overhauls the `VarName` type.
-Much of the external API for traversing and manipulating `VarName`s has been preserved, but there are significant changes:
+Much of the external API for traversing and manipulating `VarName`s (once they have been constructed) has been preserved, but if you use the `VarName` type directly, there are significant changes.
 
 **Internal representation**
 
