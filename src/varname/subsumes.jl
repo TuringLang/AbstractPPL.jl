@@ -34,12 +34,17 @@ subsumes(::Property, ::Index) = false
 subsumes(::Index, ::Property) = false
 
 function subsumes(i::Index, j::Index)
-    # TODO
-    return error("Not implemented.")
+    # TODO(penelopeysm): What we really want to do is to zip i.ix and j.ix
+    # and check that each index in `i.ix` subsumes the corresponding
+    # entry in `j.ix`. If that is true, then we can continue recursing.
+    return if i.ix == j.ix && i.kw == j.kw
+        subsumes(i.child, j.child)
+    else
+        error("Not implemented.")
+    end
 end
 
 #=
-
 # Since expressions such as `x[:][:][:][1]` and `x[1]` are equal,
 # the indexing behavior must be considered jointly.
 # Therefore we must recurse until we reach something that is NOT

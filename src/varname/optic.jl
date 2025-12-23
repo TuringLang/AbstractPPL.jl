@@ -134,6 +134,8 @@ end
 
 _pretty_string_index(ix) = string(ix)
 _pretty_string_index(::Colon) = ":"
+_pretty_string_index(x::Symbol) = repr(x)
+_pretty_string_index(x::String) = repr(x)
 _pretty_string_index(di::DynamicIndex) = "DynamicIndex($(di.expr))"
 
 _concretize_index(idx::Any, ::Any) = idx

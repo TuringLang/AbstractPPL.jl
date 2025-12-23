@@ -317,7 +317,7 @@ end
 
 _is_kw(e::Expr) = Meta.isexpr(e, :kw, 2)
 _is_kw(::Any) = false
-_handle_index(ix::Int, ::Any) = ix
+_handle_index(ix::Any, ::Any) = ix
 _handle_index(ix::Symbol, dim) = _make_dynamicindex_expr(ix, dim)
 _handle_index(ix::Expr, dim) = _make_dynamicindex_expr(ix, dim)
 

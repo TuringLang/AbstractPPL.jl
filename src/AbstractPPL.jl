@@ -1,7 +1,5 @@
 module AbstractPPL
 
-# subsumes,
-# subsumedby,
 # index_to_dict,
 # dict_to_index,
 # varname_to_string,
@@ -49,7 +47,9 @@ export AbstractOptic,
     @varname,
     @opticof,
     varname_to_optic,
-    optic_to_varname
+    optic_to_varname,
+    # subsumes
+    subsumes
 
 using Accessors: set
 export set

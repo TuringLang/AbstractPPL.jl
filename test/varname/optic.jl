@@ -66,10 +66,23 @@ using AbstractPPL
             x = randn(3, 3)
             @test @opticof(_[1:2:4])(x) == x[1:2:4]
             @test @opticof(_[CartesianIndex(1, 1)])(x) == x[CartesianIndex(1, 1)]
+
             # `Not` is actually from InvertedIndices.jl (but re-exported by DimensionalData)
             @test @opticof(_[DD.Not(3)])(x) == x[DD.Not(3)]
+
+            # DimArray selectors
             dimarray = DD.DimArray(randn(2, 3), (DD.X, DD.Y))
             @test @opticof(_[DD.X(1)])(dimarray) == dimarray[DD.X(1)]
+
+            # Symbols on NamedTuples
+            nt = (a=10, b=20, c=30)
+            @test @opticof(_[:a])(nt) == nt[:a]
+            @test set(nt, @opticof(_[:b]), 99) == (a=10, b=99, c=30)
+
+            # Strings on Dicts
+            dict = Dict("one" => 1, "two" => 2)
+            @test @opticof(_["two"])(dict) == dict["two"]
+            @test set(dict, @opticof(_["two"]), 22) == Dict("one" => 1, "two" => 22)
         end
 
         @testset "keyword arguments to getindex" begin
