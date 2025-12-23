@@ -140,6 +140,7 @@ Property{sym}(child::C=Iden()) where {sym,C<:AbstractOptic} = Property{sym,C}(ch
 Base.:(==)(a::Property{sym}, b::Property{sym}) where {sym} = a.child == b.child
 Base.:(==)(a::Property, b::Property) = false
 Base.isequal(a::Property, b::Property) = a == b
+getsym(::Property{s}) where {s} = s
 function _pretty_print_optic(io::IO, prop::Property{sym}) where {sym}
     print(io, ".$(sym)")
     return _pretty_print_optic(io, prop.child)
@@ -158,32 +159,68 @@ function concretize(prop::Property{sym}, val) where {sym}
     return Property{sym}(inner_concretized)
 end
 
+"""
+    ∘(outer::AbstractOptic, inner::AbstractOptic)
+
+Compose two `AbstractOptic`s together.
+
+```jldoctest
+julia> p1 = Property{:a}(Index((1,)))
+Optic(.a[1])
+
+julia> p2 = Property{:b}(Index((2,3)))
+Optic(.b[2, 3])
+
+julia> p1 ∘ p2
+Optic(.b[2, 3].a[1])
+```
+"""
 function Base.:(∘)(outer::AbstractOptic, inner::AbstractOptic)
     if outer isa Iden
         return inner
     elseif inner isa Iden
         return outer
     else
-        # TODO...
-        error("not implemented")
+        if inner isa Property
+            return Property{getsym(inner)}(outer ∘ inner.child)
+        elseif inner isa Index
+            return Index(inner.ix, outer ∘ inner.child)
+        else
+            error("unreachable; unknown AbstractOptic subtype $(typeof(inner))")
+        end
     end
 end
 
 """
-    _head(optic)
+    _head(optic::AbstractOptic)
 
-Get the innermost layer of an AbstractOptic. For all optics, we have that `_tail(optic) ∘
+Get the innermost layer of an optic. For all optics, we have that `_tail(optic) ∘
 _head(optic) == optic`.
+
+```jldoctest
+julia> _head(getoptic(@varname(x.a[1][2])))
+Optic(.a)
+
+julia> _head(getoptic(@varname(x)))
+Optic()
+```
 """
 _head(::Property{s}) where {s} = Property{s}(Iden())
 _head(idx::Index) = Index((idx.ix...,), Iden())
 _head(i::Iden) = i
 
 """
-    _tail(optic)
+    _tail(optic::AbstractOptic)
 
-Get everything but the innermost layer of an optic. For all  optics, we have that
+Get everything but the innermost layer of an optic. For all optics, we have that
 `_tail(optic) ∘ _head(optic) == optic`.
+
+```jldoctest
+julia> _tail(getoptic(@varname(x.a[1][2])))
+Optic([1][2])
+
+julia> _tail(getoptic(@varname(x)))
+Optic()
 ```
 """
 _tail(p::Property) = p.child
@@ -191,10 +228,18 @@ _tail(idx::Index) = idx.child
 _tail(i::Iden) = i
 
 """
-    _last(optic)
+    _last(optic::AbstractOptic)
 
-Get the outermost layer of an optic. For all  optics, we have that `_last(optic) ∘
+Get the outermost layer of an optic. For all optics, we have that `_last(optic) ∘
 _init(optic) == optic`.
+
+```jldoctest
+julia> _last(getoptic(@varname(x.a[1][2])))
+Optic([2])
+
+julia> _last(getoptic(@varname(x)))
+Optic()
+```
 """
 function _last(p::Property{s}) where {s}
     if p.child isa Iden
@@ -213,10 +258,18 @@ end
 _last(i::Iden) = i
 
 """
-    _init(optic)
+    _init(optic::AbstractOptic)
 
 Get everything but the outermost layer of an optic. For all optics, we have that
 `_last(optic) ∘ _init(optic) == optic`.
+
+```jldoctest
+julia> _init(getoptic(@varname(x.a[1][2])))
+Optic(.a[1])
+
+julia> _init(getoptic(@varname(x)))
+Optic()
+```
 """
 function _init(p::Property{s}) where {s}
     return if p.child isa Iden
