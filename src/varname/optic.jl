@@ -172,9 +172,14 @@ function _pretty_print_optic(io::IO, idx::Index)
     return _pretty_print_optic(io, idx.child)
 end
 is_dynamic(idx::Index) = any(ix -> ix isa DynamicIndex, idx.ix) || is_dynamic(idx.child)
+# Things like dictionaries can't be `view`ed into.
+_maybe_view(val::AbstractArray, i...; k...) = view(val, i...; k...)
+_maybe_view(val, i...; k...) = getindex(val, i...; k...)
 function concretize(idx::Index, val)
     concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
-    inner_concretized = concretize(idx.child, val[concretized_indices..., idx.kw...])
+    inner_concretized = concretize(
+        idx.child, _maybe_view(val, concretized_indices...; idx.kw...)
+    )
     return Index(concretized_indices, idx.kw, inner_concretized)
 end
 function (idx::Index)(obj)

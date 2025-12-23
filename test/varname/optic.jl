@@ -26,8 +26,50 @@ using AbstractPPL
         @test cat(o1, o2, o2, o1) == @opticof(_.a.b[1][2][1][2].a.b)
     end
 
-    # TODO
-    @testset "decomposition" begin end
+    @testset "decomposition" begin
+        @testset "specification" begin
+            @test ohead(@opticof _.a.b.c) == @opticof _.a
+            @test otail(@opticof _.a.b.c) == @opticof _.b.c
+            @test oinit(@opticof _.a.b.c) == @opticof _.a.b
+            @test olast(@opticof _.a.b.c) == @opticof _.c
+
+            @test ohead(@opticof _[1][2][3]) == @opticof _[1]
+            @test otail(@opticof _[1][2][3]) == @opticof _[2][3]
+            @test oinit(@opticof _[1][2][3]) == @opticof _[1][2]
+            @test olast(@opticof _[1][2][3]) == @opticof _[3]
+
+            @test ohead(@opticof _.a) == @opticof _.a
+            @test otail(@opticof _.a) == @opticof _
+            @test oinit(@opticof _.a) == @opticof _
+            @test olast(@opticof _.a) == @opticof _.a
+
+            @test ohead(@opticof _[1]) == @opticof _[1]
+            @test otail(@opticof _[1]) == @opticof _
+            @test oinit(@opticof _[1]) == @opticof _
+            @test olast(@opticof _[1]) == @opticof _[1]
+
+            @test ohead(@opticof _) == @opticof _
+            @test otail(@opticof _) == @opticof _
+            @test oinit(@opticof _) == @opticof _
+            @test olast(@opticof _) == @opticof _
+        end
+
+        @testset "invariants" begin
+            optics = (
+                @opticof(_),
+                @opticof(_[1]),
+                @opticof(_.a),
+                @opticof(_.a.b),
+                @opticof(_[1].a),
+                @opticof(_[1, x=1].a),
+                @opticof(_[].a[:]),
+            )
+            for optic in optics
+                @test olast(optic) ∘ oinit(optic) == optic
+                @test otail(optic) ∘ ohead(optic) == optic
+            end
+        end
+    end
 
     @testset "getting and setting" begin
         @testset "basic" begin
