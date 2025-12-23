@@ -121,7 +121,7 @@ function concretize(idx::Index, val)
         # dimension.
         [concretize(ix, val, dim) for (dim, ix) in enumerate(idx.ix)]
     end
-    inner_concretized = concretize(idx.child, val[concretized_indices...])
+    inner_concretized = concretize(idx.child, view(val, concretized_indices...))
     return Index((concretized_indices...,), inner_concretized)
 end
 
