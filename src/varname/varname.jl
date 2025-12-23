@@ -360,5 +360,5 @@ This fails for all other optics.
 """
 optic_to_varname(optic::Property{sym}) where {sym} = VarName{sym}(otail(optic))
 function optic_to_varname(::AbstractOptic)
-    throw(ArgumentError("to_varname: can only convert Property optics to VarName"))
+    throw(ArgumentError("optic_to_varname: can only convert Property optics to VarName"))
 end
