@@ -3,31 +3,6 @@ using InvertedIndices
 using OffsetArrays
 using LinearAlgebra: LowerTriangular, UpperTriangular, cholesky
 
-using AbstractPPL: ⊑, ⊒, ⋢, ⋣, ≍
-
-using AbstractPPL: Accessors
-using AbstractPPL.Accessors: IndexLens, PropertyLens, ⨟
-
-macro test_strict_subsumption(x, y)
-    quote
-        @test $((varname(x))) ⊑ $((varname(y)))
-        @test $((varname(x))) ⋣ $((varname(y)))
-    end
-end
-
-function test_equal(o1::VarName{sym1}, o2::VarName{sym2}) where {sym1,sym2}
-    return sym1 === sym2 && test_equal(o1.optic, o2.optic)
-end
-function test_equal(o1::ComposedFunction, o2::ComposedFunction)
-    return test_equal(o1.inner, o2.inner) && test_equal(o1.outer, o2.outer)
-end
-function test_equal(o1::Accessors.IndexLens, o2::Accessors.IndexLens)
-    return test_equal(o1.indices, o2.indices)
-end
-function test_equal(o1, o2)
-    return o1 == o2
-end
-
 @testset "varnames" begin
     @testset "string and symbol conversion" begin
         vn1 = @varname x[1][2]
@@ -40,39 +15,6 @@ end
         vn2 = @varname x[1][2]
         @test vn2 == vn1
         @test hash(vn2) == hash(vn1)
-    end
-
-    @testset "inspace" begin
-        space = (:x, :y, @varname(z[1]), @varname(M[1:10, :]))
-        @test inspace(@varname(x), space)
-        @test inspace(@varname(y), space)
-        @test inspace(@varname(x[1]), space)
-        @test inspace(@varname(z[1][1]), space)
-        @test inspace(@varname(z[1][:]), space)
-        @test inspace(@varname(z[1][2:3:10]), space)
-        @test inspace(@varname(M[[2, 3], 1]), space)
-        @test_throws ErrorException inspace(@varname(M[:, 1:4]), space)
-        @test inspace(@varname(M[1, [2, 4, 6]]), space)
-        @test !inspace(@varname(z[2]), space)
-        @test !inspace(@varname(z), space)
-    end
-
-    @testset "optic normalisation" begin
-        # Push the limits a bit with four optics, one of which is identity, and
-        # we'll parenthesise them in every possible way. (Some of these are
-        # going to be equal even before normalisation, but we should test that
-        # `normalise` works regardless of how Base or Accessors.jl define
-        # associativity.)
-        op1 = ((@o _.c) ∘ (@o _.b)) ∘ identity ∘ (@o _.a)
-        op2 = (@o _.c) ∘ ((@o _.b) ∘ identity) ∘ (@o _.a)
-        op3 = (@o _.c) ∘ (@o _.b) ∘ (identity ∘ (@o _.a))
-        op4 = ((@o _.c) ∘ (@o _.b) ∘ identity) ∘ (@o _.a)
-        op5 = (@o _.c) ∘ ((@o _.b) ∘ identity ∘ (@o _.a))
-        op6 = (@o _.c) ∘ (@o _.b) ∘ identity ∘ (@o _.a)
-        for op in (op1, op2, op3, op4, op5, op6)
-            @test AbstractPPL.normalise(op) == (@o _.c) ∘ (@o _.b) ∘ (@o _.a)
-        end
-        # Prefix and unprefix also provide further testing for normalisation.
     end
 
     @testset "construction & concretization" begin

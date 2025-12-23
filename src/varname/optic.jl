@@ -12,6 +12,9 @@ the `.a[1][2]` part.
 This is WIP.
 
 - Base.show
+- Base.:(==), Base.isequal
+- Base.:(∘) (composition)
+- ohead, otail, olast, oinit (decomposition)
 - to_accessors(optic) -> Accessors.Lens (recovering the old representation)
 - is_dynamic(optic) -> Bool (whether the optic contains any dynamic indices)
 - concretize(optic, val) -> AbstractOptic (resolving any dynamic indices given the value)
@@ -192,97 +195,97 @@ function Base.:(∘)(outer::AbstractOptic, inner::AbstractOptic)
 end
 
 """
-    _head(optic::AbstractOptic)
+    ohead(optic::AbstractOptic)
 
-Get the innermost layer of an optic. For all optics, we have that `_tail(optic) ∘
-_head(optic) == optic`.
+Get the innermost layer of an optic. For all optics, we have that `otail(optic) ∘
+ohead(optic) == optic`.
 
 ```jldoctest
-julia> _head(getoptic(@varname(x.a[1][2])))
+julia> ohead(getoptic(@varname(x.a[1][2])))
 Optic(.a)
 
-julia> _head(getoptic(@varname(x)))
+julia> ohead(getoptic(@varname(x)))
 Optic()
 ```
 """
-_head(::Property{s}) where {s} = Property{s}(Iden())
-_head(idx::Index) = Index((idx.ix...,), Iden())
-_head(i::Iden) = i
+ohead(::Property{s}) where {s} = Property{s}(Iden())
+ohead(idx::Index) = Index((idx.ix...,), Iden())
+ohead(i::Iden) = i
 
 """
-    _tail(optic::AbstractOptic)
+    otail(optic::AbstractOptic)
 
 Get everything but the innermost layer of an optic. For all optics, we have that
-`_tail(optic) ∘ _head(optic) == optic`.
+`otail(optic) ∘ ohead(optic) == optic`.
 
 ```jldoctest
-julia> _tail(getoptic(@varname(x.a[1][2])))
+julia> otail(getoptic(@varname(x.a[1][2])))
 Optic([1][2])
 
-julia> _tail(getoptic(@varname(x)))
+julia> otail(getoptic(@varname(x)))
 Optic()
 ```
 """
-_tail(p::Property) = p.child
-_tail(idx::Index) = idx.child
-_tail(i::Iden) = i
+otail(p::Property) = p.child
+otail(idx::Index) = idx.child
+otail(i::Iden) = i
 
 """
-    _last(optic::AbstractOptic)
+    olast(optic::AbstractOptic)
 
-Get the outermost layer of an optic. For all optics, we have that `_last(optic) ∘
-_init(optic) == optic`.
+Get the outermost layer of an optic. For all optics, we have that `olast(optic) ∘
+oinit(optic) == optic`.
 
 ```jldoctest
-julia> _last(getoptic(@varname(x.a[1][2])))
+julia> olast(getoptic(@varname(x.a[1][2])))
 Optic([2])
 
-julia> _last(getoptic(@varname(x)))
+julia> olast(getoptic(@varname(x)))
 Optic()
 ```
 """
-function _last(p::Property{s}) where {s}
+function olast(p::Property{s}) where {s}
     if p.child isa Iden
         return p
     else
-        return _last(p.child)
+        return olast(p.child)
     end
 end
-function _last(idx::Index)
+function olast(idx::Index)
     if idx.child isa Iden
         return idx
     else
-        return _last(idx.child)
+        return olast(idx.child)
     end
 end
-_last(i::Iden) = i
+olast(i::Iden) = i
 
 """
-    _init(optic::AbstractOptic)
+    oinit(optic::AbstractOptic)
 
 Get everything but the outermost layer of an optic. For all optics, we have that
-`_last(optic) ∘ _init(optic) == optic`.
+`olast(optic) ∘ oinit(optic) == optic`.
 
 ```jldoctest
-julia> _init(getoptic(@varname(x.a[1][2])))
+julia> oinit(getoptic(@varname(x.a[1][2])))
 Optic(.a[1])
 
-julia> _init(getoptic(@varname(x)))
+julia> oinit(getoptic(@varname(x)))
 Optic()
 ```
 """
-function _init(p::Property{s}) where {s}
+function oinit(p::Property{s}) where {s}
     return if p.child isa Iden
         Iden()
     else
-        Property{s}(_init(p.child))
+        Property{s}(oinit(p.child))
     end
 end
-function _init(idx::Index)
+function oinit(idx::Index)
     return if idx.child isa Iden
         Iden()
     else
-        Index(idx.ix, _init(idx.child))
+        Index(idx.ix, oinit(idx.child))
     end
 end
-_init(i::Iden) = i
+oinit(i::Iden) = i
