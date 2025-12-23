@@ -59,12 +59,37 @@ For example:
 - the index `begin` is turned into `DynamicIndex(:begin, (val) -> Base.firstindex(val))`.
 - the index `1:end` is turned into `DynamicIndex(:(1:end), (val) -> 1:Base.lastindex(val))`.
 
-The `expr` field stores the original expression solely for pretty-printing purposes.
+# Stored `Expr`
+
+The `expr` field stores the original expression and is used both for pretty-printing as well
+as comparisons.
+
+Note that because the stored function `f` is an anonymous function that is generated
+dynamically, we should not include it in equality comparisons, as two functions that are
+actually equivalent will not compare equal:
+
+```julia
+julia> (x -> x + 1) == (x -> x + 1)
+false
+```
+
+But, thankfully, we can just compare the `expr` field to determine whether the
+DynamicIndices were constructed from the same expression (which implies that their
+functions are equivalent).
+
+Note that these definitions also allow us some degree of resilience towards whitespace
+changes, or parenthesisation, in the original expression. For example, `begin+1` and `(begin
++ 1)` will be treated as the same expression. However, it does not handle commutative
+expressions; e.g., `begin + 1` and `1 + begin` will be treated as different expressions.
 """
 struct DynamicIndex{E<:Union{Expr,Symbol},F}
     expr::E
     f::F
 end
+Base.:(==)(a::DynamicIndex, b::DynamicIndex) = a.expr == b.expr
+Base.isequal(a::DynamicIndex, b::DynamicIndex) = isequal(a.expr, b.expr)
+Base.hash(di::DynamicIndex, h::UInt) = hash(di.expr, h)
+
 function _make_dynamicindex_expr(symbol::Symbol, dim::Union{Nothing,Int})
     # NOTE(penelopeysm): We could just use `:end` instead of Symbol(:end), but the former
     # messes up syntax highlighting with Treesitter
@@ -146,6 +171,7 @@ end
 
 Base.:(==)(a::Index, b::Index) = a.ix == b.ix && a.child == b.child
 Base.isequal(a::Index, b::Index) = a == b
+Base.hash(a::Index, h::UInt) = hash((a.ix, a.child), h)
 function _pretty_print_optic(io::IO, idx::Index)
     ixs = join(map(_pretty_string_index, idx.ix), ", ")
     print(io, "[$(ixs)]")

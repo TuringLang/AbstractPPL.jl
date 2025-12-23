@@ -19,16 +19,41 @@ using Test
         @test_throws MethodError eval(:(@varname(x[1:Colon()])))
     end
 
-    @testset "equality" begin
-        @test @varname(x) == @varname(x)
-        @test @varname(x) != @varname(y)
-        @test @varname(x[1]) == @varname(x[1])
-        @test @varname(x[1]) != @varname(x[2])
-        @test @varname(x.a) == @varname(x.a)
-        @test @varname(x.a) != @varname(x.b)
-        @test @varname(x.a[1]) == @varname(x.a[1])
-        @test @varname(x.a[1]) != @varname(x.a[2])
-        @test @varname(x.a[1]) != @varname(x.b[1])
+    @testset "equality and hash" begin
+        function check_doubleeq_and_hash(vn1, vn2, is_equal)
+            if is_equal
+                @test vn1 == vn2
+                @test hash(vn1) == hash(vn2)
+            else
+                @test vn1 != vn2
+                @test hash(vn1) != hash(vn2)
+            end
+        end
+        check_doubleeq_and_hash(@varname(x), @varname(x), true)
+        check_doubleeq_and_hash(@varname(x), @varname(y), false)
+        check_doubleeq_and_hash(@varname(x[1]), @varname(x[1]), true)
+        check_doubleeq_and_hash(@varname(x[1]), @varname(x[2]), false)
+        check_doubleeq_and_hash(@varname(x.a), @varname(x.a), true)
+        check_doubleeq_and_hash(@varname(x.a), @varname(x.b), false)
+        check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.a[1]), true)
+        check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.a[2]), false)
+        check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.b[1]), false)
+
+        @testset "dynamic indices" begin
+            check_doubleeq_and_hash(@varname(x[begin]), @varname(x[begin]), true)
+            check_doubleeq_and_hash(@varname(x[end]), @varname(x[end]), true)
+            check_doubleeq_and_hash(@varname(x[begin]), @varname(x[end]), false)
+            check_doubleeq_and_hash(@varname(x[begin + 1]), @varname(x[begin + 1]), true)
+            check_doubleeq_and_hash(@varname(x[begin + 1]), @varname(x[(begin + 1)]), true)
+            check_doubleeq_and_hash(@varname(x[begin + 1]), @varname(x[begin + 2]), false)
+            check_doubleeq_and_hash(@varname(x[end - 1]), @varname(x[end - 1]), true)
+            check_doubleeq_and_hash(@varname(x[end - 1]), @varname(x[end - 2]), false)
+            check_doubleeq_and_hash(
+                @varname(x[(begin * end - begin):end]),
+                @varname(x[((begin * end) - begin):end]),
+                true,
+            )
+        end
     end
 
     @testset "pretty-printing" begin
