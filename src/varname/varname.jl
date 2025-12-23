@@ -41,10 +41,10 @@ Return the optic of the Julia variable used to generate `vn`.
 
 ```jldoctest
 julia> getoptic(@varname(x[1][2:3]))
-[1][2:3]
+Optic([1][2:3])
 
 julia> getoptic(@varname(y))
-Iden()
+Optic()
 ```
 """
 getoptic(vn::VarName) = vn.optic
@@ -58,7 +58,7 @@ Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getoptic(vn)), h)
 
 function Base.show(io::IO, vn::VarName{sym,T}) where {sym,T}
     print(io, getsym(vn))
-    return pretty_print_optic(io, getoptic(vn))
+    return _pretty_print_optic(io, getoptic(vn))
 end
 
 """
@@ -81,58 +81,125 @@ Base.Symbol(vn::VarName) = Symbol(string(vn))
     concretize(vn::VarName, x)
 
 Return `vn` concretized on `x`, i.e. any information related to the runtime shape of `x` is
-evaluated. This will convert any Colon indices to `Base.Slice`, which contains information
-about the length of the dimension being sliced.
+evaluated. This will convert any `begin`, `end`, or `:` indices in `vn` to concrete indices
+with information about the length of the dimension being sliced.
 """
-# TODO(penelopeysm): Does this affect begin/end? The old docstring said it would, but I
-# could not see where in the implementation this was actually done. I remember that this is
-# not the first time I've been confused about this.
 concretize(vn::VarName{sym}, x) where {sym} = VarName{sym}(concretize(getoptic(vn), x))
+
+"""
+    is_dynamic(vn::VarName)
+
+Return `true` if `vn` contains any dynamic indices (i.e., `begin`, `end`, or `:`). If a
+`VarName` has been concretized, this will always return `false`.
+"""
+is_dynamic(vn::VarName) = is_dynamic(getoptic(vn))
+
+"""
+    VarNameParseException(expr)
+
+An exception thrown when a variable name expression cannot be parsed by the
+[`@varname`](@ref) macro.
+"""
+struct VarNameParseException <: Exception
+    expr::Expr
+end
+function Base.showerror(io::IO, e::VarNameParseException)
+    return print(io, "malformed variable name `$(e.expr)`")
+end
 
 """
     @varname(expr, concretize=false)
 
-A macro that returns an instance of [`VarName`](@ref) given a symbol or indexing expression `expr`.
+Create a [`VarName`](@ref) given an expression `expr` representing a variable or part of it
+(any expression that can be assigned to).
 
-If `concretize` is `true`, the resulting expression will be wrapped in a `concretize()` call.
+# Basic examples
 
-Note that expressions involving dynamic indexing, i.e. `begin` and/or `end`, will always need to be
-concretized as `VarName` only supports non-dynamic indexing as determined by
-`is_static_optic`. See examples below.
+In general, `VarName`s must have a top-level symbol representing the identifier itself, and
+can then have any number of property accesses or indexing operations chained to it.
 
-## Examples
-
-### Dynamic indexing
 ```jldoctest
-julia> x = (a = [1.0 2.0; 3.0 4.0; 5.0 6.0], );
+julia> @varname(x)
+x
 
-julia> @varname(x.a[1:end, end][:], true)
-x.a[1:3, 2][:]
+julia> @varname(x.a.b.c)
+x.a.b.c
 
-julia> @varname(x.a[end], false)  # disable concretization
-ERROR: LoadError: Variable name `x.a[end]` is dynamic and requires concretization!
-[...]
+julia> @varname(x[1][2][3])
+x[1][2][3]
 
-julia> @varname(x.a[end])  # concretization occurs by default if deemed necessary
-x.a[6]
+julia> @varname(x.a[1:3].b[2])
+x.a[1:3].b[2]
+```
 
-julia> # Note that "dynamic" here refers to usage of `begin` and/or `end`,
-       # _not_ "information only available at runtime", i.e. the following works.
-       [@varname(x.a[i]) for i = 1:length(x.a)][end]
-x.a[6]
+# Dynamic indices
 
-julia> # Potentially surprising behaviour, but this is equivalent to what Base does:
-       @varname(x[2:2:5]), 2:2:5
-(x[2:2:4], 2:2:4)
+Some expressions may involve dynamic indices, e.g., `begin`, `end`, and `:`. These indices
+cannot be resolved, or 'concretized', until the value being indexed into is known. By
+default, `@varname(...)` will not automatically concretize these expressions, and thus
+the resulting `VarName` will contain markers for these.
+
+```jldoctest
+julia> # VarNames are pretty-printed, so at first glance, it's not special...
+       vn = @varname(x[end])
+x[end]
+
+julia> # But if you look under the hood, you can see that the index is dynamic.
+       vn = @varname(x[end]); getoptic(vn).ix
+(DynamicEnd(),)
+
+julia> vn = @varname(x[1:end, end]); getoptic(vn).ix
+(DynamicRange{Int64, DynamicEnd}(1, DynamicEnd()), DynamicEnd())
+```
+
+You can detect whether a `VarName` contains any dynamic indices using `is_dynamic(vn)`:
+
+```jldoctest
+julia> vn = @varname(x[1:end, end]); is_dynamic(vn)
+true
+```
+
+To concretize such expressions, you can call `concretize(vn, val)` on the resulting
+`VarName`. After concretization, the resulting `VarName` will no longer be dynamic.
+
+```jldoctest
+julia> x = randn(2, 3);
+
+julia> vn = @varname(x[1:end, end]); vn2 = concretize(vn, x)
+x[1:2, 3][1:2]
+
+julia> getoptic(vn2).ix
+((1:2), 3)
+
+julia> is_dynamic(vn2)
+false
+```
+
+Alternatively, you can pass `true` as the second positional argument the `@varname` macro
+(note that it is not a keyword argument!). This will call `concretize` for you, using the
+top-level symbol to look up the value used for concretization.
+
+```jldoctest
+julia> x = randn(2, 3);
+
+julia> @varname(x[1:end, end][:], true)
+x[1:2, 3][1:2]
 ```
 
 # Interpolation
 
-Property names can also be constructed from interpolated symbols:
+Property names, as well as top-level symbols, can also be constructed from interpolated
+symbols:
 
 ```jldoctest
 julia> name = :hello; @varname(x.\$name)
 x.hello
+
+julia> @varname(\$name)
+hello
+
+julia> @varname(\$name.a.\$name[1])
+hello.a.hello[1]
 ```
 
 For indices, you don't need to use `\$` to interpolate, just use the variable directly:
@@ -142,37 +209,57 @@ julia> ix = 2; @varname(x[ix])
 x[2]
 ```
 """
-
-struct VarNameParseException <: Exception
-    expr::Expr
-end
-function Base.showerror(io::IO, e::VarNameParseException)
-    return print(io, "malformed variable name `$(e.expr)`")
-end
-
-macro varname(expr)
-    return _varname(expr, :(Iden()))
+macro varname(expr, concretize::Bool=false)
+    unconcretized_vn, sym = _varname(expr, :(Iden()))
+    return if concretize
+        if sym === nothing
+            throw(
+                ArgumentError(
+                    "cannot automatically concretize VarName with interpolated top-level symbol; call `concretize(vn, val)` manually instead",
+                ),
+            )
+        end
+        :(concretize($unconcretized_vn, $(esc(sym))))
+    else
+        unconcretized_vn
+    end
 end
 function _varname(sym::Symbol, inner_expr)
-    return :($VarName{$(QuoteNode(sym))}($inner_expr))
+    return :($VarName{$(QuoteNode(sym))}($inner_expr)), sym
 end
 function _varname(expr::Expr, inner_expr)
-    next_inner = if expr.head == :(.)
-        sym = _handle_property(expr.args[2], expr)
-        :(Property{$(sym)}($inner_expr))
-    elseif expr.head == :ref
-        ixs = map(first ∘ _handle_index, expr.args[2:end])
-        # TODO(penelopeysm): Technically, here we could track whether any of the indices are
-        # dynamic, and store this for later use.
-        #     isdyn = any(last, ixs_and_isdyn)
-        # What we do now (generate the dynamic VarName first, and then later check whether
-        # it needs concretization) is slightly inefficient.
-        :(Index(tuple($(ixs...)), $inner_expr))
+    if Meta.isexpr(expr, :$, 1)
+        # Interpolation of the top-level symbol e.g. @varname($name). If we hit this branch,
+        # it means that there are no further property/indexing accesses (because otherwise
+        # expr.head would be :ref or :.) Thus we don't need to recurse further, and we can
+        # just return `inner_expr` as-is.
+        # TODO(penelopeysm): Is there a way to make auto-concretisation work here? To 
+        # be clear, what we want is something like the following to work:
+        #    name = :hello; hello = rand(3); @varname($name[:], true)
+        # I've tried every combination of `esc`, `QuoteNode`, and `$` I can think of, but
+        # with no success yet. It didn't work with old AbstractPPL either ("syntax:
+        # all-underscore identifiers are write-only and their values cannot be used in
+        # expressions"); at least now we give a more sensible error message.
+        sym_expr = expr.args[1]
+        return :($VarName{$(sym_expr)}($inner_expr)), nothing
     else
-        # some other expression we can't parse
-        throw(VarNameParseException(expr))
+        next_inner = if expr.head == :(.)
+            sym = _handle_property(expr.args[2], expr)
+            :(Property{$(sym)}($inner_expr))
+        elseif expr.head == :ref
+            ixs = map(first ∘ _handle_index, expr.args[2:end])
+            # TODO(penelopeysm): Technically, here we could track whether any of the indices are
+            # dynamic, and store this for later use.
+            #     isdyn = any(last, ixs_and_isdyn)
+            # What we do now (generate the dynamic VarName first, and then later check whether
+            # it needs concretization) is slightly inefficient.
+            :(Index(tuple($(ixs...)), $inner_expr))
+        else
+            # some other expression we can't parse
+            throw(VarNameParseException(expr))
+        end
+        return _varname(expr.args[1], next_inner)
     end
-    return _varname(expr.args[1], next_inner)
 end
 
 function _handle_property(qn::QuoteNode, original_expr)
@@ -227,245 +314,3 @@ function _handle_index(ix::Expr)
         return ix, false
     end
 end
-
-#=
-drop_escape(x) = x
-function drop_escape(expr::Expr)
-    Meta.isexpr(expr, :escape) && return drop_escape(expr.args[1])
-    return Expr(expr.head, map(x -> drop_escape(x), expr.args)...)
-end
-
-function _parse_obj_optic(ex)
-    obj, optics = _parse_obj_optics(ex)
-    optic = Expr(:call, Accessors.opticcompose, optics...)
-    return obj, optic
-end
-
-# Accessors doesn't have the same support for interpolation
-# so this function is copied and altered from `Setfield._parse_obj_lens`
-function _parse_obj_optics(ex)
-    if Meta.isexpr(ex, :$, 1)
-        return esc(:_), (esc(ex.args[1]),)
-    elseif Meta.isexpr(ex, :ref) && !isempty(ex.args)
-        front, indices... = ex.args
-        obj, frontoptics = _parse_obj_optics(front)
-        if any(Accessors.need_dynamic_optic, indices)
-            @gensym collection
-            indices = Accessors.replace_underscore.(indices, collection)
-            dims = length(indices) == 1 ? nothing : 1:length(indices)
-            lindices = esc.(Accessors.lower_index.(collection, indices, dims))
-            optics =
-                :($(Accessors.DynamicIndexLens)($(esc(collection)) -> ($(lindices...),)))
-        else
-            index = esc(Expr(:tuple, indices...))
-            optics = :($(Accessors.IndexLens)($index))
-        end
-    elseif Meta.isexpr(ex, :., 2)
-        front = ex.args[1]
-        property = ex.args[2].value # ex.args[2] is a QuoteNode
-        obj, frontoptics = _parse_obj_optics(front)
-        if property isa Union{Symbol,String}
-            optics = :($(Accessors.PropertyLens){$(QuoteNode(property))}())
-        elseif Meta.isexpr(property, :$, 1)
-            optics = :($(Accessors.PropertyLens){$(esc(property.args[1]))}())
-        else
-            throw(
-                ArgumentError(
-                    string(
-                        "Error while parsing :($ex). Second argument to `getproperty` can only be",
-                        "a `Symbol` or `String` literal, received `$property` instead.",
-                    ),
-                ),
-            )
-        end
-    else
-        obj = esc(ex)
-        return obj, ()
-    end
-    return obj, tuple(frontoptics..., optics)
-end
-
-"""
-    @vsym(expr)
-
-A macro that returns the variable symbol given the input variable expression `expr`.
-For example, `@vsym x[1]` returns `:x`.
-
-## Examples
-
-```jldoctest
-julia> @vsym x
-:x
-
-julia> @vsym x[1,1][2,3]
-:x
-
-julia> @vsym x[end]
-:x
-```
-"""
-macro vsym(expr::Union{Expr,Symbol})
-    return QuoteNode(vsym(expr))
-end
-
-"""
-    vsym(expr)
-
-Return name part of the [`@varname`](@ref)-compatible expression `expr` as a symbol for input of the
-[`VarName`](@ref) constructor.
-"""
-function vsym end
-
-vsym(expr::Symbol) = expr
-function vsym(expr::Expr)
-    if Meta.isexpr(expr, :ref) || Meta.isexpr(expr, :.)
-        return vsym(expr.args[1])
-    else
-        error("Malformed variable name `$(expr)`!")
-    end
-end
-
-"""
-    _head(optic)
-
-Get the innermost layer of an optic.
-
-For all (normalised) optics, we have that `normalise(_tail(optic) ∘
-_head(optic) == optic)`.
-
-!!! note
-    Does not perform optic normalisation on the input. You may wish to call
-    `normalise(optic)` before using this function if the optic you are passing
-    was not obtained from a VarName.
-
-```jldoctest; setup=:(using Accessors)
-julia> AbstractPPL._head(Accessors.@o _.a.b.c)
-(@o _.a)
-
-julia> AbstractPPL._head(Accessors.@o _[1][2][3])
-(@o _[1])
-
-julia> AbstractPPL._head(Accessors.@o _.a)
-(@o _.a)
-
-julia> AbstractPPL._head(Accessors.@o _[1])
-(@o _[1])
-
-julia> AbstractPPL._head(Accessors.@o _)
-identity (generic function with 1 method)
-```
-"""
-_head(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.inner
-_head(o::Accessors.PropertyLens) = o
-_head(o::Accessors.IndexLens) = o
-_head(::typeof(identity)) = identity
-
-"""
-    _tail(optic)
-
-Get everything but the innermost layer of an optic.
-
-For all (normalised) optics, we have that `normalise(_tail(optic) ∘
-_head(optic) == optic)`.
-
-!!! note
-    Does not perform optic normalisation on the input. You may wish to call
-    `normalise(optic)` before using this function if the optic you are passing
-    was not obtained from a VarName.
-
-```jldoctest; setup=:(using Accessors)
-julia> AbstractPPL._tail(Accessors.@o _.a.b.c)
-(@o _.b.c)
-
-julia> AbstractPPL._tail(Accessors.@o _[1][2][3])
-(@o _[2][3])
-
-julia> AbstractPPL._tail(Accessors.@o _.a)
-identity (generic function with 1 method)
-
-julia> AbstractPPL._tail(Accessors.@o _[1])
-identity (generic function with 1 method)
-
-julia> AbstractPPL._tail(Accessors.@o _)
-identity (generic function with 1 method)
-```
-"""
-_tail(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = o.outer
-_tail(::Accessors.PropertyLens) = identity
-_tail(::Accessors.IndexLens) = identity
-_tail(::typeof(identity)) = identity
-
-"""
-    _last(optic)
-
-Get the outermost layer of an optic.
-
-For all (normalised) optics, we have that `normalise(_last(optic) ∘
-_init(optic)) == optic`.
-
-!!! note
-    Does not perform optic normalisation on the input. You may wish to call
-    `normalise(optic)` before using this function if the optic you are passing
-    was not obtained from a VarName.
-
-```jldoctest; setup=:(using Accessors)
-julia> AbstractPPL._last(Accessors.@o _.a.b.c)
-(@o _.c)
-
-julia> AbstractPPL._last(Accessors.@o _[1][2][3])
-(@o _[3])
-
-julia> AbstractPPL._last(Accessors.@o _.a)
-(@o _.a)
-
-julia> AbstractPPL._last(Accessors.@o _[1])
-(@o _[1])
-
-julia> AbstractPPL._last(Accessors.@o _)
-identity (generic function with 1 method)
-```
-"""
-_last(o::ComposedFunction{Outer,Inner}) where {Outer,Inner} = _last(o.outer)
-_last(o::Accessors.PropertyLens) = o
-_last(o::Accessors.IndexLens) = o
-_last(::typeof(identity)) = identity
-
-"""
-    _init(optic)
-
-Get everything but the outermost layer of an optic.
-
-For all (normalised) optics, we have that `normalise(_last(optic) ∘
-_init(optic)) == optic`.
-
-!!! note
-    Does not perform optic normalisation on the input. You may wish to call
-    `normalise(optic)` before using this function if the optic you are passing
-    was not obtained from a VarName.
-
-```jldoctest; setup=:(using Accessors)
-julia> AbstractPPL._init(Accessors.@o _.a.b.c)
-(@o _.a.b)
-
-julia> AbstractPPL._init(Accessors.@o _[1][2][3])
-(@o _[1][2])
-
-julia> AbstractPPL._init(Accessors.@o _.a)
-identity (generic function with 1 method)
-
-julia> AbstractPPL._init(Accessors.@o _[1])
-identity (generic function with 1 method)
-
-julia> AbstractPPL._init(Accessors.@o _)
-identity (generic function with 1 method)
-"""
-# This one needs normalise because it's going 'against' the direction of the
-# linked list (otherwise you will end up with identities scattered throughout)
-function _init(o::ComposedFunction{Outer,Inner}) where {Outer,Inner}
-    return normalise(_init(o.outer) ∘ o.inner)
-end
-_init(::Accessors.PropertyLens) = identity
-_init(::Accessors.IndexLens) = identity
-_init(::typeof(identity)) = identity
-
-=#
