@@ -140,45 +140,63 @@ _concretize_index(idx::Any, ::Any) = idx
 _concretize_index(idx::DynamicIndex, val) = idx.f(val)
 
 """
-    Index(ix, child=Iden())
+    Index(ix, kw, child=Iden())
 
-An indexing optic representing access to indices `ix`. A VarName{:x} with this optic
-represents access to `x[ix...]`. The child optic represents any further indexing or
-property access after this indexing operation.
+An indexing optic representing access to indices `ix`, which may also take the form of
+keyword arguments `kw`. A VarName{:x} with this optic represents access to `x[ix...,
+kw...]`. The child optic represents any further indexing or property access after this
+indexing operation.
 """
-struct Index{I<:Tuple,C<:AbstractOptic} <: AbstractOptic
+struct Index{I<:Tuple,N<:NamedTuple,C<:AbstractOptic} <: AbstractOptic
     ix::I
+    kw::N
     child::C
-    function Index(ix::Tuple, child::C=Iden()) where {C<:AbstractOptic}
-        return new{typeof(ix),C}(ix, child)
+    function Index(ix::Tuple, kw::NamedTuple, child::C=Iden()) where {C<:AbstractOptic}
+        return new{typeof(ix),typeof(kw),C}(ix, kw, child)
     end
 end
 
-Base.:(==)(a::Index, b::Index) = a.ix == b.ix && a.child == b.child
-Base.isequal(a::Index, b::Index) = a == b
-Base.hash(a::Index, h::UInt) = hash((a.ix, a.child), h)
+Base.:(==)(a::Index, b::Index) = a.ix == b.ix && a.kw == b.kw && a.child == b.child
+function Base.isequal(a::Index, b::Index)
+    return isequal(a.ix, b.ix) && isequal(a.kw, b.kw) && isequal(a.child, b.child)
+end
+Base.hash(a::Index, h::UInt) = hash((a.ix, a.kw, a.child), h)
 function _pretty_print_optic(io::IO, idx::Index)
-    ixs = join(map(_pretty_string_index, idx.ix), ", ")
-    print(io, "[$(ixs)]")
+    ixs = collect(map(_pretty_string_index, idx.ix))
+    kws = map(
+        kv -> "$(kv.first)=$(_pretty_string_index(kv.second))", collect(pairs(idx.kw))
+    )
+    print(io, "[$(join(vcat(ixs, kws), ", "))]")
     return _pretty_print_optic(io, idx.child)
 end
 is_dynamic(idx::Index) = any(ix -> ix isa DynamicIndex, idx.ix) || is_dynamic(idx.child)
 function concretize(idx::Index, val)
     concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
-    inner_concretized = concretize(idx.child, val[concretized_indices...])
-    return Index(concretized_indices, inner_concretized)
+    inner_concretized = concretize(idx.child, val[concretized_indices..., idx.kw...])
+    return Index(concretized_indices, idx.kw, inner_concretized)
 end
 function (idx::Index)(obj)
     cidx = concretize(idx, obj)
-    return cidx.child(obj[cidx.ix...])
+    return cidx.child(Base.getindex(obj, cidx.ix...; cidx.kw...))
 end
 function Accessors.set(obj, idx::Index, newval)
     cidx = concretize(idx, obj)
-    inner_obj = obj[cidx.ix...]
+    inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
     inner_newval = Accessors.set(inner_obj, idx.child, newval)
-    # Defer to Accessors' implementation, so that we don't have to reinvent the wheel
-    # (well, not more than what we have already done...)
-    return Accessors.set(obj, Accessors.IndexLens(cidx.ix), inner_newval)
+    return if !isempty(cidx.kw)
+        # `Accessors.IndexLens` does not handle keyword arguments so we need to do this
+        # ourselves. Note that the following code essentially assumes that `obj` is an
+        # AbstractArray or similar type that directly implements `setindex!`.
+        newobj = similar(obj)
+        copy!(newobj, obj)
+        Base.setindex!(newobj, inner_newval, cidx.ix...; cidx.kw...)
+        newobj
+    else
+        # Defer to Accessors' implementation, so that we don't have to reinvent the wheel
+        # (well, not more than what we have already done...). This is helpful because
+        # Accessors implements a lot of methods for different types of `obj`.
+        Accessors.set(obj, Accessors.IndexLens(cidx.ix), inner_newval)
+    end
 end
 
 """
@@ -241,7 +259,7 @@ function Base.:(∘)(outer::AbstractOptic, inner::AbstractOptic)
         if inner isa Property
             return Property{getsym(inner)}(outer ∘ inner.child)
         elseif inner isa Index
-            return Index(inner.ix, outer ∘ inner.child)
+            return Index(inner.ix, inner.kw, outer ∘ inner.child)
         else
             error("unreachable; unknown AbstractOptic subtype $(typeof(inner))")
         end
@@ -274,7 +292,7 @@ Optic()
 ```
 """
 ohead(::Property{s}) where {s} = Property{s}(Iden())
-ohead(idx::Index) = Index((idx.ix...,), Iden())
+ohead(idx::Index) = Index(idx.ix, idx.kw, Iden())
 ohead(i::Iden) = i
 
 """
@@ -350,7 +368,7 @@ function oinit(idx::Index)
     return if idx.child isa Iden
         Iden()
     else
-        Index(idx.ix, oinit(idx.child))
+        Index(idx.ix, idx.kw, oinit(idx.child))
     end
 end
 oinit(i::Iden) = i

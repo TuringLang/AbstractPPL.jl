@@ -70,10 +70,13 @@ using AbstractPPL
             @test @opticof(_[DD.Not(3)])(x) == x[DD.Not(3)]
             dimarray = DD.DimArray(randn(2, 3), (DD.X, DD.Y))
             @test @opticof(_[DD.X(1)])(dimarray) == dimarray[DD.X(1)]
-            # TODO(penelopeysm): This doesn't support keyword arguments to getindex yet.
-            # For example:
-            # dimarray = DD.DimArray(randn(2, 3), (:x, :y))
-            # @test @opticof(_[x=1])(dimarray) == dimarray[x=1]
+        end
+
+        @testset "keyword arguments to getindex" begin
+            dimarray = DD.DimArray([0.0 1.0; 2.0 3.0], (:x, :y))
+            @test @opticof(_[x=1])(dimarray) == dimarray[x=1]
+            @test set(dimarray, @opticof(_[y=2]), [9.0; 8.0]) ==
+                DD.DimArray([0.0 9.0; 2.0 8.0], (:x, :y))
         end
 
         struct SampleStruct

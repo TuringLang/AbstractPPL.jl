@@ -269,11 +269,25 @@ function _varname(expr::Expr, inner_expr)
             :(Property{$(sym)}($inner_expr))
         elseif expr.head == :ref
             original_ixs = expr.args[2:end]
-            is_single_index = length(original_ixs) == 1
-            ixs = map(enumerate(original_ixs)) do (dim, ix)
-                _handle_index(ix, is_single_index ? nothing : dim)
+            positional_args = []
+            keyword_args = []
+            for (dim, ix_expr) in enumerate(original_ixs)
+                if _is_kw(ix_expr)
+                    push!(keyword_args, :($(ix_expr.args[1]) = $(esc(ix_expr.args[2]))))
+                else
+                    push!(positional_args, (dim, ix_expr))
+                end
             end
-            :(Index(tuple($(ixs...)), $inner_expr))
+            is_single_index = length(positional_args) == 1
+            positional_ixs = map(positional_args) do (dim, ix_expr)
+                _handle_index(ix_expr, is_single_index ? nothing : dim)
+            end
+            kwarg_expr = if isempty(keyword_args)
+                :((;))
+            else
+                Expr(:tuple, keyword_args...)
+            end
+            :(Index(tuple($(positional_ixs...)), $kwarg_expr, $inner_expr))
         else
             # some other expression we can't parse
             throw(VarNameParseException(expr))
@@ -301,6 +315,8 @@ function _handle_property(::Any, original_expr)
     throw(VarNameParseException(original_expr))
 end
 
+_is_kw(e::Expr) = Meta.isexpr(e, :kw, 2)
+_is_kw(::Any) = false
 _handle_index(ix::Int, ::Any) = ix
 _handle_index(ix::Symbol, dim) = _make_dynamicindex_expr(ix, dim)
 _handle_index(ix::Expr, dim) = _make_dynamicindex_expr(ix, dim)

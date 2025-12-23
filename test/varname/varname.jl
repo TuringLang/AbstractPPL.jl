@@ -6,9 +6,10 @@ using Test
 @testset "varname/varname.jl" verbose = true begin
     @testset "basic construction (and type stability)" begin
         @test @varname(x) == (@inferred VarName{:x}(Iden()))
-        @test @varname(x[1]) == (@inferred VarName{:x}(Index((1,), Iden())))
+        @test @varname(x[1]) == (@inferred VarName{:x}(Index((1,), (;), Iden())))
         @test @varname(x.a) == (@inferred VarName{:x}(Property{:a}(Iden())))
-        @test @varname(x.a[1]) == (@inferred VarName{:x}(Property{:a}(Index((1,), Iden()))))
+        @test @varname(x.a[1]) ==
+            (@inferred VarName{:x}(Property{:a}(Index((1,), (;), Iden()))))
     end
 
     @testset "errors on invalid inputs" begin
@@ -38,6 +39,8 @@ using Test
         check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.a[1]), true)
         check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.a[2]), false)
         check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.b[1]), false)
+        check_doubleeq_and_hash(@varname(x[1, i=2]), @varname(x[1, i=2]), true)
+        check_doubleeq_and_hash(@varname(x[i=2, 4]), @varname(x[4, i=2]), true)
 
         @testset "dynamic indices" begin
             check_doubleeq_and_hash(@varname(x[begin]), @varname(x[begin]), true)
@@ -64,6 +67,7 @@ using Test
         @test string(@varname(x[begin])) == "x[DynamicIndex(begin)]"
         @test string(@varname(x[end])) == "x[DynamicIndex(end)]"
         @test string(@varname(x[:])) == "x[:]"
+        @test string(@varname(x[1, i=3])) == "x[1, i=3]"
     end
 
     @testset "dynamic indices and manual concretization" begin
@@ -114,6 +118,7 @@ using Test
         @test !is_dynamic(@varname(x[1:3, 3, 2 + 9]))
         i = 10
         @test !is_dynamic(@varname(x[1:3, 3, 2 + 9, 1:3:i]))
+        @test !is_dynamic(@varname(x[k=i]))
     end
 
     @testset "automatic concretization" begin
@@ -149,8 +154,11 @@ using Test
 
         @testset "of indices" begin
             idx = 3
-            vn = @varname(x[idx])
-            @test vn == @varname(x[3])
+            @test @varname(x[idx]) == @varname(x[3])
+            @test @varname(x[2 * idx]) == @varname(x[6])
+            @test @varname(x[1:idx]) == @varname(x[1:3])
+            @test @varname(x[k=idx]) == @varname(x[k=3])
+            @test @varname(x[k=2 * idx]) == @varname(x[k=6])
         end
 
         @testset "with dynamic indices" begin
