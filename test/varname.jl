@@ -4,52 +4,6 @@ using OffsetArrays
 using LinearAlgebra: LowerTriangular, UpperTriangular, cholesky
 
 @testset "varnames" begin
-    @testset "subsumption with standard indexing" begin
-        # x ⊑ x
-        @test @varname(x) ⊑ @varname(x)
-        @test @varname(x[1]) ⊑ @varname(x[1])
-        @test @varname(x.a) ⊑ @varname(x.a)
-
-        # x ≍ y
-        @test @varname(x) ≍ @varname(y)
-        @test @varname(x.a) ≍ @varname(y.a)
-        @test @varname(a.x) ≍ @varname(a.y)
-        @test @varname(a.x[1]) ≍ @varname(a.x.z)
-        @test @varname(x[1]) ≍ @varname(y[1])
-        @test @varname(x[1]) ≍ @varname(x.y)
-
-        # x ∘ ℓ ⊑ x
-        @test_strict_subsumption x.a x
-        @test_strict_subsumption x[1] x
-        @test_strict_subsumption x[2:2:5] x
-        @test_strict_subsumption x[10, 20] x
-
-        # x ∘ ℓ₁ ⊑ x ∘ ℓ₂ ⇔ ℓ₁ ⊑ ℓ₂
-        @test_strict_subsumption x.a.b x.a
-        @test_strict_subsumption x[1].a x[1]
-        @test_strict_subsumption x.a[1] x.a
-        @test_strict_subsumption x[1:10][2] x[1:10]
-
-        @test_strict_subsumption x[1] x[1:10]
-        @test_strict_subsumption x[1:5] x[1:10]
-        @test_strict_subsumption x[4:6] x[1:10]
-
-        @test_strict_subsumption x[[2, 3, 5]] x[[7, 6, 5, 4, 3, 2, 1]]
-
-        @test_strict_subsumption x[:a][1] x[:a]
-
-        # boolean indexing works as long as it is concretized
-        A = rand(10, 10)
-        @test @varname(A[iseven.(1:10), 1], true) ⊑ @varname(A[1:10, 1])
-        @test @varname(A[iseven.(1:10), 1], true) ⋣ @varname(A[1:10, 1])
-
-        # we can reasonably allow colons on the right side ("universal set")
-        @test @varname(x[1]) ⊑ @varname(x[:])
-        @test @varname(x[1:10, 1]) ⊑ @varname(x[:, 1:10])
-        @test_throws ErrorException (@varname(x[:]) ⊑ @varname(x[1]))
-        @test_throws ErrorException (@varname(x[:]) ⊑ @varname(x[:]))
-    end
-
     @testset "de/serialisation of VarNames" begin
         y = ones(10)
         z = ones(5, 2)

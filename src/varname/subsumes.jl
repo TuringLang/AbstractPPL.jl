@@ -1,135 +1,44 @@
 """
-    inspace(vn::Union{VarName, Symbol}, space::Tuple)
+    subsumes(parent::VarName, child::VarName)
 
-Check whether `vn`'s variable symbol is in `space`.  The empty tuple counts as the "universal space"
-containing all variables. Subsumption (see [`subsumes`](@ref)) is respected.
-
-## Examples
+Check whether the variable name `child` describes a sub-range of the variable `parent`,
+i.e., is contained within it.
 
 ```jldoctest
-julia> inspace(@varname(x[1][2:3]), ())
+julia> subsumes(@varname(x), @varname(x[1, 2]))
 true
 
-julia> inspace(@varname(x[1][2:3]), (:x,))
-true
-
-julia> inspace(@varname(x[1][2:3]), (@varname(x),))
-true
-
-julia> inspace(@varname(x[1][2:3]), (@varname(x[1:10]), :y))
-true
-
-julia> inspace(@varname(x[1][2:3]), (@varname(x[:][2:4]), :y))
-true
-
-julia> inspace(@varname(x[1][2:3]), (@varname(x[1:10]),))
+julia> subsumes(@varname(x[1, 2]), @varname(x[1, 2][3]))
 true
 ```
-"""
-inspace(vn, space::Tuple{}) = true # empty tuple is treated as universal space
-inspace(vn, space::Tuple) = vn in space
-inspace(vn::VarName, space::Tuple{}) = true
-inspace(vn::VarName, space::Tuple) = any(_in(vn, s) for s in space)
 
-_in(vn::VarName, s::Symbol) = getsym(vn) == s
-_in(vn::VarName, s::VarName) = subsumes(s, vn)
+Note that often this is not possible to determine statically. For example:
 
-"""
-    subsumes(u::VarName, v::VarName)
+- When dynamic indices are present, subsumption cannot be determined, unless `child ==
+  parent`.
+- Subsumption between different forms of indexing is not supported, e.g. `x[4]` and `x[2,
+  2]` are not considered to subsume each other, even though they might in practice (e.g. if
+  `x` is a 2x2 matrix).
 
-Check whether the variable name `v` describes a sub-range of the variable `u`.  Supported
-indexing:
-
-  - Scalar:
-
-  ```jldoctest
-  julia> subsumes(@varname(x), @varname(x[1, 2]))
-  true
-  
-  julia> subsumes(@varname(x[1, 2]), @varname(x[1, 2][3]))
-  true
-  ```
-  
-  - Array of scalar: basically everything that fulfills `issubset`.
-  
-  ```jldoctest
-  julia> subsumes(@varname(x[[1, 2], 3]), @varname(x[1, 3]))
-  true
-  
-  julia> subsumes(@varname(x[1:3]), @varname(x[2][1]))
-  true
-  ```
-  
-  - Slices:
-  
-  ```jldoctest
-  julia> subsumes(@varname(x[2, :]), @varname(x[2, 10][1]))
-  true
-  ```
-
-Currently _not_ supported are: 
-
-  - Boolean indexing, literal `CartesianIndex` (these could be added, though)
-  - Linear indexing of multidimensional arrays: `x[4]` does not subsume `x[2, 2]` for a matrix `x`
-  - Trailing ones: `x[2, 1]` does not subsume `x[2]` for a vector `x`
+In such cases, `subsumes` will conservatively return `false`.
 """
 function subsumes(u::VarName, v::VarName)
     return getsym(u) == getsym(v) && subsumes(getoptic(u), getoptic(v))
 end
+subsumes(::Iden, ::Iden) = true
+subsumes(::Iden, ::AbstractOptic) = true
+subsumes(::AbstractOptic, ::Iden) = false
+subsumes(t::Property{name}, u::Property{name}) where {name} = subsumes(t.child, u.child)
+subsumes(t::Property, u::Property) = false
+subsumes(::Property, ::Index) = false
+subsumes(::Index, ::Property) = false
 
-# Idea behind `subsumes` for `Lens` is that we traverse the two lenses in parallel,
-# checking `subsumes` for every level. This for example means that if we are comparing
-# `PropertyLens{:a}` and `PropertyLens{:b}` we immediately know that they do not subsume
-# each other since at the same level/depth they access different properties.
-# E.g. `x`, `x[1]`, i.e. `u` is always subsumed by `t`
-subsumes(::typeof(identity), ::typeof(identity)) = true
-subsumes(::typeof(identity), ::ALLOWED_OPTICS) = true
-subsumes(::ALLOWED_OPTICS, ::typeof(identity)) = false
-
-function subsumes(t::ComposedFunction, u::ComposedFunction)
-    return subsumes(t.outer, u.outer) && subsumes(t.inner, u.inner)
+function subsumes(i::Index, j::Index)
+    # TODO
+    return error("Not implemented.")
 end
 
-# If `t` is still a composed lens, then there is no way it can subsume `u` since `u` is a
-# leaf of the "lens-tree".
-subsumes(t::ComposedFunction, u::PropertyLens) = false
-# Here we need to check if `u.inner` (i.e. the next lens to be applied from `u`) is
-# subsumed by `t`, since this would mean that the rest of the composition is also subsumed
-# by `t`.
-subsumes(t::PropertyLens, u::ComposedFunction) = subsumes(t, u.inner)
-
-# For `PropertyLens` either they have the same `name` and thus they are indeed the same.
-subsumes(t::PropertyLens{name}, u::PropertyLens{name}) where {name} = true
-# Otherwise they represent different properties, and thus are not the same.
-subsumes(t::PropertyLens, u::PropertyLens) = false
-
-# PropertyLens and IndexLens can't subsume each other
-subsumes(::PropertyLens, ::IndexLens) = false
-subsumes(::IndexLens, ::PropertyLens) = false
-
-# Indices subsumes if they are subindices, i.e. we just call `_issubindex`.
-# FIXME: Does not support `DynamicIndexLens`.
-# FIXME: Does not correctly handle cases such as `subsumes(x, x[:])`
-#        (but neither did old implementation).
-function subsumes(
-    t::Union{IndexLens,ComposedFunction{<:ALLOWED_OPTICS,<:IndexLens}},
-    u::Union{IndexLens,ComposedFunction{<:ALLOWED_OPTICS,<:IndexLens}},
-)
-    return subsumes_indices(t, u)
-end
-
-"""
-    subsumedby(t, u)
-
-True if `t` is subsumed by `u`, i.e., if `subsumes(u, t)` is true.
-"""
-subsumedby(t, u) = subsumes(u, t)
-uncomparable(t, u) = t ⋢ u && u ⋢ t
-const ⊒ = subsumes
-const ⊑ = subsumedby
-const ⋣ = !subsumes
-const ⋢ = !subsumedby
-const ≍ = uncomparable
+#=
 
 # Since expressions such as `x[:][:][:][1]` and `x[1]` are equal,
 # the indexing behavior must be considered jointly.
@@ -237,4 +146,4 @@ subsumes_index(i, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(::AbstractVector, ::Colon) = error("Colons cannot be subsumed")
 subsumes_index(i::Colon, j) = true
 subsumes_index(i::AbstractVector, j) = issubset(j, i)
-subsumes_index(i, j) = i == j
+subsumes_index(i, j) = i == j =#

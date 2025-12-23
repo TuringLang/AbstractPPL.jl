@@ -45,6 +45,9 @@ It used to be relevant for Turing's old Gibbs sampler; but now it no longer serv
 
 `ConcretizedSlice` has been removed (since colons are no longer concretized).
 
+The subsumption interface has been pared down to just a single function, `subsumes`.
+All other functions, such as `subsumedby`, `uncomparable`, and the Unicode operators, have been removed.
+
 ## 0.13.6
 
 Fix a missing qualifier in AbstractPPLDistributionsExt.
