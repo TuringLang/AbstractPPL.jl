@@ -1,3 +1,39 @@
+## 0.14.0
+
+This release overhauls the `VarName` type.
+Much of the external API for traversing and manipulating `VarName`s has been preserved, but there are significant changes:
+
+**Internal representation**
+
+The `optic` field of VarName now uses our hand-rolled optic types, which are subtypes of `AbstractPPL.AbstractOptic`.
+Previously these were optics from Accessors.jl.
+
+This change was made for two reasons: firstly, it is easier to provide custom behaviour for VarNames as we avoid running into possible type piracy issues, and secondly, the linked-list data structure used in `AbstractOptic` is easier to work with than Accessors.jl, which used `Base.ComposedFunction` to represent optic compositions and required a lot of care to avoid issues with associativity and identity optics.
+
+To construct an optic, the easiest way is to use the `@opticof` macro, which superficially behaves similarly to `Accessors.@optic` (for example, you can write `@opticof _[1].y.z`), but also supports automatic concretization by passing a second parameter (just like `@varname`).
+
+**Concretization**
+
+VarNames using 'dynamic' indices, i.e., `begin` and `end`, are now instantiated in a 'dynamic' form, meaning that these indices are unresolved.
+These indices need to be resolved, or concretized, against the actual container.
+For example, `@varname(x[end])` is dynamic, but when concretized against `x = randn(3)`, this becomes `@varname(x[3])`.
+This can be done using `concretize(varname, x)`.
+
+The idea of concretization is not new to AbstractPPL.
+However, there are some differences:
+
+  - Colons are no longer concretized: they *always* remain as Colons, even after calling `concretize`.
+  - Previously, AbstractPPL would refuse to allow you to construct unconcretized versions of `begin` and `end`. This is no longer the case; you can now create such VarNames in their unconcretized forms.
+    This is useful, for example, when indexing into a chain that contains `x` as a variable-length vector. This change allows you to write `chain[@varname(x[end])]` without having AbstractPPL throw an error.
+
+**Interface**
+
+The `vsym` function (and `@vsym`) has been removed; you should use `getsym(vn)` instead.
+
+The `Base.get` and `Base.set!` methods for VarNames have been removed (these were responsible for method ambiguities).
+
+The `inspace` function has been removed (it used to be relevant for Turing's old Gibbs sampler; but now it no longer serves any use).
+
 ## 0.13.6
 
 Fix a missing qualifier in AbstractPPLDistributionsExt.
