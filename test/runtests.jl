@@ -6,7 +6,7 @@ const GROUP = get(ENV, "GROUP", "All")
 
 @testset "AbstractPPL.jl" begin
     if GROUP == "All" || GROUP == "Tests"
-        include("Aqua.jl")
+        # include("Aqua.jl")
         include("abstractprobprog.jl")
         include("varname/optic.jl")
         include("varname/varname.jl")

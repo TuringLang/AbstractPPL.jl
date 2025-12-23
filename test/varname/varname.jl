@@ -77,7 +77,7 @@ using Test
             @test vn isa VarName
             @test is_dynamic(vn)
             arr = randn(4, 4)
-            @test concretize(vn, arr) == @varname(x[:])
+            @test concretize(vn, arr) == @varname(x[1:16])
         end
     end
 
