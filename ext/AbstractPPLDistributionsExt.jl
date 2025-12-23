@@ -49,6 +49,8 @@ This decision may be revisited in the future.
 
 module AbstractPPLDistributionsExt
 
+#=
+
 using AbstractPPL: AbstractPPL, VarName, Accessors, LinearAlgebra
 using Distributions: Distributions
 using LinearAlgebra: Cholesky, LowerTriangular, UpperTriangular
@@ -322,4 +324,5 @@ function AbstractPPL.getvalue(
     end
 end
 
+=#
 end

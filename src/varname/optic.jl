@@ -76,8 +76,8 @@ function _make_dynamicindex_expr(symbol::Symbol, dim::Union{Nothing,Int})
         func = dim === nothing ? :(Base.lastindex) : :(Base.Fix2(lastindex, $dim))
         return :(DynamicIndex($(QuoteNode(symbol)), $func))
     else
-        # Just a variable.
-        return symbol
+        # Just a variable; but we need to escape it to allow interpolation.
+        return esc(symbol)
     end
 end
 function _make_dynamicindex_expr(expr::Expr, dim::Union{Nothing,Int})
@@ -188,10 +188,10 @@ end
 Compose two `AbstractOptic`s together.
 
 ```jldoctest
-julia> p1 = Property{:a}(Index((1,)))
+julia> p1 = @opticof(_.a[1])
 Optic(.a[1])
 
-julia> p2 = Property{:b}(Index((2,3)))
+julia> p2 = @opticof(_.b[2, 3])
 Optic(.b[2, 3])
 
 julia> p1 ∘ p2
@@ -215,16 +215,27 @@ function Base.:(∘)(outer::AbstractOptic, inner::AbstractOptic)
 end
 
 """
+    cat(optics::AbstractOptic...)
+
+Compose multiple `AbstractOptic`s together. The optics should be provided from
+innermost to outermost, i.e., `cat(o1, o2, o3)` corresponds to `o3 ∘ o2 ∘ o1`.
+
+"""
+function Base.cat(optics::AbstractOptic...)
+    return foldl((a, b) -> b ∘ a, optics; init=Iden())
+end
+
+"""
     ohead(optic::AbstractOptic)
 
 Get the innermost layer of an optic. For all optics, we have that `otail(optic) ∘
 ohead(optic) == optic`.
 
 ```jldoctest
-julia> ohead(getoptic(@varname(x.a[1][2])))
+julia> ohead(@opticof _.a[1][2])
 Optic(.a)
 
-julia> ohead(getoptic(@varname(x)))
+julia> ohead(@opticof _)
 Optic()
 ```
 """
@@ -239,10 +250,10 @@ Get everything but the innermost layer of an optic. For all optics, we have that
 `otail(optic) ∘ ohead(optic) == optic`.
 
 ```jldoctest
-julia> otail(getoptic(@varname(x.a[1][2])))
+julia> otail(@opticof _.a[1][2])
 Optic([1][2])
 
-julia> otail(getoptic(@varname(x)))
+julia> otail(@opticof _)
 Optic()
 ```
 """
@@ -257,10 +268,10 @@ Get the outermost layer of an optic. For all optics, we have that `olast(optic) 
 oinit(optic) == optic`.
 
 ```jldoctest
-julia> olast(getoptic(@varname(x.a[1][2])))
+julia> olast(@opticof _.a[1][2])
 Optic([2])
 
-julia> olast(getoptic(@varname(x)))
+julia> olast(@opticof _)
 Optic()
 ```
 """
@@ -287,10 +298,10 @@ Get everything but the outermost layer of an optic. For all optics, we have that
 `olast(optic) ∘ oinit(optic) == optic`.
 
 ```jldoctest
-julia> oinit(getoptic(@varname(x.a[1][2])))
+julia> oinit(@opticof _.a[1][2])
 Optic(.a[1])
 
-julia> oinit(getoptic(@varname(x)))
+julia> oinit(@opticof _)
 Optic()
 ```
 """

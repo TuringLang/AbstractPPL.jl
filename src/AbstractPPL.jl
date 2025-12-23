@@ -1,8 +1,24 @@
 module AbstractPPL
 
-# VarName and Optic functions
-export VarName, getsym, getoptic, concretize, is_dynamic, @varname, @opticof
-export AbstractOptic, Iden, Index, Property, DynamicIndex, ohead, otail, olast, oinit
+# Optics
+export AbstractOptic,
+    Iden,
+    Index,
+    Property,
+    ohead,
+    otail,
+    olast,
+    oinit,
+    # VarName
+    VarName,
+    getsym,
+    getoptic,
+    concretize,
+    is_dynamic,
+    @varname,
+    @opticof,
+    varname_to_optic,
+    optic_to_varname
 
 # subsumes,
 # subsumedby,

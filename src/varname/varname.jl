@@ -81,8 +81,8 @@ Base.Symbol(vn::VarName) = Symbol(string(vn))
     concretize(vn::VarName, x)
 
 Return `vn` concretized on `x`, i.e. any information related to the runtime shape of `x` is
-evaluated. This will convert any `begin`, `end`, or `:` indices in `vn` to concrete indices
-with information about the length of the dimension being sliced.
+evaluated. This will convert any `begin` and `end` indices in `vn` to concrete indices with
+information about the length of the dimension being indexed into.
 """
 concretize(vn::VarName{sym}, x) where {sym} = VarName{sym}(concretize(getoptic(vn), x))
 
@@ -135,8 +135,7 @@ end
 """
     @varname(expr, concretize=false)
 
-Create a [`VarName`](@ref) given an expression `expr` representing a variable or part of it
-(any expression that can be assigned to).
+Create a [`VarName`](@ref) given an expression `expr` representing a variable or part of it.
 
 # Basic examples
 
@@ -174,14 +173,14 @@ julia> vn = @varname(x[1, end-1])
 x[1, DynamicIndex(end - 1)]
 ```
 
-You can detect whether a `VarName` contains any dynamic indices using `is_dynamic(vn)`:
+You can detect whether a `VarName` contains any dynamic indices using [`is_dynamic`](@ref):
 
 ```jldoctest
 julia> vn = @varname(x[1, end-1]); AbstractPPL.is_dynamic(vn)
 true
 ```
 
-To concretize such expressions, you can call `concretize(vn, val)` on the resulting
+To concretize such expressions, you can call [`concretize`](@ref) on the resulting
 `VarName`. After concretization, the resulting `VarName` will no longer be dynamic.
 
 ```jldoctest
@@ -197,9 +196,9 @@ julia> AbstractPPL.is_dynamic(vn2)
 false
 ```
 
-Alternatively, you can pass `true` as the second positional argument the `@varname` macro
-(note that it is not a keyword argument!). This will call `concretize` for you, using the
-top-level symbol to look up the value used for concretization.
+Alternatively, you can pass `true` as the second positional argument to the `@varname` macro
+(note that it is not a keyword argument!). This will automatically call [`concretize`](@ref)
+for you, using the top-level symbol to look up the value used for concretization.
 
 ```jldoctest
 julia> x = randn(2, 3);
@@ -224,7 +223,7 @@ julia> @varname(\$name.a.\$name[1])
 hello.a.hello[1]
 ```
 
-For indices, you don't need to use `\$` to interpolate, just use the variable directly:
+For indices, you do nott need to use `\$` to interpolate, just use the variable directly:
 
 ```jldoctest
 julia> ix = 2; @varname(x[ix])
@@ -344,4 +343,22 @@ macro opticof(expr, concretize::Bool=false)
     else
         :(getoptic($unconcretized_vn))
     end
+end
+
+"""
+    varname_to_optic(vn::VarName)
+
+Convert a `VarName` to an optic, by converting the top-level symbol to a `Property` optic.
+"""
+varname_to_optic(vn::VarName{sym}) where {sym} = Property{sym}(getoptic(vn))
+
+"""
+    optic_to_varname(optic::Property{sym}) where {sym}
+
+Convert a `Property` optic to a `VarName`, by converting the top-level property to a symbol.
+This fails for all other optics.
+"""
+optic_to_varname(optic::Property{sym}) where {sym} = VarName{sym}(otail(optic))
+function optic_to_varname(::AbstractOptic)
+    throw(ArgumentError("to_varname: can only convert Property optics to VarName"))
 end
