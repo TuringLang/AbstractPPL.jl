@@ -11,14 +11,12 @@ using Test
         @test @varname(x.a[1]) == VarName{:x}(Property{:a}(Index((1,), Iden())))
     end
 
-    @testset "errors on nonsensical inputs" begin
+    @testset "errors on invalid inputs" begin
         # Note: have to wrap in eval to avoid throwing an error before the actual test
         errmsg = "malformed variable name"
         @test_throws errmsg eval(:(@varname(1)))
         @test_throws errmsg eval(:(@varname(x + y)))
-        # TODO(penelopeysm): I would like to test this, but JuliaFormatter reformats
-        # this into x[1::] which then fails to parse. Grr.
-        # @test_throws MethodError eval(:(@varname(x[1: :])))
+        @test_throws MethodError eval(:(@varname(x[1:Colon()])))
     end
 
     @testset "dynamic indices and manual concretization" begin
@@ -92,6 +90,49 @@ using Test
         @testset "linear indexing for matrices" begin
             vn = @varname(test_array[begin:end], true)
             @test vn == concretize(@varname(test_array[begin:end]), test_array)
+        end
+    end
+
+    @testset "interpolation" begin
+        @testset "of property names" begin
+            prop = :myprop
+            vn = @varname(x.$prop)
+            @test vn == @varname(x.myprop)
+        end
+
+        @testset "of indices" begin
+            idx = 3
+            vn = @varname(x[idx])
+            @test vn == @varname(x[3])
+        end
+
+        @testset "with dynamic indices" begin
+            idx = 3
+            vn = @varname(x[end - idx])
+            @test vn isa VarName
+            @test is_dynamic(vn)
+            arr = randn(6)
+            @test concretize(vn, arr) == @varname(x[3])
+            # Note that `idx` is only resolved at concretization time (because it's stored
+            # in a function that looks like (val -> lastindex(val) - idx) -- the VALUE of
+            # `idx` is not interpolated at macro time because we have no way of obtaining
+            # values inside the macro). So we could change it and re-concretize...
+            idx = 4
+            @test concretize(vn, arr) == @varname(x[2])
+        end
+
+        @testset "of top-level name" begin
+            name = :x
+            @test @varname($name) == @varname(x)
+            @test @varname($name[1]) == @varname(x[1])
+            @test @varname($name.a) == @varname(x.a)
+        end
+
+        @testset "mashup of everything" begin
+            name = :x
+            index = 2
+            prop = :b
+            @test @varname($name.$prop[3 * index]) == @varname(x.b[6])
         end
     end
 end

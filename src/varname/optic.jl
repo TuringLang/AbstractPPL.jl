@@ -111,6 +111,7 @@ function _make_dynamicindex_expr(symbol::Symbol, val_sym::Symbol, dim::Union{Not
     end
 end
 function _make_dynamicindex_expr(i::Any, ::Symbol, ::Union{Nothing,Int})
+    # this handles things like integers, colons, etc.
     return i
 end
 

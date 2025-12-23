@@ -262,7 +262,7 @@ function _varname(expr::Expr, inner_expr)
         # expr.head would be :ref or :.) Thus we don't need to recurse further, and we can
         # just return `inner_expr` as-is.
         sym_expr = expr.args[1]
-        return :($VarName{$(sym_expr)}($inner_expr)), nothing
+        return :(VarName{$(esc(sym_expr))}($inner_expr)), nothing
     else
         next_inner = if expr.head == :(.)
             sym = _handle_property(expr.args[2], expr)
