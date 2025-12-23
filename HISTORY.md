@@ -32,6 +32,8 @@ The `vsym` function (and `@vsym`) has been removed; you should use `getsym(vn)` 
 
 The `Base.get` and `Base.set!` methods for VarNames have been removed (these were responsible for method ambiguities).
 
+VarNames cannot be composed with optics now (you need to compose the optics yourself).
+
 The `inspace` function has been removed (it used to be relevant for Turing's old Gibbs sampler; but now it no longer serves any use).
 
 ## 0.13.6

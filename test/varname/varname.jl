@@ -4,11 +4,11 @@ using AbstractPPL
 using Test
 
 @testset "varname/varname.jl" verbose = true begin
-    @testset "basic construction" begin
-        @test @varname(x) == VarName{:x}(Iden())
-        @test @varname(x[1]) == VarName{:x}(Index((1,), Iden()))
-        @test @varname(x.a) == VarName{:x}(Property{:a}(Iden()))
-        @test @varname(x.a[1]) == VarName{:x}(Property{:a}(Index((1,), Iden())))
+    @testset "basic construction (and type stability)" begin
+        @test @varname(x) == (@inferred VarName{:x}(Iden()))
+        @test @varname(x[1]) == (@inferred VarName{:x}(Index((1,), Iden())))
+        @test @varname(x.a) == (@inferred VarName{:x}(Property{:a}(Iden())))
+        @test @varname(x.a[1]) == (@inferred VarName{:x}(Property{:a}(Index((1,), Iden()))))
     end
 
     @testset "errors on invalid inputs" begin
@@ -17,6 +17,28 @@ using Test
         @test_throws errmsg eval(:(@varname(1)))
         @test_throws errmsg eval(:(@varname(x + y)))
         @test_throws MethodError eval(:(@varname(x[1:Colon()])))
+    end
+
+    @testset "equality" begin
+        @test @varname(x) == @varname(x)
+        @test @varname(x) != @varname(y)
+        @test @varname(x[1]) == @varname(x[1])
+        @test @varname(x[1]) != @varname(x[2])
+        @test @varname(x.a) == @varname(x.a)
+        @test @varname(x.a) != @varname(x.b)
+        @test @varname(x.a[1]) == @varname(x.a[1])
+        @test @varname(x.a[1]) != @varname(x.a[2])
+        @test @varname(x.a[1]) != @varname(x.b[1])
+    end
+
+    @testset "pretty-printing" begin
+        @test string(@varname(x)) == "x"
+        @test string(@varname(x[1])) == "x[1]"
+        @test string(@varname(x.a)) == "x.a"
+        @test string(@varname(x.a[1])) == "x.a[1]"
+        @test string(@varname(x[begin])) == "x[DynamicIndex(begin)]"
+        @test string(@varname(x[end])) == "x[DynamicIndex(end)]"
+        @test string(@varname(x[:])) == "x[:]"
     end
 
     @testset "dynamic indices and manual concretization" begin

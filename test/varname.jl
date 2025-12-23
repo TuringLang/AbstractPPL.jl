@@ -4,60 +4,6 @@ using OffsetArrays
 using LinearAlgebra: LowerTriangular, UpperTriangular, cholesky
 
 @testset "varnames" begin
-    @testset "string and symbol conversion" begin
-        vn1 = @varname x[1][2]
-        @test string(vn1) == "x[1][2]"
-        @test Symbol(vn1) == Symbol("x[1][2]")
-    end
-
-    @testset "equality and hashing" begin
-        vn1 = @varname x[1][2]
-        vn2 = @varname x[1][2]
-        @test vn2 == vn1
-        @test hash(vn2) == hash(vn1)
-    end
-
-    @testset "construction & concretization" begin
-        i = 1:10
-        j = 2:2:5
-        @test @varname(A[1].b[i]) == @varname(A[1].b[1:10])
-        @test @varname(A[j]) == @varname(A[2:2:5])
-
-        @test @varname(A[:, 1][1 + 1]) == @varname(A[:, 1][2])
-        @test(@varname(A[:, 1][2]) == VarName{:A}(@o(_[:, 1]) ⨟ @o(_[2])))
-
-        # concretization
-        y = zeros(10, 10)
-        x = (a=[1.0 2.0; 3.0 4.0; 5.0 6.0],)
-
-        @test @varname(y[begin, i], true) == @varname(y[1, 1:10])
-        @test test_equal(@varname(y[:], true), @varname(y[1:100]))
-        @test test_equal(@varname(y[:, begin], true), @varname(y[1:10, 1]))
-        @test getoptic(AbstractPPL.concretize(@varname(y[:]), y)).indices[1] ===
-            AbstractPPL.ConcretizedSlice(to_indices(y, (:,))[1])
-        @test test_equal(@varname(x.a[1:end, end][:], true), @varname(x.a[1:3, 2][1:3]))
-    end
-
-    @testset "compose and opcompose" begin
-        @test IndexLens(1) ∘ @varname(x.a) == @varname(x.a[1])
-        @test @varname(x.a) ⨟ IndexLens(1) == @varname(x.a[1])
-
-        @test @varname(x) ⨟ identity == @varname(x)
-        @test identity ∘ @varname(x) == @varname(x)
-        @test @varname(x.a) ⨟ identity == @varname(x.a)
-        @test identity ∘ @varname(x.a) == @varname(x.a)
-        @test @varname(x[1].b) ⨟ identity == @varname(x[1].b)
-        @test identity ∘ @varname(x[1].b) == @varname(x[1].b)
-    end
-
-    @testset "get & set" begin
-        x = (a=[1.0 2.0; 3.0 4.0; 5.0 6.0], b=1.0)
-        @test get(x, @varname(a[1, 2])) == 2.0
-        @test get(x, @varname(b)) == 1.0
-        @test set(x, @varname(a[1, 2]), 10) == (a=[1.0 10.0; 3.0 4.0; 5.0 6.0], b=1.0)
-        @test set(x, @varname(b), 10) == (a=[1.0 2.0; 3.0 4.0; 5.0 6.0], b=10.0)
-    end
-
     @testset "subsumption with standard indexing" begin
         # x ⊑ x
         @test @varname(x) ⊑ @varname(x)
@@ -102,31 +48,6 @@ using LinearAlgebra: LowerTriangular, UpperTriangular, cholesky
         @test @varname(x[1:10, 1]) ⊑ @varname(x[:, 1:10])
         @test_throws ErrorException (@varname(x[:]) ⊑ @varname(x[1]))
         @test_throws ErrorException (@varname(x[:]) ⊑ @varname(x[:]))
-    end
-
-    @testset "non-standard indexing" begin
-        A = rand(10, 10)
-        @test test_equal(
-            @varname(A[1, Not(3)], true), @varname(A[1, [1, 2, 4, 5, 6, 7, 8, 9, 10]])
-        )
-
-        B = OffsetArray(A, -5, -5) # indices -4:5×-4:5
-        @test test_equal(@varname(B[1, :], true), @varname(B[1, -4:5]))
-    end
-    @testset "type stability" begin
-        @inferred VarName{:a}()
-        @inferred VarName{:a}(IndexLens(1))
-        @inferred VarName{:a}(IndexLens(1, 2))
-        @inferred VarName{:a}(PropertyLens(:b))
-        @inferred VarName{:a}(Accessors.opcompose(IndexLens(1), PropertyLens(:b)))
-
-        b = (a=[1, 2, 3],)
-        @inferred get(b, @varname(a[1]))
-        @inferred Accessors.set(b, @varname(a[1]), 10)
-
-        c = (b=(a=[1, 2, 3],),)
-        @inferred get(c, @varname(b.a[1]))
-        @inferred Accessors.set(c, @varname(b.a[1]), 10)
     end
 
     @testset "de/serialisation of VarNames" begin
