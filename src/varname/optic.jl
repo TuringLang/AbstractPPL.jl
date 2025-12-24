@@ -187,6 +187,11 @@ _maybe_view(val, i...; k...) = getindex(val, i...; k...)
 function concretize(idx::Index, val)
     concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
     inner_concretized = if idx.child isa Iden
+        # Explicitly having this branch allows us to shortcircuit _maybe_view(...), which
+        # can error if val[concretized_indices...] is an UndefInitializer. Note that if
+        # val[concretized_indices...] is an UndefInitializer, then it is not meaningful for
+        # `idx.child` to be anything other than `Iden` anyway, since there is nothing to
+        # further index into.
         Iden()
     else
         concretize(idx.child, _maybe_view(val, concretized_indices...; idx.kw...))
