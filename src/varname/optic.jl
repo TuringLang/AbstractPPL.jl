@@ -158,7 +158,12 @@ struct Index{I<:Tuple,N<:NamedTuple,C<:AbstractOptic} <: AbstractOptic
     end
 end
 
-Base.:(==)(a::Index, b::Index) = a.ix == b.ix && a.kw == b.kw && a.child == b.child
+# Workaround for https://github.com/JuliaLang/julia/issues/60470
+_tuple_eq(t1::Tuple, t2::Tuple) = (length(t1) == length(t2)) && _tuple_eq_inner(t1, t2)
+_tuple_eq_inner(t1::Tuple{}, t2::Tuple{}) = true
+_tuple_eq_inner(t1::Tuple{Any,Vararg{Any}}, t2::Tuple{Any,Vararg{Any}}) = Base._eq(t1, t2)
+
+Base.:(==)(a::Index, b::Index) = _tuple_eq(a.ix, b.ix) && a.kw == b.kw && a.child == b.child
 function Base.isequal(a::Index, b::Index)
     return isequal(a.ix, b.ix) && isequal(a.kw, b.kw) && isequal(a.child, b.child)
 end
