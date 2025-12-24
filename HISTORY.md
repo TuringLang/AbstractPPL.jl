@@ -48,6 +48,9 @@ It used to be relevant for Turing's old Gibbs sampler; but now it no longer serv
 The subsumption interface has been pared down to just a single function, `subsumes`.
 All other functions, such as `subsumedby`, `uncomparable`, and the Unicode operators, have been removed.
 
+Serialization still works exactly as before.
+However, you will see differences in the serialization output compared to previous versions, due to the changes in the internal structure.
+
 ## 0.13.6
 
 Fix a missing qualifier in AbstractPPLDistributionsExt.

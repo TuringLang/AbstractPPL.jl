@@ -16,7 +16,7 @@ include("varname/subsumes.jl")
 include("varname/hasvalue.jl")
 include("varname/leaves.jl")
 include("varname/prefix.jl")
-# include("varname/serialize.jl")
+include("varname/serialize.jl")
 
 # Optics
 export AbstractOptic,
@@ -47,14 +47,14 @@ export AbstractOptic,
     getvalue,
     canview,
     varname_leaves,
-    varname_and_value_leaves
+    varname_and_value_leaves,
+    # Serialisation
+    index_to_dict,
+    dict_to_index,
+    varname_to_string,
+    string_to_varname
 
-# Serialisation
-# index_to_dict,
-# dict_to_index,
-# varname_to_string,
-# string_to_varname,
-
+# Convenience re-export
 using Accessors: set
 export set
 

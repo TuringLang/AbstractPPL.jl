@@ -1,9 +1,11 @@
-using Accessors
-using InvertedIndices
-using OffsetArrays
+module VarNameSerialisationTests
 
-@testset "varnames" begin
-    @testset "de/serialisation of VarNames" begin
+using AbstractPPL
+using InvertedIndices: Not, InvertedIndex
+using Test
+
+@testset "varname/serialize.jl" verbose = true begin
+    @testset "roundtrip" begin
         y = ones(10)
         z = ones(5, 2)
         vns = [
@@ -23,8 +25,8 @@ using OffsetArrays
             @varname(x.a[1:10]),
             @varname(x[1].a),
             @varname(y[:]),
-            @varname(y[begin:end]),
-            @varname(y[end]),
+            @varname(y[begin:end], true),
+            @varname(y[end], true),
             @varname(y[:], false),
             @varname(y[:], true),
             @varname(z[:], false),
@@ -35,6 +37,8 @@ using OffsetArrays
             @varname(z[:, :], true),
             @varname(z[2:5, :], false),
             @varname(z[2:5, :], true),
+            @varname(x[i=1]),
+            @varname(x[].a[j=2].b[3, 4, 5, [6]]),
         ]
         for vn in vns
             @test string_to_varname(varname_to_string(vn)) == vn
@@ -50,24 +54,29 @@ using OffsetArrays
         @test hash(vn_vec) == hash(vn_vec2)
     end
 
-    @testset "de/serialisation of VarNames with custom index types" begin
-        using OffsetArrays: OffsetArrays, Origin
-        weird = Origin(4)(ones(10))
-        vn = @varname(weird[:], true)
+    @testset "deserialisation fails for unconcretised dynamic indices" begin
+        for vn in (@varname(x[1:end]), @varname(x[begin:end]), @varname(x[2:step:end]))
+            @test_throws ArgumentError varname_to_string(vn)
+        end
+    end
+
+    @testset "custom index types" begin
+        vn = @varname(x[Not(3)])
 
         # This won't work as we don't yet know how to handle OffsetArray
         @test_throws MethodError varname_to_string(vn)
 
         # Now define the relevant methods
-        AbstractPPL.index_to_dict(o::OffsetArrays.IdOffsetRange{I,R}) where {I,R} = Dict(
-            "type" => "OffsetArrays.OffsetArray",
-            "parent" => AbstractPPL.index_to_dict(o.parent),
-            "offset" => o.offset,
+        AbstractPPL.index_to_dict(o::InvertedIndex{I}) where {I} = Dict(
+            "type" => "InvertedIndices.InvertedIndex",
+            "skip" => AbstractPPL.index_to_dict(o.skip),
         )
-        AbstractPPL.dict_to_index(::Val{Symbol("OffsetArrays.OffsetArray")}, d) =
-            OffsetArrays.IdOffsetRange(AbstractPPL.dict_to_index(d["parent"]), d["offset"])
+        AbstractPPL.dict_to_index(::Val{Symbol("InvertedIndices.InvertedIndex")}, d) =
+            InvertedIndex(AbstractPPL.dict_to_index(d["skip"]))
 
         # Serialisation should now work
         @test string_to_varname(varname_to_string(vn)) == vn
     end
 end
+
+end # module
