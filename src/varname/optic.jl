@@ -173,7 +173,6 @@ function _pretty_print_optic(io::IO, idx::Index)
 end
 is_dynamic(idx::Index) = any(ix -> ix isa DynamicIndex, idx.ix) || is_dynamic(idx.child)
 
-#=
 # Helper function to decide whether to use `view` or `getindex`. For AbstractArray, the
 # default behaviour is to attempt to use a view.
 _maybe_view(val::AbstractArray, i...; k...) = view(val, i...; k...)
@@ -184,16 +183,14 @@ _maybe_view(val::AbstractArray, i...; k...) = view(val, i...; k...)
 _maybe_view(val::AbstractArray, i::Int...) = getindex(val, i...)
 # Other things like dictionaries can't be `view`ed into.
 _maybe_view(val, i...; k...) = getindex(val, i...; k...)
-=#
-# The above implementation works fine in the AbstractPPL test suite, but causes lots of test
-# breakage in DynamicPPL. TODO(penelopeysm): Figure out why and see if we can re-enable it.
-_maybe_view(val, i...; k...) = getindex(val, i...; k...)
 
 function concretize(idx::Index, val)
     concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
-    inner_concretized = concretize(
-        idx.child, _maybe_view(val, concretized_indices...; idx.kw...)
-    )
+    inner_concretized = if idx.child isa Iden
+        Iden()
+    else
+        concretize(idx.child, _maybe_view(val, concretized_indices...; idx.kw...))
+    end
     return Index(concretized_indices, idx.kw, inner_concretized)
 end
 function (idx::Index)(obj)
@@ -202,8 +199,12 @@ function (idx::Index)(obj)
 end
 function Accessors.set(obj, idx::Index, newval)
     cidx = concretize(idx, obj)
-    inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
-    inner_newval = Accessors.set(inner_obj, idx.child, newval)
+    inner_newval = if idx.child isa Iden
+        newval
+    else
+        inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
+        Accessors.set(inner_obj, idx.child, newval)
+    end
     return if !isempty(cidx.kw)
         # `Accessors.IndexLens` does not handle keyword arguments so we need to do this
         # ourselves. Note that the following code essentially assumes that `obj` is an
