@@ -254,7 +254,7 @@ function varname(expr, concretize::Bool)
     unconcretized_vn, sym = _varname(expr, :($(Iden)()))
     return if concretize
         sym === nothing && throw(VarNameConcretizationException())
-        :($(concretize)($unconcretized_vn, $(esc(sym))))
+        :($(AbstractPPL.concretize)($unconcretized_vn, $(esc(sym))))
     else
         unconcretized_vn
     end
