@@ -70,7 +70,9 @@ _subsumes_index(::DynamicIndex, ::Colon) = false
 _subsumes_index(::Colon, ::DynamicIndex) = true
 _subsumes_index(::Any, ::DynamicIndex) = false
 _subsumes_index(::Colon, ::Any) = true
+_subsumes_index(::Colon, ::Colon) = true
 _subsumes_index(::Any, ::Colon) = false
 _subsumes_index(a::AbstractVector, b::Any) = issubset(b, a)
 _subsumes_index(a::AbstractVector, b::Colon) = false
+_subsumes_index(a::AbstractVector, b::DynamicIndex) = false
 _subsumes_index(a::Any, b::Any) = a == b
