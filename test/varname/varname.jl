@@ -2,6 +2,7 @@ module VarNameTests
 
 using AbstractPPL
 using Test
+using JET: @test_call
 
 @testset "varname/varname.jl" verbose = true begin
     @testset "basic construction (and type stability)" begin
@@ -56,6 +57,28 @@ using Test
                 @varname(x[((begin * end) - begin):end]),
                 true,
             )
+        end
+    end
+
+    @testset "JET on equality + dynamic dispatch" begin
+        # This test is very specific, so some context is needed:
+        #
+        # In DynamicPPL it's quite common to want to search for a VarName in a collection of
+        # VarNames. Usually the collection will not have a concrete element type (because
+        # it's a mixture of different optics). Thus, there will be a fair amount of dynamic
+        # dispatch when performing the comparisons.
+        #
+        # In AbstractPPL, there is custom code in `src/varname/optic.jl` to make sure that
+        # equality comparisons of `Index` lenses are JET-friendly even when this happens
+        # (i.e., JET.jl doesn't error on `@report_call`). These were needed because base
+        # Julia's equality methods on tuples error with JET:
+        # https://github.com/JuliaLang/julia/issues/60470, and using those default methods
+        # would cause test failures in DynamicPPLJETExt.
+        #
+        # This test therefore makes sure we don't cause any regressions.
+        vns = [@varname(x), @varname(x[1]), @varname(x.a)]
+        for vn in vns
+            @test_call any(k -> k == vn, vns)
         end
     end
 

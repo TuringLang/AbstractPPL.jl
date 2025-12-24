@@ -11,7 +11,6 @@ using AbstractPPL
         @test string(@opticof(_)) == "Optic()"
         @test string(@opticof(_[begin])) == "Optic([DynamicIndex(begin)])"
         @test string(@opticof(_[2:end])) == "Optic([DynamicIndex(2:end)])"
-
         @test string(with_mutation(@opticof(_.a.b.c))) == "Optic!!(.a.b.c)"
         @test string(with_mutation(@opticof(_[1][2][3]))) == "Optic!!([1][2][3])"
         @test string(with_mutation(@opticof(_))) == "Optic!!()"
@@ -151,7 +150,7 @@ using AbstractPPL
             # not necessary... see
             # https://github.com/TuringLang/DynamicPPL.jl/issues/823#issuecomment-3166049286)
             x = Vector{Real}(undef, 3)
-            optic = opticof(_[2])
+            optic = @opticof(_[2])
             @test_throws UndefRefError optic(x)
             x2 = set(x, optic, 3.14)
             @test x2[2] == 3.14
@@ -245,7 +244,7 @@ using AbstractPPL
                 # discussion.
                 x = Vector{Real}(undef, 3)
                 old_objid = objectid(x)
-                optic = with_mutation(opticof(_[2]))
+                optic = with_mutation(@opticof(_[2]))
                 @test_throws UndefRefError optic(x)
                 set(x, optic, 3.14)
                 @test x[2] == 3.14

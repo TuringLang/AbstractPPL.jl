@@ -206,8 +206,16 @@ function _tuple_eq_inner(t1::Base.Any32, t2::Base.Any32)
     end
     return anymissing ? missing : true
 end
+# Because the Base methods for NamedTuple equality rely on tuple equality, we also need to
+# patch that :(
+_nt_eq(a::NamedTuple{n}, b::NamedTuple{n}) where {n} = _tuple_eq(Tuple(a), Tuple(b))
+_nt_eq(a::NamedTuple, b::NamedTuple) = false
 
-Base.:(==)(a::Index, b::Index) = _tuple_eq(a.ix, b.ix) && a.kw == b.kw && a.child == b.child
+# Note: Do NOT change this to `a.ix == b.ix`! This is a workaround for
+# https://github.com/JuliaLang/julia/issues/60470
+function Base.:(==)(a::Index, b::Index)
+    return _tuple_eq(a.ix, b.ix) && _nt_eq(a.kw, b.kw) && a.child == b.child
+end
 function Base.isequal(a::Index, b::Index)
     return isequal(a.ix, b.ix) && isequal(a.kw, b.kw) && isequal(a.child, b.child)
 end
