@@ -173,6 +173,7 @@ function _pretty_print_optic(io::IO, idx::Index)
 end
 is_dynamic(idx::Index) = any(ix -> ix isa DynamicIndex, idx.ix) || is_dynamic(idx.child)
 
+#=
 # Helper function to decide whether to use `view` or `getindex`. For AbstractArray, the
 # default behaviour is to attempt to use a view.
 _maybe_view(val::AbstractArray, i...; k...) = view(val, i...; k...)
@@ -182,6 +183,10 @@ _maybe_view(val::AbstractArray, i...; k...) = view(val, i...; k...)
 # 0-dimensional SubArray will fail.
 _maybe_view(val::AbstractArray, i::Int...) = getindex(val, i...)
 # Other things like dictionaries can't be `view`ed into.
+_maybe_view(val, i...; k...) = getindex(val, i...; k...)
+=#
+# The above implementation works fine in the AbstractPPL test suite, but causes lots of test
+# breakage in DynamicPPL. TODO(penelopeysm): Figure out why and see if we can re-enable it.
 _maybe_view(val, i...; k...) = getindex(val, i...; k...)
 
 function concretize(idx::Index, val)

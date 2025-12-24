@@ -43,6 +43,7 @@ export AbstractOptic,
     unprefix,
     hasvalue,
     getvalue,
+    canview,
     varname_leaves,
     varname_and_value_leaves
 
