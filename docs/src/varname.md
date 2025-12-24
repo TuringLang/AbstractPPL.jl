@@ -123,6 +123,18 @@ new_data = set(data, optic, 99)
 new_data, data
 ```
 
+If you want to try to mutate values, you can wrap an optic using `with_mutation`.
+
+```@example vn
+optic_mut = with_mutation(optic)
+set(data, optic_mut, 99)
+data
+```
+
+```@docs
+with_mutation
+```
+
 ## Composing and decomposing optics
 
 If you have two optics, you can compose them using the `∘` operator:

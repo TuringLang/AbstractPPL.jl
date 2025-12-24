@@ -53,36 +53,6 @@ using AbstractPPL: AbstractPPL, VarName, Accessors
 using Distributions: Distributions
 using LinearAlgebra: Cholesky, LowerTriangular, UpperTriangular
 
-#=
-This section is copied from Accessors.jl's documentation:
-https://juliaobjects.github.io/Accessors.jl/stable/examples/custom_macros/
-
-It defines a wrapper that, when called with `set`, mutates the original value
-rather than returning a new value. We need this because the non-mutating optics
-don't work for triangular matrices (and hence LKJCholesky): see
-https://github.com/JuliaObjects/Accessors.jl/issues/203
-=#
-struct Lens!{L}
-    pure::L
-end
-(l::Lens!)(o) = l.pure(o)
-Accessors.set(::Any, l::Lens!{AbstractPPL.Iden}, val) = val
-function Accessors.set(obj, l::Lens!{<:AbstractPPL.Property{sym}}, newval) where {sym}
-    inner_obj = getproperty(obj, sym)
-    inner_newval = Accessors.set(inner_obj, Lens!(l.pure.child), newval)
-    # Note that the following line actually does not mutate `obj.sym`. That's fine, because
-    # the things we are dealing with won't have mutable fields. The point is that
-    # the inner lens will have mutated whatever `obj.sym` pointed to.
-    return Accessors.set(obj, l.pure, inner_newval)
-end
-function Accessors.set(obj, l::Lens!{<:AbstractPPL.Index}, newval)
-    cidx = AbstractPPL.concretize(l.pure, obj)
-    inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
-    inner_newval = AbstractPPL.set(inner_obj, Lens!(l.pure.child), newval)
-    setindex!(obj, inner_newval, cidx.ix...; cidx.kw...)
-    return obj
-end
-
 """
     get_optics(dist::MultivariateDistribution)
     get_optics(dist::MatrixDistribution)
@@ -321,10 +291,10 @@ function AbstractPPL.getvalue(
             # Retrieve the value of this given index
             sub_value = AbstractPPL.getvalue(vals, sub_vn)
             # Set it inside the value we're reconstructing.
-            # Note: `o` is normally non-mutating. We have to wrap it in `Lens!`
-            # to make it mutating, because Cholesky distributions are broken
-            # by https://github.com/JuliaObjects/Accessors.jl/issues/203.
-            Accessors.set(value, Lens!(o), sub_value)
+            # Note: `o` is normally non-mutating. We have to use the mutating version,
+            # because Cholesky distributions are broken by
+            # https://github.com/JuliaObjects/Accessors.jl/issues/203.
+            Accessors.set(value, AbstractPPL.with_mutation(o), sub_value)
         end
         return value
     else

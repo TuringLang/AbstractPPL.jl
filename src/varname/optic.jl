@@ -1,4 +1,5 @@
 using Accessors: Accessors
+using BangBang: BangBang
 using MacroTools: MacroTools
 
 """
@@ -166,15 +167,15 @@ end
 
 # Workaround for https://github.com/JuliaLang/julia/issues/60470
 # In particular, these four methods are new:
-_tuple_eq_inner(t1::Tuple{}, t2::Tuple{}) = true
-_tuple_eq_inner(t1::Tuple{}, t2::Tuple) = false
-_tuple_eq_inner_missing(t1::Tuple, t2::Tuple{}) = false
-_tuple_eq_inner_missing(t1::Tuple{}, t2::Tuple) = false
+_tuple_eq_inner(::Tuple, ::Tuple{}) = false
+_tuple_eq_inner(::Tuple{}, ::Tuple) = false
+_tuple_eq_inner_missing(::Tuple, ::Tuple{}) = false
+_tuple_eq_inner_missing(::Tuple{}, ::Tuple) = false
 # These methods are directly copied from Base tuple.jl and correspond to the usual equality
 # checks for tuples
 _tuple_eq(t1::Tuple, t2::Tuple) = (length(t1) == length(t2)) && _tuple_eq_inner(t1, t2)
-_tuple_eq_inner(t1::Tuple, t2::Tuple{}) = false
-_tuple_eq_inner_missing(t1::Tuple{}, t2::Tuple{}) = missing
+_tuple_eq_inner(::Tuple{}, ::Tuple{}) = true
+_tuple_eq_inner_missing(::Tuple{}, ::Tuple{}) = missing
 function _tuple_eq_inner(t1::Tuple, t2::Tuple)
     eq = t1[1] == t2[1]
     if eq === false
@@ -448,3 +449,87 @@ function oinit(idx::Index)
     end
 end
 oinit(i::Iden) = i
+
+"""
+    with_mutation(o::AbstractOptic)
+
+Create a version of the optic `o` which attempts to mutate its input where possible.
+
+On their own, `AbstractOptic`s are non-mutating:
+
+```jldoctest
+julia> optic = @opticof(_[1])
+Optic([1])
+
+julia> x = [0.0, 0.0];
+
+julia> set(x, optic, 1.0); x
+2-element Vector{Float64}:
+ 0.0
+ 0.0
+```
+
+With this function, we can create a mutating version of the optic:
+
+```jldoctest
+julia> optic_mut = with_mutation(@opticof(_[1]))
+Optic!!([1])
+
+julia> x = [0.0, 0.0];
+
+julia> set(x, optic_mut, 1.0); x
+2-element Vector{Float64}:
+ 1.0
+ 0.0
+```
+
+Thanks to the BangBang.jl package, this optic will gracefully fall back to non-mutating
+behaviour if mutation is not possible. For example, if we try to use it on a tuple:
+
+```jldoctest
+julia> optic_mut = with_mutation(@opticof(_[1]))
+Optic!!([1])
+
+julia> x = (0.0, 0.0);
+
+julia> set(x, optic_mut, 1.0); x
+(0.0, 0.0)
+```
+"""
+with_mutation(o::AbstractOptic) = _Optic!!(o)
+
+struct _Optic!!{O<:AbstractOptic} <: AbstractOptic
+    pure::O
+end
+_Optic!!(l::_Optic!!) = l
+Base.:(==)(a::_Optic!!, b::_Optic!!) = a.pure == b.pure
+Base.isequal(a::_Optic!!, b::_Optic!!) = isequal(a.pure, b.pure)
+Base.hash(a::_Optic!!, h::UInt) = hash("_Optic!!", hash(a.pure, h))
+function Base.show(io::IO, l::_Optic!!)
+    print(io, "Optic!!(")
+    _pretty_print_optic(io, l.pure)
+    return print(io, ")")
+end
+
+# Getter.
+(l::_Optic!!)(o) = l.pure(o)
+# Setters.
+Accessors.set(::Any, l::_Optic!!{AbstractPPL.Iden}, val) = val
+function Accessors.set(obj, l::_Optic!!{<:AbstractPPL.Property{sym}}, newval) where {sym}
+    inner_obj = getproperty(obj, sym)
+    inner_newval = Accessors.set(inner_obj, _Optic!!(l.pure.child), newval)
+    return BangBang.setproperty!!(obj, sym, inner_newval)
+end
+function Accessors.set(obj, l::_Optic!!{<:AbstractPPL.Index}, newval)
+    cidx = AbstractPPL.concretize(l.pure, obj)
+    inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
+    inner_newval = AbstractPPL.set(inner_obj, _Optic!!(l.pure.child), newval)
+    return if isempty(cidx.kw)
+        # setindex!! doesn't support keyword arguments.
+        BangBang.setindex!!(obj, inner_newval, cidx.ix...)
+    else
+        # If there are keyword arguments, we just assume that setindex! will always work.
+        # This is a bit dangerous, but fine.
+        setindex!(obj, inner_newval, cidx.ix...; cidx.kw...)
+    end
+end

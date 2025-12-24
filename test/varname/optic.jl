@@ -144,6 +144,84 @@ using AbstractPPL
         @test set(s, @opticof(_.a), 10) == SampleStruct(10, s.b)
         @test set(s, @opticof(_.b), 2.5) == SampleStruct(s.a, 2.5)
     end
+
+    @testset "mutating versions" begin
+        @testset "arrays" begin
+            x = zeros(4)
+            old_objid = objectid(x)
+            optic = with_mutation(@opticof(_[2]))
+            @test optic(x) === x[2]
+            set(x, optic, 1.0)
+            @test x[2] == 1.0
+            @test x == [0.0, 1.0, 0.0, 0.0]
+            @test objectid(x) == old_objid
+        end
+
+        @testset "dicts" begin
+            x = Dict("a" => 1, "b" => 2)
+            old_objid = objectid(x)
+            optic = with_mutation(@opticof(_["b"]))
+            @test optic(x) === x["b"]
+            set(x, optic, 99)
+            @test x["b"] == 99
+            @test x == Dict("a" => 1, "b" => 99)
+            @test objectid(x) == old_objid
+        end
+
+        @testset "mutable structs" begin
+            mutable struct MutableStruct
+                a::Int
+                b::Float64
+            end
+            x = MutableStruct(3, 1.5)
+            old_objid = objectid(x)
+            optic = with_mutation(@opticof(_.a))
+            @test optic(x) === x.a
+            set(x, optic, 10)
+            @test x.a == 10
+            @test x.b == 1.5
+            @test objectid(x) == old_objid
+        end
+
+        @testset "fallback for immutable data" begin
+            @testset "NamedTuple" begin
+                s = (a=1, b=2)
+                old_objid = objectid(s)
+                optic = with_mutation(@opticof(_.a))
+                @test optic(s) === s.a
+                s2 = set(s, optic, 10)
+                @test s2 == (a=10, b=2)
+                @test s == (a=1, b=2)
+                @test objectid(s) == old_objid
+            end
+
+            @testset "tuple" begin
+                s = (3, 1.5)
+                old_objid = objectid(s)
+                optic = with_mutation(@opticof(_[1]))
+                @test optic(s) === s[1]
+                s2 = set(s, optic, 10)
+                @test s2 == (10, 1.5)
+                @test s == (3, 1.5)
+                @test objectid(s) == old_objid
+            end
+
+            @testset "struct" begin
+                struct SampleStructAgain
+                    a::Int
+                    b::Float64
+                end
+                s = SampleStructAgain(3, 1.5)
+                old_objid = objectid(s)
+                optic = with_mutation(@opticof(_.a))
+                @test optic(s) === s.a
+                s2 = set(s, optic, 10)
+                @test s2 == SampleStructAgain(10, 1.5)
+                @test s == SampleStructAgain(3, 1.5)
+                @test objectid(s) == old_objid
+            end
+        end
+    end
 end
 
 end # module
