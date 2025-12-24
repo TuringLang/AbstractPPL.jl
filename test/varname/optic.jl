@@ -147,14 +147,38 @@ using AbstractPPL
 
     @testset "mutating versions" begin
         @testset "arrays" begin
-            x = zeros(4)
-            old_objid = objectid(x)
-            optic = with_mutation(@opticof(_[2]))
-            @test optic(x) === x[2]
-            set(x, optic, 1.0)
-            @test x[2] == 1.0
-            @test x == [0.0, 1.0, 0.0, 0.0]
-            @test objectid(x) == old_objid
+            @testset "static index" begin
+                x = zeros(4)
+                old_objid = objectid(x)
+                optic = with_mutation(@opticof(_[2]))
+                @test optic(x) === x[2]
+                set(x, optic, 1.0)
+                @test x[2] == 1.0
+                @test x == [0.0, 1.0, 0.0, 0.0]
+                @test objectid(x) == old_objid
+            end
+
+            @testset "dynamic index" begin
+                x = zeros(2, 2)
+                old_objid = objectid(x)
+                optic = with_mutation(@opticof(_[begin, end]))
+                @test optic(x) === x[begin, end]
+                set(x, optic, 2.0)
+                @test x[begin, end] == 2.0
+                @test x == [0.0 2.0; 0.0 0.0]
+                @test objectid(x) == old_objid
+            end
+
+            @testset "keyword index" begin
+                x = DD.DimArray(zeros(2, 2), (:x, :y))
+                old_objid = objectid(x)
+                optic = with_mutation(@opticof(_[x=1, y=2]))
+                @test optic(x) === x[x=1, y=2]
+                set(x, optic, 2.0)
+                @test x[x=1, y=2] == 2.0
+                @test collect(x) == [0.0 2.0; 0.0 0.0]
+                @test objectid(x) == old_objid
+            end
         end
 
         @testset "dicts" begin
