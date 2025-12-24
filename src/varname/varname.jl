@@ -240,6 +240,17 @@ ERROR: LoadError: cannot automatically concretize VarName with interpolated top-
 ```
 """
 macro varname(expr, concretize::Bool=false)
+    return varname_macro(expr, concretize)
+end
+
+"""
+    varname_macro(expr, concretize::Bool)
+
+Implementation of the `@varname` macro. See the documentation for `@varname` for details.
+This function is exported to allow other macros (e.g. in DynamicPPL) to reuse the same
+logic.
+"""
+function varname_macro(expr, concretize::Bool)
     unconcretized_vn, sym = _varname(expr, :(Iden()))
     return if concretize
         sym === nothing && throw(VarNameConcretizationException())
@@ -348,17 +359,7 @@ specifically, if the top-level symbol is interpolated, automatic concretization 
 possible.
 """
 macro opticof(expr, concretize::Bool=false)
-    # This implementation is a bit ugly, as it copies the logic from `@varname`. However,
-    # getting the output of `@varname` and then processing it is a bit tricky, specifically
-    # when concretization is involved (because the top-level value must be escaped, but not
-    # anything else!). So it's easier to just duplicate the logic here.
-    unconcretized_vn, sym = _varname(expr, :(Iden()))
-    return if concretize
-        sym === nothing && throw(VarNameConcretizationException())
-        :(getoptic(concretize($unconcretized_vn, $(esc(sym)))))
-    else
-        :(getoptic($unconcretized_vn))
-    end
+    return :(getoptic($(varname_macro(expr, concretize))))
 end
 
 """

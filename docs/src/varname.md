@@ -19,6 +19,7 @@ vn = @varname(x.a[1])
 ```@docs
 VarName
 @varname
+varname_macro
 ```
 
 You can obtain the components of a `VarName` using the `getsym` and `getoptic` functions:
