@@ -163,7 +163,7 @@ using Test
         end
     end
 
-    @testset "DimArray and keyword indices" begin
+    @testset "DimArray indices (including keyword)" begin
         x = (; a=DD.DimArray(randn(2, 3), (:i, :j)))
         @test hasvalue(x, @varname(a))
         @test getvalue(x, @varname(a)) == x.a
@@ -177,6 +177,20 @@ using Test
         @test canview(@opticof(_[i=1, j=2]), x.a)
         @test hasvalue(x, @varname(a[i=1, j=2]))
         @test getvalue(x, @varname(a[i=1, j=2])) == x.a[i=1, j=2]
+        @test hasvalue(x, @varname(a[i=DD.Not(1)]))
+        @test getvalue(x, @varname(a[i=DD.Not(1)])) == x.a[i=DD.Not(1)]
+
+        y = (; b=DD.DimArray(randn(2, 3), (DD.X, DD.Y)))
+        @test hasvalue(y, @varname(b))
+        @test getvalue(y, @varname(b)) == y.b
+        @test hasvalue(y, @varname(b[1, 2]))
+        @test getvalue(y, @varname(b[1, 2])) == y.b[1, 2]
+        @test hasvalue(y, @varname(b[:]))
+        @test getvalue(y, @varname(b[:])) == y.b[:]
+        @test hasvalue(y, @varname(b[DD.X(1)]))
+        @test getvalue(y, @varname(b[DD.X(1)])) == y.b[DD.X(1)]
+        @test hasvalue(y, @varname(b[DD.X(1), DD.Y(2)]))
+        @test getvalue(y, @varname(b[DD.X(1), DD.Y(2)])) == y.b[DD.X(1), DD.Y(2)]
     end
 end
 
