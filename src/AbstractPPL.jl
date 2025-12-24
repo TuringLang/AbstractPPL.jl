@@ -26,7 +26,7 @@ include("varname/varname.jl")
 include("varname/subsumes.jl")
 # include("varname/hasvalue.jl")
 # include("varname/leaves.jl")
-# include("varname/prefix.jl")
+include("varname/prefix.jl")
 # include("varname/serialize.jl")
 
 # Optics
@@ -48,8 +48,10 @@ export AbstractOptic,
     @opticof,
     varname_to_optic,
     optic_to_varname,
-    # subsumes
-    subsumes
+    # other functions
+    subsumes,
+    prefix,
+    unprefix
 
 using Accessors: set
 export set

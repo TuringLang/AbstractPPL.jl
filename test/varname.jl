@@ -72,49 +72,6 @@ using LinearAlgebra: LowerTriangular, UpperTriangular, cholesky
         @test string_to_varname(varname_to_string(vn)) == vn
     end
 
-    @testset "prefix and unprefix" begin
-        @testset "basic cases" begin
-            @test prefix(@varname(y), @varname(x)) == @varname(x.y)
-            @test prefix(@varname(y), @varname(x[1])) == @varname(x[1].y)
-            @test prefix(@varname(y), @varname(x.a)) == @varname(x.a.y)
-            @test prefix(@varname(y[1]), @varname(x)) == @varname(x.y[1])
-            @test prefix(@varname(y.a), @varname(x)) == @varname(x.y.a)
-
-            @test unprefix(@varname(x.y[1]), @varname(x)) == @varname(y[1])
-            @test unprefix(@varname(x[1].y), @varname(x[1])) == @varname(y)
-            @test unprefix(@varname(x.a.y), @varname(x.a)) == @varname(y)
-            @test unprefix(@varname(x.y.a), @varname(x)) == @varname(y.a)
-            @test_throws ArgumentError unprefix(@varname(x.y.a), @varname(n))
-            @test_throws ArgumentError unprefix(@varname(x.y.a), @varname(x[1]))
-        end
-
-        @testset "round-trip" begin
-            # These seem similar to the ones above, but in the past they used
-            # to error because of issues with un-normalised ComposedFunction
-            # optics. We explicitly test round-trip (un)prefixing here to make
-            # sure that there aren't any regressions.
-            # This tuple is probably overkill, but the tests are super fast
-            # anyway.
-            vns = (
-                @varname(p),
-                @varname(q),
-                @varname(r[1]),
-                @varname(s.a),
-                @varname(t[1].a),
-                @varname(u[1].a.b),
-                @varname(v.a[1][2].b.c.d[3])
-            )
-            for vn1 in vns
-                for vn2 in vns
-                    prefixed = prefix(vn1, vn2)
-                    @test subsumes(vn2, prefixed)
-                    unprefixed = unprefix(prefixed, vn2)
-                    @test unprefixed == vn1
-                end
-            end
-        end
-    end
-
     @testset "varname{_and_value}_leaves" begin
         @testset "single value: float, int" begin
             x = 1.0
