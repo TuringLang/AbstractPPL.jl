@@ -360,7 +360,7 @@ specifically, if the top-level symbol is interpolated, automatic concretization 
 possible.
 """
 macro opticof(expr, concretize::Bool=false)
-    return :(getoptic($(varname_macro(expr, concretize))))
+    return :(getoptic($(varname(expr, concretize))))
 end
 
 """
