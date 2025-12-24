@@ -11,8 +11,7 @@ const GROUP = get(ENV, "GROUP", "All")
         include("varname/optic.jl")
         include("varname/varname.jl")
         include("varname/subsumes.jl")
-        # include("varname.jl")
-        # include("hasvalue.jl")
+        include("varname/hasvalue.jl")
     end
 
     if GROUP == "All" || GROUP == "Doctests"

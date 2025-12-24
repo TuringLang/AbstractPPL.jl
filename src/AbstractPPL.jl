@@ -24,7 +24,7 @@ include("evaluate.jl")
 include("varname/optic.jl")
 include("varname/varname.jl")
 include("varname/subsumes.jl")
-# include("varname/hasvalue.jl")
+include("varname/hasvalue.jl")
 # include("varname/leaves.jl")
 include("varname/prefix.jl")
 # include("varname/serialize.jl")
@@ -51,7 +51,9 @@ export AbstractOptic,
     # other functions
     subsumes,
     prefix,
-    unprefix
+    unprefix,
+    hasvalue,
+    getvalue
 
 using Accessors: set
 export set

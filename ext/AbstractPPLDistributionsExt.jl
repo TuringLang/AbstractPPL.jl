@@ -49,9 +49,7 @@ This decision may be revisited in the future.
 
 module AbstractPPLDistributionsExt
 
-#=
-
-using AbstractPPL: AbstractPPL, VarName, Accessors, LinearAlgebra
+using AbstractPPL: AbstractPPL, VarName, Accessors
 using Distributions: Distributions
 using LinearAlgebra: Cholesky, LowerTriangular, UpperTriangular
 
@@ -68,17 +66,21 @@ struct Lens!{L}
     pure::L
 end
 (l::Lens!)(o) = l.pure(o)
-function Accessors.set(o, l::Lens!{<:ComposedFunction}, val)
-    o_inner = l.pure.inner(o)
-    return Accessors.set(o_inner, Lens!(l.pure.outer), val)
+Accessors.set(::Any, l::Lens!{AbstractPPL.Iden}, val) = val
+function Accessors.set(obj, l::Lens!{<:AbstractPPL.Property{sym}}, newval) where {sym}
+    inner_obj = getproperty(obj, sym)
+    inner_newval = Accessors.set(inner_obj, Lens!(l.pure.child), newval)
+    # Note that the following line actually does not mutate `obj.sym`. That's fine, because
+    # the things we are dealing with won't have mutable fields. The point is that
+    # the inner lens will have mutated whatever `obj.sym` pointed to.
+    return Accessors.set(obj, l.pure, inner_newval)
 end
-function Accessors.set(o, l::Lens!{Accessors.PropertyLens{prop}}, val) where {prop}
-    setproperty!(o, prop, val)
-    return o
-end
-function Accessors.set(o, l::Lens!{<:Accessors.IndexLens}, val)
-    o[l.pure.indices...] = val
-    return o
+function Accessors.set(obj, l::Lens!{<:AbstractPPL.Index}, newval)
+    cidx = AbstractPPL.concretize(l.pure, obj)
+    inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
+    inner_newval = AbstractPPL.set(inner_obj, Lens!(l.pure.child), newval)
+    setindex!(obj, inner_newval, cidx.ix...; cidx.kw...)
+    return obj
 end
 
 """
@@ -92,7 +94,7 @@ function get_optics(
     dist::Union{Distributions.MultivariateDistribution,Distributions.MatrixDistribution}
 )
     indices = CartesianIndices(size(dist))
-    return map(idx -> Accessors.IndexLens(idx.I), indices)
+    return map(idx -> AbstractPPL.Index(idx.I, (;), AbstractPPL.Iden()), indices)
 end
 function get_optics(dist::Distributions.LKJCholesky)
     is_up = dist.uplo == 'U'
@@ -102,8 +104,14 @@ function get_optics(dist::Distributions.LKJCholesky)
     end
     # there is an additional layer as we need to access `.L` or `.U` before we
     # can index into it
-    field_lens = is_up ? (Accessors.@o _.U) : (Accessors.@o _.L)
-    return map(idx -> Accessors.IndexLens(idx.I) ∘ field_lens, cartesian_indices)
+    function make_lens(idx)
+        if is_up
+            AbstractPPL.Property{:U}(AbstractPPL.Index(idx.I, (;), AbstractPPL.Iden()))
+        else
+            AbstractPPL.Property{:L}(AbstractPPL.Index(idx.I, (;), AbstractPPL.Iden()))
+        end
+    end
+    return map(make_lens, cartesian_indices)
 end
 
 """
@@ -324,5 +332,4 @@ function AbstractPPL.getvalue(
     end
 end
 
-=#
 end

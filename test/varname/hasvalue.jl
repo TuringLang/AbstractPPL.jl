@@ -1,3 +1,8 @@
+module VarNameHasValueTests
+
+using AbstractPPL
+using Test
+
 @testset "base getvalue + hasvalue" begin
     @testset "basic NamedTuple" begin
         nt = (a=[1], b=2, c=(x=3, y=[4], z=(; p=[(; q=5)])), d=[1.0 0.5; 0.5 1.0])
@@ -214,4 +219,6 @@ end
         )
         @test !hasvalue(d, @varname(y), LKJCholesky(3, 1.0, :U); error_on_incomplete=true)
     end
+end
+
 end

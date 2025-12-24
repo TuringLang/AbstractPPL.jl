@@ -4,37 +4,48 @@
 Return `true` if `optic` can be used to view `container`, and `false` otherwise.
 
 # Examples
-```jldoctest; setup=:(using Accessors)
-julia> AbstractPPL.canview(@o(_.a), (a = 1.0, ))
+```jldoctest
+julia> AbstractPPL.canview(@opticof(_.a), (a = 1.0, ))
 true
 
-julia> AbstractPPL.canview(@o(_.a), (b = 1.0, )) # property `a` does not exist
+julia> AbstractPPL.canview(@opticof(_.a), (b = 1.0, )) # property `a` does not exist
 false
 
-julia> AbstractPPL.canview(@o(_.a[1]), (a = [1.0, 2.0], ))
+julia> AbstractPPL.canview(@opticof(_.a[1]), (a = [1.0, 2.0], ))
 true
 
-julia> AbstractPPL.canview(@o(_.a[3]), (a = [1.0, 2.0], )) # out of bounds
+julia> AbstractPPL.canview(@opticof(_.a[3]), (a = [1.0, 2.0], )) # out of bounds
 false
 ```
 """
 canview(optic, container) = false
-canview(::typeof(identity), _) = true
-function canview(::Accessors.PropertyLens{field}, x) where {field}
-    return hasproperty(x, field)
+canview(::Iden, ::Any) = true
+function canview(prop::Property{field}, x) where {field}
+    return hasproperty(x, field) && canview(prop.child, getproperty(x, field))
 end
-
-# `IndexLens`: only relevant if `x` supports indexing.
-canview(optic::Accessors.IndexLens, x) = false
-function canview(optic::Accessors.IndexLens, x::AbstractArray)
-    return checkbounds(Bool, x, optic.indices...)
+function canview(optic::Index, x::AbstractArray)
+    # TODO(penelopeysm): `checkbounds` doesn't work with keyword arguments for
+    # DimArray. Hence if we have keyword arguments, we just return false for now.
+    # https://github.com/rafaqz/DimensionalData.jl/issues/1156
+    return isempty(optic.kw) &&
+           checkbounds(Bool, x, optic.ix...) &&
+           canview(optic.child, getindex(x, optic.ix...))
 end
-
-# `ComposedFunction`: check that we can view `.inner` and `.outer`, but using
-# value extracted using `.inner`.
-function canview(optic::ComposedFunction, x)
-    return canview(optic.inner, x) && canview(optic.outer, optic.inner(x))
+# Handle some other edge cases.
+function canview(optic::Index, x::AbstractDict)
+    return isempty(optic.kw) &&
+           optic.ix.length == 1 &&
+           haskey(x, only(optic.ix)) &&
+           canview(optic.child, x[only(optic.ix)])
 end
+function canview(optic::Index, x::NamedTuple)
+    return isempty(optic.kw) &&
+           optic.ix.length == 1 &&
+           haskey(x, only(optic.ix)) &&
+           canview(optic.child, x[only(optic.ix)])
+end
+# Give up on all other edge cases.
+canview(optic::Index, x) = false
 
 """
     getvalue(vals::NamedTuple, vn::VarName)
@@ -153,21 +164,21 @@ function getvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
     # `x[1][2]`, we start by checking if `x[1]` is present, then `x`). We will
     # then keep removing optics from `test_optic`, either until we find a key
     # that is present, or until we run out of optics to test (which happens 
-    # after getoptic(test_vn) == identity).
+    # after getoptic(test_vn) isa Iden).
     o = getoptic(vn)
-    test_vn = VarName{sym}(_init(o))
-    test_optic = _last(o)
+    test_vn = VarName{sym}(oinit(o))
+    test_optic = olast(o)
 
     while true
         if haskey(vals, test_vn) && canview(test_optic, vals[test_vn])
             return test_optic(vals[test_vn])
         else
             # Try to move the outermost optic from test_vn into test_optic.
-            # If test_vn is already an identity, we can't, so we stop.
+            # If test_vn is already an Iden, we can't, so we stop.
             o = getoptic(test_vn)
-            o == identity && error("$(vn) was not found in the dictionary provided")
-            test_vn = VarName{sym}(_init(o))
-            test_optic = normalise(test_optic ∘ _last(o))
+            o isa Iden && error("$(vn) was not found in the dictionary provided")
+            test_vn = VarName{sym}(oinit(o))
+            test_optic = test_optic ∘ olast(o)
         end
     end
 end
@@ -246,21 +257,21 @@ function hasvalue(vals::AbstractDict{<:VarName}, vn::VarName{sym}) where {sym}
     # `x[1][2]`, we start by checking if `x[1]` is present, then `x`). We will
     # then keep removing optics from `test_optic`, either until we find a key
     # that is present, or until we run out of optics to test (which happens 
-    # after getoptic(test_vn) == identity).
+    # after getoptic(test_vn) == Iden()).
     o = getoptic(vn)
-    test_vn = VarName{sym}(_init(o))
-    test_optic = _last(o)
+    test_vn = VarName{sym}(oinit(o))
+    test_optic = olast(o)
 
     while true
         if haskey(vals, test_vn) && canview(test_optic, vals[test_vn])
             return true
         else
             # Try to move the outermost optic from test_vn into test_optic.
-            # If test_vn is already an identity, we can't, so we stop.
+            # If test_vn is already an Iden, we can't, so we stop.
             o = getoptic(test_vn)
-            o == identity && return false
-            test_vn = VarName{sym}(_init(o))
-            test_optic = normalise(test_optic ∘ _last(o))
+            o isa Iden && return false
+            test_vn = VarName{sym}(oinit(o))
+            test_optic = test_optic ∘ olast(o)
         end
     end
     return false

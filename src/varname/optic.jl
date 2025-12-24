@@ -172,9 +172,17 @@ function _pretty_print_optic(io::IO, idx::Index)
     return _pretty_print_optic(io, idx.child)
 end
 is_dynamic(idx::Index) = any(ix -> ix isa DynamicIndex, idx.ix) || is_dynamic(idx.child)
-# Things like dictionaries can't be `view`ed into.
+
+# Helper function to decide whether to use `view` or `getindex`.
 _maybe_view(val::AbstractArray, i...; k...) = view(val, i...; k...)
+# If it's just a single element, don't use a view, as that returns a weird 0-dimensional
+# SubArray (rather than an element) that messes things up if there are further layers of
+# optics. For example, if it's an Array of NamedTuples, then trying to access fields on that
+# 0-dimensional SubArray will fail.
+_maybe_view(val::AbstractArray, i::Int...) = getindex(val, i...)
+# Other Things like dictionaries can't be `view`ed into.
 _maybe_view(val, i...; k...) = getindex(val, i...; k...)
+
 function concretize(idx::Index, val)
     concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
     inner_concretized = concretize(
