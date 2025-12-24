@@ -52,7 +52,9 @@ getoptic(vn::VarName) = vn.optic
 function Base.:(==)(x::VarName, y::VarName)
     return getsym(x) == getsym(y) && getoptic(x) == getoptic(y)
 end
-Base.isequal(x::VarName, y::VarName) = x == y
+function Base.isequal(x::VarName, y::VarName)
+    return getsym(x) == getsym(y) && isequal(getoptic(x), getoptic(y))
+end
 
 Base.hash(vn::VarName, h::UInt) = hash((getsym(vn), getoptic(vn)), h)
 

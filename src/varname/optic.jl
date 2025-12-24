@@ -14,6 +14,10 @@ function Base.show(io::IO, optic::AbstractOptic)
     _pretty_print_optic(io, optic)
     return print(io, ")")
 end
+# Lots of (==) and isequal methods as a workaround for
+# https://github.com/JuliaLang/julia/issues/60470 :(
+Base.:(==)(a::AbstractOptic, b::AbstractOptic) = false
+Base.isequal(a::AbstractOptic, b::AbstractOptic) = false
 
 """
     Iden()
@@ -26,6 +30,8 @@ _pretty_print_optic(::IO, ::Iden) = nothing
 is_dynamic(::Iden) = false
 concretize(i::Iden, ::Any) = i
 (::Iden)(obj) = obj
+Base.:(==)(::Iden, ::Iden) = true
+Base.isequal(::Iden, ::Iden) = true
 Accessors.set(obj::Any, ::Iden, val) = Accessors.set(obj, identity, val)
 
 """
@@ -159,9 +165,46 @@ struct Index{I<:Tuple,N<:NamedTuple,C<:AbstractOptic} <: AbstractOptic
 end
 
 # Workaround for https://github.com/JuliaLang/julia/issues/60470
-_tuple_eq(t1::Tuple, t2::Tuple) = (length(t1) == length(t2)) && _tuple_eq_inner(t1, t2)
+# In particular, these four methods are new:
 _tuple_eq_inner(t1::Tuple{}, t2::Tuple{}) = true
-_tuple_eq_inner(t1::Tuple{Any,Vararg{Any}}, t2::Tuple{Any,Vararg{Any}}) = Base._eq(t1, t2)
+_tuple_eq_inner(t1::Tuple{}, t2::Tuple) = false
+_tuple_eq_inner_missing(t1::Tuple, t2::Tuple{}) = false
+_tuple_eq_inner_missing(t1::Tuple{}, t2::Tuple) = false
+# These methods are directly copied from Base tuple.jl and correspond to the usual equality
+# checks for tuples
+_tuple_eq(t1::Tuple, t2::Tuple) = (length(t1) == length(t2)) && _tuple_eq_inner(t1, t2)
+_tuple_eq_inner(t1::Tuple, t2::Tuple{}) = false
+_tuple_eq_inner_missing(t1::Tuple{}, t2::Tuple{}) = missing
+function _tuple_eq_inner(t1::Tuple, t2::Tuple)
+    eq = t1[1] == t2[1]
+    if eq === false
+        return false
+    elseif ismissing(eq)
+        return _tuple_eq_inner_missing(Base.tail(t1), Base.tail(t2))
+    else
+        return _tuple_eq_inner(Base.tail(t1), Base.tail(t2))
+    end
+end
+function _tuple_eq_inner_missing(t1::Tuple, t2::Tuple)
+    eq = t1[1] == t2[1]
+    if eq === false
+        return false
+    else
+        return _tuple_eq_inner_missing(Base.tail(t1), Base.tail(t2))
+    end
+end
+function _tuple_eq_inner(t1::Base.Any32, t2::Base.Any32)
+    anymissing = false
+    for i in eachindex(t1, t2)
+        eq = (t1[i] == t2[i])
+        if ismissing(eq)
+            anymissing = true
+        elseif !eq
+            return false
+        end
+    end
+    return anymissing ? missing : true
+end
 
 Base.:(==)(a::Index, b::Index) = _tuple_eq(a.ix, b.ix) && a.kw == b.kw && a.child == b.child
 function Base.isequal(a::Index, b::Index)
@@ -245,7 +288,8 @@ Property{sym}(child::C=Iden()) where {sym,C<:AbstractOptic} = Property{sym,C}(ch
 
 Base.:(==)(a::Property{sym}, b::Property{sym}) where {sym} = a.child == b.child
 Base.:(==)(a::Property, b::Property) = false
-Base.isequal(a::Property, b::Property) = a == b
+Base.isequal(a::Property{sym}, b::Property{sym}) where {sym} = isequal(a.child, b.child)
+Base.isequal(a::Property, b::Property) = false
 getsym(::Property{s}) where {s} = s
 function _pretty_print_optic(io::IO, prop::Property{sym}) where {sym}
     print(io, ".$(sym)")
