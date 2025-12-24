@@ -1,5 +1,4 @@
 using LinearAlgebra: LinearAlgebra
-
 """
     varname_leaves(vn::VarName, val)
 
@@ -28,41 +27,41 @@ x.z[2][1]
 varname_leaves(vn::VarName, ::Real) = [vn]
 function varname_leaves(vn::VarName, val::AbstractArray{<:Union{Real,Missing}})
     return (
-        VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn)) for
+        VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ getoptic(vn)) for
         I in CartesianIndices(val)
     )
 end
 function varname_leaves(vn::VarName, val::AbstractArray)
     return Iterators.flatten(
         varname_leaves(
-            VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn)), val[I]
+            VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ getoptic(vn)), val[I]
         ) for I in CartesianIndices(val)
     )
 end
 function varname_leaves(vn::VarName, val::NamedTuple)
     iter = Iterators.map(keys(val)) do k
-        optic = Accessors.PropertyLens{k}()
+        optic = Property{k}(Iden())
         varname_leaves(VarName{getsym(vn)}(optic ∘ getoptic(vn)), optic(val))
     end
     return Iterators.flatten(iter)
 end
 function varname_leaves(vn::VarName, val::LinearAlgebra.Cholesky)
     return if val.uplo == 'L'
-        optic = Accessors.PropertyLens{:L}()
+        optic = Property{:L}(Iden())
         varname_leaves(VarName{getsym(vn)}(optic ∘ getoptic(vn)), val.L)
     else
-        optic = Accessors.PropertyLens{:U}()
+        optic = Property{:U}(Iden())
         varname_leaves(VarName{getsym(vn)}(optic ∘ getoptic(vn)), val.U)
     end
 end
 function varname_leaves(vn::VarName, x::LinearAlgebra.LowerTriangular)
     return Iterators.map(Iterators.filter(I -> I[1] >= I[2], CartesianIndices(x))) do I
-        VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn))
+        VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ getoptic(vn))
     end
 end
 function varname_leaves(vn::VarName, x::LinearAlgebra.UpperTriangular)
     return Iterators.map(Iterators.filter(I -> I[1] <= I[2], CartesianIndices(x))) do I
-        VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn))
+        VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ getoptic(vn))
     end
 end
 # This is a default fallback for types that we don't know how to handle.
@@ -215,7 +214,7 @@ function varname_and_value_leaves_inner(
 )
     return (
         Leaf(
-            VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ AbstractPPL.getoptic(vn)),
+            VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ AbstractPPL.getoptic(vn)),
             val[I],
         ) for I in CartesianIndices(val)
     )
@@ -224,14 +223,14 @@ end
 function varname_and_value_leaves_inner(vn::VarName, val::AbstractArray)
     return Iterators.flatten(
         varname_and_value_leaves_inner(
-            VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ AbstractPPL.getoptic(vn)),
+            VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ AbstractPPL.getoptic(vn)),
             val[I],
         ) for I in CartesianIndices(val)
     )
 end
 function varname_and_value_leaves_inner(vn::VarName, val::NamedTuple)
     iter = Iterators.map(keys(val)) do k
-        optic = Accessors.PropertyLens{k}()
+        optic = Property{k}(Iden())
         varname_and_value_leaves_inner(
             VarName{getsym(vn)}(optic ∘ getoptic(vn)), optic(val)
         )
@@ -242,21 +241,25 @@ end
 # Special types.
 function varname_and_value_leaves_inner(vn::VarName, x::LinearAlgebra.Cholesky)
     return if x.uplo == 'L'
-        varname_and_value_leaves_inner(Accessors.PropertyLens{:L}() ∘ vn, x.L)
+        varname_and_value_leaves_inner(
+            VarName{getsym(vn)}(Property{:L}(Iden()) ∘ getoptic(vn)), x.L
+        )
     else
-        varname_and_value_leaves_inner(Accessors.PropertyLens{:U}() ∘ vn, x.U)
+        varname_and_value_leaves_inner(
+            VarName{getsym(vn)}(Property{:U}(Iden()) ∘ getoptic(vn)), x.U
+        )
     end
 end
 function varname_and_value_leaves_inner(vn::VarName, x::LinearAlgebra.LowerTriangular)
     return (
-        Leaf(VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn)), x[I])
+        Leaf(VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ getoptic(vn)), x[I])
         # Iteration over the lower-triangular indices.
         for I in CartesianIndices(x) if I[1] >= I[2]
     )
 end
 function varname_and_value_leaves_inner(vn::VarName, x::LinearAlgebra.UpperTriangular)
     return (
-        Leaf(VarName{getsym(vn)}(Accessors.IndexLens(Tuple(I)) ∘ getoptic(vn)), x[I])
+        Leaf(VarName{getsym(vn)}(Index(Tuple(I), (;), Iden()) ∘ getoptic(vn)), x[I])
         # Iteration over the upper-triangular indices.
         for I in CartesianIndices(x) if I[1] <= I[2]
     )

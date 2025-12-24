@@ -12,6 +12,7 @@ const GROUP = get(ENV, "GROUP", "All")
         include("varname/varname.jl")
         include("varname/subsumes.jl")
         include("varname/hasvalue.jl")
+        include("varname/leaves.jl")
     end
 
     if GROUP == "All" || GROUP == "Doctests"

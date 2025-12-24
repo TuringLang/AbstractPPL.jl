@@ -1,16 +1,5 @@
 module AbstractPPL
 
-# index_to_dict,
-# dict_to_index,
-# varname_to_string,
-# string_to_varname,
-# prefix,
-# unprefix,
-# getvalue,
-# hasvalue,
-# varname_leaves,
-# varname_and_value_leaves
-
 # Abstract model functions
 export AbstractProbabilisticProgram,
     condition, decondition, fix, unfix, logdensityof, densityof, AbstractContext, evaluate!!
@@ -25,7 +14,7 @@ include("varname/optic.jl")
 include("varname/varname.jl")
 include("varname/subsumes.jl")
 include("varname/hasvalue.jl")
-# include("varname/leaves.jl")
+include("varname/leaves.jl")
 include("varname/prefix.jl")
 # include("varname/serialize.jl")
 
@@ -53,7 +42,15 @@ export AbstractOptic,
     prefix,
     unprefix,
     hasvalue,
-    getvalue
+    getvalue,
+    varname_leaves,
+    varname_and_value_leaves
+
+# Serialisation
+# index_to_dict,
+# dict_to_index,
+# varname_to_string,
+# string_to_varname,
 
 using Accessors: set
 export set
