@@ -8,6 +8,7 @@ using Test
         @test subsumes(@varname(x), @varname(x))
         @test subsumes(@varname(x[1]), @varname(x[1]))
         @test subsumes(@varname(x.a), @varname(x.a))
+        @test subsumes(@varname(x[:]), @varname(x[:]))
     end
 
     uncomparable(vn1, vn2) = !subsumes(vn1, vn2) && !subsumes(vn2, vn1)
@@ -59,6 +60,8 @@ using Test
             @test strictly_subsumes(@varname(x[:]), @varname(x[end]))
             @test strictly_subsumes(@varname(x[:]), @varname(x[1:end]))
             @test strictly_subsumes(@varname(x[:]), @varname(x[end - 3]))
+            @test uncomparable(@varname(x[begin]), @varname(x["a"]))
+            @test uncomparable(@varname(x[begin]), @varname(x[1:5]))
         end
 
         @testset "keyword indices" begin

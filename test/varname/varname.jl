@@ -131,6 +131,13 @@ using JET: @test_call
             arr = randn(4, 4)
             @test concretize(vn, arr) == @varname(x[1:16])
         end
+
+        @testset "nested" begin
+            vn = @varname(x.a[end].b)
+            @test vn isa VarName
+            @test is_dynamic(vn)
+            @test concretize(vn, (; a=[(; b=1)])) == @varname(x.a[1].b)
+        end
     end
 
     @testset "things that shouldn't be dynamic aren't dynamic" begin

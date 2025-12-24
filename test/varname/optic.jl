@@ -8,11 +8,13 @@ using AbstractPPL
     @testset "pretty-printing" begin
         @test string(@opticof(_.a.b.c)) == "Optic(.a.b.c)"
         @test string(@opticof(_[1][2][3])) == "Optic([1][2][3])"
+        @test string(@opticof(_["a"][:b])) == "Optic([\"a\"][:b])"
         @test string(@opticof(_)) == "Optic()"
         @test string(@opticof(_[begin])) == "Optic([DynamicIndex(begin)])"
         @test string(@opticof(_[2:end])) == "Optic([DynamicIndex(2:end)])"
         @test string(with_mutation(@opticof(_.a.b.c))) == "Optic!!(.a.b.c)"
         @test string(with_mutation(@opticof(_[1][2][3]))) == "Optic!!([1][2][3])"
+        @test string(with_mutation(@opticof(_["a"][:b]))) == "Optic!!([\"a\"][:b])"
         @test string(with_mutation(@opticof(_))) == "Optic!!()"
         @test string(with_mutation(@opticof(_[begin]))) == "Optic!!([DynamicIndex(begin)])"
         @test string(with_mutation(@opticof(_[2:end]))) == "Optic!!([DynamicIndex(2:end)])"
@@ -227,6 +229,13 @@ using AbstractPPL
     end
 
     @testset "mutating versions" begin
+        @testset "construction and equality" begin
+            @test with_mutation(@opticof(_.a.b)) != @opticof(_.a.b)
+            # check that there is no nesting
+            @test with_mutation(with_mutation(@opticof(_.a.b))) ==
+                with_mutation(@opticof(_.a.b))
+        end
+
         @testset "arrays" begin
             @testset "static index" begin
                 x = zeros(4)
