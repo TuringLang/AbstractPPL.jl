@@ -144,6 +144,22 @@ using AbstractPPL
             @test set(x, @opticof(_[]), 9.0) == 9.0
         end
 
+        @testset "vector of undef" begin
+            # For this test to be meaningful, the eltype of `x` must be abstract. This sort
+            # of situation happens in DynamicPPL's demo models -- the use of `Real` as
+            # eltype is meant to help with ForwardDiff (even though *technically* that is
+            # not necessary... see
+            # https://github.com/TuringLang/DynamicPPL.jl/issues/823#issuecomment-3166049286)
+            x = Vector{Real}(undef, 3)
+            optic = opticof(_[2])
+            @test_throws UndefRefError optic(x)
+            x2 = set(x, optic, 3.14)
+            @test x2[2] == 3.14
+            @test !isassigned(x2, 1)
+            @test isassigned(x2, 2)
+            @test !isassigned(x2, 3)
+        end
+
         @testset "dynamic indices" begin
             x = [0.0 1.0; 2.0 3.0]
             @test @opticof(_[begin])(x) == x[begin]
@@ -221,6 +237,21 @@ using AbstractPPL
                 set(x, optic, 1.0)
                 @test x[2] == 1.0
                 @test x == [0.0, 1.0, 0.0, 0.0]
+                @test objectid(x) == old_objid
+            end
+
+            @testset "vector of undef" begin
+                # eltype(x) must be abstract for this test to be meaningful. See above for
+                # discussion.
+                x = Vector{Real}(undef, 3)
+                old_objid = objectid(x)
+                optic = with_mutation(opticof(_[2]))
+                @test_throws UndefRefError optic(x)
+                set(x, optic, 3.14)
+                @test x[2] == 3.14
+                @test !isassigned(x, 1)
+                @test isassigned(x, 2)
+                @test !isassigned(x, 3)
                 @test objectid(x) == old_objid
             end
 
