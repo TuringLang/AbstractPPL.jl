@@ -94,6 +94,15 @@ using AbstractPPL
             @test set(v, @opticof(_.d[:]), fill(9.9, 2, 2)) == (a=v.a, d=fill(9.9, 2, 2))
         end
 
+        @testset "no indices" begin
+            x = [0.0]
+            @test @opticof(_[])(x) == x[]
+            @test set(x, @opticof(_[]), 9.0) == [9.0]
+            x = 0.0
+            @test @opticof(_[])(x) == x[]
+            @test set(x, @opticof(_[]), 9.0) == 9.0
+        end
+
         @testset "dynamic indices" begin
             x = [0.0 1.0; 2.0 3.0]
             @test @opticof(_[begin])(x) == x[begin]
@@ -169,6 +178,17 @@ using AbstractPPL
                 @test objectid(x) == old_objid
             end
 
+            @testset "DimArray, setting a single element" begin
+                dimarray = DD.DimArray(zeros(2, 3), (DD.X, DD.Y))
+                old_objid = objectid(dimarray)
+                optic = with_mutation(@opticof(_[DD.X(1), DD.Y(1)]))
+                @test optic(dimarray) == dimarray[DD.X(1), DD.Y(1)]
+                dimarray = set(dimarray, optic, 1.0)
+                @test dimarray[DD.X(1), DD.Y(1)] == 1.0
+                @test collect(dimarray) == [1.0 0.0 0.0; 0.0 0.0 0.0]
+                @test objectid(dimarray) == old_objid
+            end
+
             @testset "keyword index" begin
                 x = DD.DimArray(zeros(2, 2), (:x, :y))
                 old_objid = objectid(x)
@@ -217,6 +237,27 @@ using AbstractPPL
                 @test s2 == (a=10, b=2)
                 @test s == (a=1, b=2)
                 @test objectid(s) == old_objid
+            end
+
+            # NOTE(penelopeysm): This SHOULD really mutate. It is not an error with
+            # AbstractPPL, though, it is an interface problem between BangBang and
+            # DimensionalData (essentially BangBang can't detect that DimArray is mutable).
+            # 
+            # To be precise, the test fails because BangBang thinks that `DD.Y(1)` is an
+            # index that extracts a single element from the DimArray. For example, this
+            # would be the case if it was dimarray[1]. So, BangBang thinks that you can't
+            # set an array there, and so it falls back to the immutable behavior.
+            # Specifically, it's this line that returns false:
+            # https://github.com/JuliaFolds2/BangBang.jl/blob/e92b4c1673a686533b5f9724a198b63d8974d52f/src/base.jl#L528
+            @testset "DimArray, setting a vector" begin
+                dimarray = DD.DimArray(zeros(2, 3), (DD.X, DD.Y))
+                old_objid = objectid(dimarray)
+                optic = with_mutation(@opticof(_[DD.Y(1)]))
+                @test optic(dimarray) == dimarray[DD.Y(1)]
+                dimarray = set(dimarray, optic, [1.0, 2.0])
+                @test collect(dimarray[DD.Y(1)]) == [1.0; 2.0]
+                @test collect(dimarray) == [1.0 0.0 0.0; 2.0 0.0 0.0]
+                # @test objectid(dimarray) == old_objid
             end
 
             @testset "tuple" begin
