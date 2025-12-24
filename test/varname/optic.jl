@@ -5,9 +5,50 @@ using DimensionalData: DimensionalData as DD
 using AbstractPPL
 
 @testset "varname/optic.jl" verbose = true begin
-    # Note that much of the functionality in optic.jl is tested by varname.jl (for example,
-    # pretty-printing VarNames essentially boils down to pretty-printing optics). So, this
-    # file focuses on tests that are specific to optics.
+    @testset "pretty-printing" begin
+        @test string(@opticof(_.a.b.c)) == "Optic(.a.b.c)"
+        @test string(@opticof(_[1][2][3])) == "Optic([1][2][3])"
+        @test string(@opticof(_)) == "Optic()"
+        @test string(@opticof(_[begin])) == "Optic([DynamicIndex(begin)])"
+        @test string(@opticof(_[2:end])) == "Optic([DynamicIndex(2:end)])"
+
+        @test string(with_mutation(@opticof(_.a.b.c))) == "Optic!!(.a.b.c)"
+        @test string(with_mutation(@opticof(_[1][2][3]))) == "Optic!!([1][2][3])"
+        @test string(with_mutation(@opticof(_))) == "Optic!!()"
+        @test string(with_mutation(@opticof(_[begin]))) == "Optic!!([DynamicIndex(begin)])"
+        @test string(with_mutation(@opticof(_[2:end]))) == "Optic!!([DynamicIndex(2:end)])"
+    end
+
+    @testset "equality" begin
+        optics = (
+            @opticof(_),
+            @opticof(_[1]),
+            @opticof(_.a),
+            @opticof(_[begin]),
+            @opticof(_[end]),
+            @opticof(_[:]),
+            @opticof(_.a[2]),
+            @opticof(_.a[1, :]),
+            @opticof(_[1].a),
+            @opticof(_[1, x=1].a),
+        )
+        for (i, optic1) in enumerate(optics)
+            for (j, optic2) in enumerate(optics)
+                if i == j
+                    @test optic1 == optic2
+                    @test with_mutation(optic1) == with_mutation(optic2)
+                    @test isequal(optic1, optic2)
+                    @test isequal(with_mutation(optic1), with_mutation(optic2))
+                else
+                    @test optic1 != optic2
+                    @test with_mutation(optic1) != with_mutation(optic2)
+                    @test !isequal(optic1, optic2)
+                    @test !isequal(with_mutation(optic1), with_mutation(optic2))
+                end
+            end
+        end
+    end
+
     @testset "composition" begin
         @testset "with identity" begin
             i = AbstractPPL.Iden()
@@ -143,15 +184,31 @@ using AbstractPPL
                 DD.DimArray([0.0 9.0; 2.0 8.0], (:x, :y))
         end
 
-        struct SampleStruct
-            a::Int
-            b::Float64
+        @testset "properties on struct" begin
+            struct SampleStruct
+                a::Int
+                b::Float64
+            end
+            s = SampleStruct(3, 1.5)
+            @test @opticof(_.a)(s) == 3
+            @test @opticof(_.b)(s) == 1.5
+            @test set(s, @opticof(_.a), 10) == SampleStruct(10, s.b)
+            @test set(s, @opticof(_.b), 2.5) == SampleStruct(s.a, 2.5)
         end
-        s = SampleStruct(3, 1.5)
-        @test @opticof(_.a)(s) == 3
-        @test @opticof(_.b)(s) == 1.5
-        @test set(s, @opticof(_.a), 10) == SampleStruct(10, s.b)
-        @test set(s, @opticof(_.b), 2.5) == SampleStruct(s.a, 2.5)
+
+        @testset "nested optics" begin
+            x = (; a=[(; b=1)])
+            optic = @opticof(_.a[1].b)
+            @test optic(x) == 1
+            x2 = set(x, optic, 42)
+            @test x2 == (; a=[(; b=42)])
+
+            y = [(; a=[1.0])]
+            optic2 = @opticof(_[1].a[1])
+            @test optic2(y) == 1.0
+            y2 = set(y, optic2, 3.14)
+            @test y2 == [(; a=[3.14])]
+        end
     end
 
     @testset "mutating versions" begin
@@ -198,6 +255,31 @@ using AbstractPPL
                 @test x[x=1, y=2] == 2.0
                 @test collect(x) == [0.0 2.0; 0.0 0.0]
                 @test objectid(x) == old_objid
+            end
+
+            @testset "nested optics" begin
+                x = (; a=[(; b=1)])
+                old_objid = objectid(x)
+                old_inner_objid = objectid(x.a)
+                optic = with_mutation(@opticof(_.a[1].b))
+                @test optic(x) == 1
+                set(x, optic, 42)
+                @test x == (; a=[(; b=42)])
+                # Check that mutation happened at the very bottom level.
+                @test objectid(x) == old_objid
+                @test objectid(x.a) == old_inner_objid
+
+                y = [(; a=[1.0])]
+                old_objid = objectid(y)
+                old_inner_objid = objectid(y[1])
+                old_inner_inner_objid = objectid(y[1].a)
+                optic2 = with_mutation(@opticof(_[1].a[1]))
+                @test optic2(y) == 1.0
+                set(y, optic2, 3.14)
+                @test y == [(; a=[3.14])]
+                @test objectid(y) == old_objid
+                @test objectid(y[1]) == old_inner_objid
+                @test objectid(y[1].a) == old_inner_inner_objid
             end
         end
 
