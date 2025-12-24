@@ -251,7 +251,7 @@ This function is exported to allow other macros (e.g. in DynamicPPL) to reuse th
 logic.
 """
 function varname(expr, concretize::Bool)
-    unconcretized_vn, sym = _varname(expr, :(Iden()))
+    unconcretized_vn, sym = _varname(expr, :($(Iden)()))
     return if concretize
         sym === nothing && throw(VarNameConcretizationException())
         :($(concretize)($unconcretized_vn, $(esc(sym))))
