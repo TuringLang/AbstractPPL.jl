@@ -1,6 +1,7 @@
 module VarNameHasValueTests
 
 using AbstractPPL
+using DimensionalData: DimensionalData as DD
 using Test
 
 @testset "base getvalue + hasvalue" begin
@@ -160,6 +161,22 @@ using Test
             @test !hasvalue(d, @varname(x[1][2][1][1]))
             @test !hasvalue(d, @varname(x[2][1][1][1]))
         end
+    end
+
+    @testset "DimArray and keyword indices" begin
+        x = (; a=DD.DimArray(randn(2, 3), (:i, :j)))
+        @test hasvalue(x, @varname(a))
+        @test getvalue(x, @varname(a)) == x.a
+        @test hasvalue(x, @varname(a[1, 2]))
+        @test getvalue(x, @varname(a[1, 2])) == x.a[1, 2]
+        @test hasvalue(x, @varname(a[:]))
+        @test getvalue(x, @varname(a[:])) == x.a[:]
+        @test canview(@opticof(_[i=1]), x.a)
+        @test hasvalue(x, @varname(a[i=1]))
+        @test getvalue(x, @varname(a[i=1])) == x.a[i=1]
+        @test canview(@opticof(_[i=1, j=2]), x.a)
+        @test hasvalue(x, @varname(a[i=1, j=2]))
+        @test getvalue(x, @varname(a[i=1, j=2])) == x.a[i=1, j=2]
     end
 end
 

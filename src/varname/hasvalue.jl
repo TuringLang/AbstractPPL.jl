@@ -18,18 +18,17 @@ julia> AbstractPPL.canview(@opticof(_.a[3]), (a = [1.0, 2.0], )) # out of bounds
 false
 ```
 """
-canview(optic, container) = false
+canview(::AbstractOptic, ::Any) = false
 canview(::Iden, ::Any) = true
 function canview(prop::Property{field}, x) where {field}
     return hasproperty(x, field) && canview(prop.child, getproperty(x, field))
 end
 function canview(optic::Index, x::AbstractArray)
-    # TODO(penelopeysm): `checkbounds` doesn't work with keyword arguments for
-    # DimArray. Hence if we have keyword arguments, we just return false for now.
-    # https://github.com/rafaqz/DimensionalData.jl/issues/1156
-    return isempty(optic.kw) &&
-           checkbounds(Bool, x, optic.ix...) &&
-           canview(optic.child, getindex(x, optic.ix...))
+    return if isempty(optic.kw)
+        checkbounds(Bool, x, optic.ix...) && canview(optic.child, getindex(x, optic.ix...))
+    else
+        _canview_fallback_kw(optic, x)
+    end
 end
 # Handle some other edge cases.
 function canview(optic::Index, x::AbstractDict)
@@ -44,8 +43,18 @@ function canview(optic::Index, x::NamedTuple)
            haskey(x, only(optic.ix)) &&
            canview(optic.child, x[only(optic.ix)])
 end
-# Give up on all other edge cases.
-canview(optic::Index, x) = false
+# For cases where there are keyword arguments, we don't have much of a choice but to
+# try/catch. For example, this will be hit when using keyword arguments for DimArray.
+# However, there's no `checkbounds` method (yet):
+# https://github.com/rafaqz/DimensionalData.jl/issues/1156
+function _canview_fallback_kw(optic::Index, x)
+    try
+        v = getindex(x, optic.ix...; optic.kw...)
+        return canview(optic.child, v)
+    catch
+        return false
+    end
+end
 
 """
     getvalue(vals::NamedTuple, vn::VarName)
