@@ -293,13 +293,13 @@ function _varname(expr::Expr, inner_expr)
             positional_ixs = map(positional_args) do (dim, ix_expr)
                 _handle_index(ix_expr, is_single_index ? nothing : dim)
             end
-            positional_tpl = Expr(:tuple, positional_ixs...)
+            positional_expr = Expr(:tuple, positional_ixs...)
             kwarg_expr = if isempty(keyword_args)
                 :((;))
             else
                 Expr(:tuple, keyword_args...)
             end
-            :(Index($positional_tpl, $kwarg_expr, $inner_expr))
+            :(Index($positional_expr, $kwarg_expr, $inner_expr))
         else
             # some other expression we can't parse
             throw(VarNameParseException(expr))
