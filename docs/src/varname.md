@@ -226,9 +226,10 @@ varname_leaves
 varname_and_value_leaves
 ```
 
-## Reading from a container with a VarName
+## Reading from a container with a VarName (or optic)
 
 ```@docs
+canview
 hasvalue
 getvalue
 ```
