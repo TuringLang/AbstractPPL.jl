@@ -152,7 +152,7 @@ _concretize_index(idx::DynamicIndex, val) = idx.f(val)
     Index(ix, kw, child=Iden())
 
 An indexing optic representing access to indices `ix`, which may also take the form of
-keyword arguments `kw`. A VarName{:x} with this optic represents access to `x[ix...,
+keyword arguments `kw`. A `VarName{:x}` with this optic represents access to `x[ix...,
 kw...]`. The child optic represents any further indexing or property access after this
 indexing operation.
 """
@@ -278,9 +278,9 @@ end
 """
     Property{sym}(child=Iden())
 
-A property access optic representing access to property `sym`. A VarName{:x} with this
-optic represents access to `x.sym`. The child optic represents any further indexing
-or property access after this property access operation.
+A property access optic representing access to property `sym`. A `VarName{:x}` with this
+optic represents access to `x.sym`. The child optic represents any further indexing or
+property access after this property access operation.
 """
 struct Property{sym,C<:AbstractOptic} <: AbstractOptic
     child::C

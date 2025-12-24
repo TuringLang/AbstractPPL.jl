@@ -225,15 +225,14 @@ julia> @varname(\$name.a.\$name[1])
 hello.a.hello[1]
 ```
 
-For indices, you do nott need to use `\$` to interpolate, just use the variable directly:
+For indices, you do not need to use `\$` to interpolate, just use the variable directly:
 
 ```jldoctest
 julia> ix = 2; @varname(x[ix])
 x[2]
 ```
 
-However, if the top-level symbol is interpolated, automatic concretization is not
-possible:
+Note that if the top-level symbol is interpolated, automatic concretization is not possible:
 
 ```jldoctest
 julia> name = :x; @varname(\$name[1:end], true)
@@ -345,15 +344,15 @@ If you don't need to concretize, you should use `_` as the top-level symbol to
 indicate that it is not relevant:
 
 ```jldoctest
-julia> AbstractPPL.@opticof(_.a.b)
+julia> @opticof(_.a.b)
 Optic(.a.b)
 ```
 
-Only if you need to concretize should you provide a real variable name (in which case
-it is then used to look up the value for concretization):
+If you need to concretize, then you can provide a real variable name (which is then used to
+look up the value for concretization):
 
 ```jldoctest
-julia> x = randn(3, 4); AbstractPPL.@opticof(x[1:end, end], true)
+julia> x = randn(3, 4); @opticof(x[1:end, end], true)
 Optic([1:3, 4])
 ```
 
