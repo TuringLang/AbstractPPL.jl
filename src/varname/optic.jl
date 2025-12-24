@@ -514,22 +514,26 @@ end
 # Getter.
 (l::_Optic!!)(o) = l.pure(o)
 # Setters.
-Accessors.set(::Any, l::_Optic!!{AbstractPPL.Iden}, val) = val
-function Accessors.set(obj, l::_Optic!!{<:AbstractPPL.Property{sym}}, newval) where {sym}
+Accessors.set(::Any, l::_Optic!!{Iden}, val) = val
+function Accessors.set(obj, l::_Optic!!{<:Property{sym}}, newval) where {sym}
     inner_obj = getproperty(obj, sym)
     inner_newval = Accessors.set(inner_obj, _Optic!!(l.pure.child), newval)
     return BangBang.setproperty!!(obj, sym, inner_newval)
 end
-function Accessors.set(obj, l::_Optic!!{<:AbstractPPL.Index}, newval)
-    cidx = AbstractPPL.concretize(l.pure, obj)
-    inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
-    inner_newval = AbstractPPL.set(inner_obj, _Optic!!(l.pure.child), newval)
+function Accessors.set(obj, l::_Optic!!{<:Index}, newval)
+    cidx = concretize(l.pure, obj)
+    inner_newval = if l.pure.child isa Iden
+        newval
+    else
+        inner_obj = Base.getindex(obj, cidx.ix...; cidx.kw...)
+        Accessors.set(inner_obj, _Optic!!(l.pure.child), newval)
+    end
     return if isempty(cidx.kw)
         # setindex!! doesn't support keyword arguments.
         BangBang.setindex!!(obj, inner_newval, cidx.ix...)
     else
         # If there are keyword arguments, we just assume that setindex! will always work.
         # This is a bit dangerous, but fine.
-        setindex!(obj, inner_newval, cidx.ix...; cidx.kw...)
+        Base.setindex!(obj, inner_newval, cidx.ix...; cidx.kw...)
     end
 end
