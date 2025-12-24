@@ -81,10 +81,10 @@ function _make_dynamicindex_expr(symbol::Symbol, dim::Union{Nothing,Int})
     # https://github.com/tree-sitter/tree-sitter-julia/issues/104
     if symbol === Symbol(:begin)
         func = dim === nothing ? :(Base.firstindex) : :(Base.Fix2(firstindex, $dim))
-        return :(DynamicIndex($(QuoteNode(symbol)), $func))
+        return :($(DynamicIndex)($(QuoteNode(symbol)), $func))
     elseif symbol === Symbol(:end)
         func = dim === nothing ? :(Base.lastindex) : :(Base.Fix2(lastindex, $dim))
-        return :(DynamicIndex($(QuoteNode(symbol)), $func))
+        return :($(DynamicIndex)($(QuoteNode(symbol)), $func))
     else
         # Just a variable; but we need to escape it to allow interpolation.
         return esc(symbol)
@@ -94,7 +94,7 @@ function _make_dynamicindex_expr(expr::Expr, dim::Union{Nothing,Int})
     @gensym val
     if has_begin_or_end(expr)
         replaced_expr = MacroTools.postwalk(x -> _make_dynamicindex_expr(x, val, dim), expr)
-        return :(DynamicIndex($(QuoteNode(expr)), $val -> $replaced_expr))
+        return :($(DynamicIndex)($(QuoteNode(expr)), $val -> $replaced_expr))
     else
         return esc(expr)
     end
