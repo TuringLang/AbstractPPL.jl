@@ -204,3 +204,31 @@ subsumes(vn1, vn2)
 ```@docs
 subsumes
 ```
+
+## Prefixing and unprefixing
+
+Composing two optics can be done using the `∘` operator, as shown above.
+But what if we want to compose two `VarName`s?
+This is used, for example, in DynamicPPL's submodel functionality.
+
+```@docs
+prefix
+unprefix
+```
+
+## VarName leaves
+
+The following functions are used to extract the 'leaves' of a VarName, that is, the atomic components of a VarName that do not have any further substructure.
+For example, for a vector variable `x`, the leaves would be `x[1]`, `x[2]`, etc.
+
+```@docs
+varname_leaves
+varname_and_value_leaves
+```
+
+## Reading from a container with a VarName
+
+```@docs
+hasvalue
+getvalue
+```
