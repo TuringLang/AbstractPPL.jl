@@ -240,21 +240,21 @@ ERROR: LoadError: cannot automatically concretize VarName with interpolated top-
 ```
 """
 macro varname(expr, concretize::Bool=false)
-    return varname_macro(expr, concretize)
+    return varname(expr, concretize)
 end
 
 """
-    varname_macro(expr, concretize::Bool)
+    varname(expr, concretize::Bool)
 
 Implementation of the `@varname` macro. See the documentation for `@varname` for details.
 This function is exported to allow other macros (e.g. in DynamicPPL) to reuse the same
 logic.
 """
-function varname_macro(expr, concretize::Bool)
+function varname(expr, concretize::Bool)
     unconcretized_vn, sym = _varname(expr, :(Iden()))
     return if concretize
         sym === nothing && throw(VarNameConcretizationException())
-        :(concretize($unconcretized_vn, $(esc(sym))))
+        :($(concretize)($unconcretized_vn, $(esc(sym))))
     else
         unconcretized_vn
     end
@@ -264,7 +264,7 @@ function _varname(@nospecialize(expr::Any), ::Any)
     throw(VarNameParseException(expr))
 end
 function _varname(sym::Symbol, inner_expr)
-    return :($VarName{$(QuoteNode(sym))}($inner_expr)), sym
+    return :($(VarName){$(QuoteNode(sym))}($inner_expr)), sym
 end
 function _varname(expr::Expr, inner_expr)
     if Meta.isexpr(expr, :$, 1)
@@ -273,11 +273,11 @@ function _varname(expr::Expr, inner_expr)
         # expr.head would be :ref or :.) Thus we don't need to recurse further, and we can
         # just return `inner_expr` as-is.
         sym_expr = expr.args[1]
-        return :(VarName{$(esc(sym_expr))}($inner_expr)), nothing
+        return :($(VarName){$(esc(sym_expr))}($inner_expr)), nothing
     else
         next_inner = if expr.head == :(.)
             sym = _handle_property(expr.args[2], expr)
-            :(Property{$(sym)}($inner_expr))
+            :($(Property){$(sym)}($inner_expr))
         elseif expr.head == :ref
             original_ixs = expr.args[2:end]
             positional_args = []
@@ -299,7 +299,7 @@ function _varname(expr::Expr, inner_expr)
             else
                 Expr(:tuple, keyword_args...)
             end
-            :(Index($positional_expr, $kwarg_expr, $inner_expr))
+            :($(Index)($positional_expr, $kwarg_expr, $inner_expr))
         else
             # some other expression we can't parse
             throw(VarNameParseException(expr))
