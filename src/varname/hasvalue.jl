@@ -33,13 +33,13 @@ end
 # Handle some other edge cases.
 function canview(optic::Index, x::AbstractDict)
     return isempty(optic.kw) &&
-           optic.ix.length == 1 &&
+           length(optic.ix) == 1 &&
            haskey(x, only(optic.ix)) &&
            canview(optic.child, x[only(optic.ix)])
 end
 function canview(optic::Index, x::NamedTuple)
     return isempty(optic.kw) &&
-           optic.ix.length == 1 &&
+           length(optic.ix) == 1 &&
            haskey(x, only(optic.ix)) &&
            canview(optic.child, x[only(optic.ix)])
 end

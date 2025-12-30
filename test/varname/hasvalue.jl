@@ -4,6 +4,70 @@ using AbstractPPL
 using DimensionalData: DimensionalData as DD
 using Test
 
+@testset "canview" begin
+    @testset "Vector" begin
+        x = [1, 2, 3]
+        @test canview(@opticof(_[1]), x)
+        @test canview(@opticof(_[2]), x)
+        @test canview(@opticof(_[1:2]), x)
+        @test canview(@opticof(_[:]), x)
+        @test !canview(@opticof(_[4]), x)
+        @test !canview(@opticof(_[2:4]), x)
+    end
+
+    @testset "Matrix" begin
+        x = [1 2 3; 4 5 6]
+        @test canview(@opticof(_[1, 1]), x)
+        @test canview(@opticof(_[2, 3]), x)
+        @test canview(@opticof(_[1:2, 2]), x)
+        @test canview(@opticof(_[:, 1]), x)
+        @test canview(@opticof(_[1, :]), x)
+        @test !canview(@opticof(_[3, 1]), x)
+        @test !canview(@opticof(_[1, 4]), x)
+        @test !canview(@opticof(_[2:3, 1]), x)
+    end
+
+    @testset "DimArray" begin
+        x = DD.DimArray([1, 2, 3], (:i,))
+        @test canview(@opticof(_[1]), x)
+        @test canview(@opticof(_[2]), x)
+        @test canview(@opticof(_[1:2]), x)
+        @test canview(@opticof(_[:]), x)
+        @test !canview(@opticof(_[4]), x)
+        @test canview(@opticof(_[i=1]), x)
+        # For some weird reason DimData does not error on these two but just warns that
+        # there's no index j!
+        @test canview(@opticof(_[j=2]), x)
+        @test canview(@opticof(_[i=1, j=2]), x)
+    end
+
+    @testset "Dict" begin
+        x = Dict(:a => [1, 2, 3], :b => (c=4, d=[5, 6]))
+        @test canview(@opticof(_[:a]), x)
+        @test canview(@opticof(_[:a][1]), x)
+        @test canview(@opticof(_[:a][2]), x)
+        @test canview(@opticof(_[:a][:]), x)
+        @test canview(@opticof(_[:b]), x)
+        @test canview(@opticof(_[:b].c), x)
+        @test canview(@opticof(_[:b].d), x)
+        @test canview(@opticof(_[:b].d[1]), x)
+        @test canview(@opticof(_[:b].d[2]), x)
+    end
+
+    @testset "NamedTuple" begin
+        x = (a=[1, 2, 3], b=(c=4, d=[5, 6]))
+        @test canview(@opticof(_.a), x)
+        @test canview(@opticof(_.a[1]), x)
+        @test canview(@opticof(_.a[2]), x)
+        @test canview(@opticof(_.a[:]), x)
+        @test canview(@opticof(_.b), x)
+        @test canview(@opticof(_.b.c), x)
+        @test canview(@opticof(_.b.d), x)
+        @test canview(@opticof(_.b.d[1]), x)
+        @test canview(@opticof(_.b.d[2]), x)
+    end
+end
+
 @testset "base getvalue + hasvalue" begin
     @testset "basic NamedTuple" begin
         nt = (a=[1], b=2, c=(x=3, y=[4], z=(; p=[(; q=5)])), d=[1.0 0.5; 0.5 1.0])
