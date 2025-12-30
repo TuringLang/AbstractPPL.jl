@@ -91,7 +91,7 @@ concretize(vn::VarName{sym}, x) where {sym} = VarName{sym}(concretize(getoptic(v
 """
     is_dynamic(vn::VarName)
 
-Return `true` if `vn` contains any dynamic indices (i.e., `begin`, `end`, or `:`). If a
+Return `true` if `vn` contains any dynamic indices (i.e., `begin` and `end`). If a
 `VarName` has been concretized, this will always return `false`.
 """
 is_dynamic(vn::VarName) = is_dynamic(getoptic(vn))
