@@ -38,6 +38,8 @@ using Test
             @varname(z[2:5, :], false),
             @varname(z[2:5, :], true),
             @varname(x[i=1]),
+            @varname(x[j=2, i=1]),
+            @varname(x[i=1, j=2]),
             @varname(x[].a[j=2].b[3, 4, 5, [6]]),
         ]
         for vn in vns
@@ -76,6 +78,15 @@ using Test
 
         # Serialisation should now work
         @test string_to_varname(varname_to_string(vn)) == vn
+
+        # Delete the methods to avoid side effects when running tests again.
+        Base.delete_method(which(AbstractPPL.index_to_dict, (InvertedIndex{Int},)))
+        Base.delete_method(
+            which(
+                AbstractPPL.dict_to_index,
+                (Val{Symbol("InvertedIndices.InvertedIndex")}, Dict),
+            ),
+        )
     end
 end
 
