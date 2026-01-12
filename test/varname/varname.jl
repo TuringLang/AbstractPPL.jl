@@ -220,6 +220,13 @@ using JET: @test_call
             @test @varname($name.$prop[3 * index]) == @varname(x.b[6])
         end
     end
+
+    @testset "append_optic" begin
+        @test append_optic(@varname(x), @opticof(_.a)) == @varname(x.a)
+        @test append_optic(@varname(x), @opticof(_[1])) == @varname(x[1])
+        @test append_optic(@varname(x.a), @opticof(_[1])) == @varname(x.a[1])
+        @test append_optic(@varname(x[1]), @opticof(_.a)) == @varname(x[1].a)
+    end
 end
 
 end # module VarNameTests
