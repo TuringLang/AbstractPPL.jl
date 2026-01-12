@@ -39,6 +39,7 @@ export AbstractOptic,
     @opticof,
     varname_to_optic,
     optic_to_varname,
+    append_optic,
     # other functions
     subsumes,
     prefix,

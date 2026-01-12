@@ -381,3 +381,22 @@ optic_to_varname(optic::Property{sym}) where {sym} = VarName{sym}(otail(optic))
 function optic_to_varname(::AbstractOptic)
     throw(ArgumentError("optic_to_varname: can only convert Property optics to VarName"))
 end
+
+"""
+    append_optic(vn::VarName, optic::AbstractOptic)
+
+Compose `optic` with the optic in `vn`, returning a new `VarName`.
+
+`optic` is placed at the tail of the existing optic, e.g.
+
+```jldoctest
+julia> vn = @varname(x.a.b)
+x.a.b
+
+julia> append_optic(vn, @opticof(_[1]))
+x.a.b[1]
+```
+"""
+function append_optic(vn::VarName{sym}, optic::AbstractOptic) where {sym}
+    return VarName{sym}(cat(getoptic(vn), optic))
+end

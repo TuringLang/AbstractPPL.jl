@@ -162,6 +162,12 @@ composed2 = Base.cat(optic1, optic2)
 Base.cat(::AbstractOptic...)
 ```
 
+`append_optic` is a shortcut for 'composing' an optic with a VarName.
+
+```@docs
+append_optic
+```
+
 Several functions are provided to decompose optics, which all stem from their linked-list structure.
 Their names directly mirror Haskell's functions for decomposing lists, but are prefixed with `o`:
 
