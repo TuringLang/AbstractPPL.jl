@@ -9,7 +9,7 @@ DocMeta.setdocmeta!(AbstractPPL, :DocTestSetup, :(using AbstractPPL); recursive=
 makedocs(;
     sitename="AbstractPPL",
     modules=[AbstractPPL, Base.get_extension(AbstractPPL, :AbstractPPLDistributionsExt)],
-    pages=["index.md", "api.md", "interface.md"],
+    pages=["index.md", "varname.md", "pplapi.md", "interface.md"],
     checkdocs=:exports,
     doctest=false,
 )

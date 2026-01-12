@@ -1,3 +1,84 @@
+module VarNameHasValueTests
+
+using AbstractPPL
+using DimensionalData: DimensionalData as DD
+using Test
+
+@testset "canview" begin
+    @testset "Vector" begin
+        x = [1, 2, 3]
+        @test canview(@opticof(_[1]), x)
+        @test canview(@opticof(_[2]), x)
+        @test canview(@opticof(_[1:2]), x)
+        @test canview(@opticof(_[:]), x)
+        @test !canview(@opticof(_[4]), x)
+        @test !canview(@opticof(_[2:4]), x)
+    end
+
+    @testset "Matrix" begin
+        x = [1 2 3; 4 5 6]
+        @test canview(@opticof(_[1, 1]), x)
+        @test canview(@opticof(_[2, 3]), x)
+        @test canview(@opticof(_[1:2, 2]), x)
+        @test canview(@opticof(_[:, 1]), x)
+        @test canview(@opticof(_[1, :]), x)
+        @test !canview(@opticof(_[3, 1]), x)
+        @test !canview(@opticof(_[1, 4]), x)
+        @test !canview(@opticof(_[2:3, 1]), x)
+    end
+
+    @testset "DimArray" begin
+        x = DD.DimArray([1, 2, 3], (:i,))
+        @test canview(@opticof(_[1]), x)
+        @test canview(@opticof(_[2]), x)
+        @test canview(@opticof(_[1:2]), x)
+        @test canview(@opticof(_[:]), x)
+        @test !canview(@opticof(_[4]), x)
+        @test canview(@opticof(_[i=1]), x)
+        # For some weird reason DimData does not error on these two but just warns that
+        # there's no index j!
+        @test canview(@opticof(_[j=2]), x)
+        @test canview(@opticof(_[i=1, j=2]), x)
+    end
+
+    @testset "Dict" begin
+        x = Dict(:a => [1, 2, 3], :b => (c=4, d=[5, 6]))
+        @test canview(@opticof(_[:a]), x)
+        @test canview(@opticof(_[:a][1]), x)
+        @test canview(@opticof(_[:a][2]), x)
+        @test canview(@opticof(_[:a][:]), x)
+        @test canview(@opticof(_[:b]), x)
+        @test canview(@opticof(_[:b].c), x)
+        @test canview(@opticof(_[:b].d), x)
+        @test canview(@opticof(_[:b].d[1]), x)
+        @test canview(@opticof(_[:b].d[2]), x)
+    end
+
+    @testset "NamedTuple" begin
+        x = (a=[1, 2, 3], b=(c=4, d=[5, 6]))
+        @test canview(@opticof(_.a), x)
+        @test canview(@opticof(_.a[1]), x)
+        @test canview(@opticof(_.a[2]), x)
+        @test canview(@opticof(_.a[:]), x)
+        @test canview(@opticof(_.b), x)
+        @test canview(@opticof(_.b.c), x)
+        @test canview(@opticof(_.b.d), x)
+        @test canview(@opticof(_.b.d[1]), x)
+        @test canview(@opticof(_.b.d[2]), x)
+    end
+
+    @testset "Dynamic lenses" begin
+        x = randn(2, 2)
+        @test canview(@opticof(_[begin]), x)
+        @test canview(@opticof(_[end]), x)
+        @test canview(@opticof(_[1:end]), x)
+        @test canview(@opticof(_[begin, end]), x)
+        @test canview(@opticof(_[begin + 1, end - 1]), x)
+        @test canview(@opticof(_[begin, :]), x)
+        @test canview(@opticof(_[:, begin]), x)
+    end
+end
+
 @testset "base getvalue + hasvalue" begin
     @testset "basic NamedTuple" begin
         nt = (a=[1], b=2, c=(x=3, y=[4], z=(; p=[(; q=5)])), d=[1.0 0.5; 0.5 1.0])
@@ -156,6 +237,36 @@
             @test !hasvalue(d, @varname(x[2][1][1][1]))
         end
     end
+
+    @testset "DimArray indices (including keyword)" begin
+        x = (; a=DD.DimArray(randn(2, 3), (:i, :j)))
+        @test hasvalue(x, @varname(a))
+        @test getvalue(x, @varname(a)) == x.a
+        @test hasvalue(x, @varname(a[1, 2]))
+        @test getvalue(x, @varname(a[1, 2])) == x.a[1, 2]
+        @test hasvalue(x, @varname(a[:]))
+        @test getvalue(x, @varname(a[:])) == x.a[:]
+        @test canview(@opticof(_[i=1]), x.a)
+        @test hasvalue(x, @varname(a[i=1]))
+        @test getvalue(x, @varname(a[i=1])) == x.a[i=1]
+        @test canview(@opticof(_[i=1, j=2]), x.a)
+        @test hasvalue(x, @varname(a[i=1, j=2]))
+        @test getvalue(x, @varname(a[i=1, j=2])) == x.a[i=1, j=2]
+        @test hasvalue(x, @varname(a[i=DD.Not(1)]))
+        @test getvalue(x, @varname(a[i=DD.Not(1)])) == x.a[i=DD.Not(1)]
+
+        y = (; b=DD.DimArray(randn(2, 3), (DD.X, DD.Y)))
+        @test hasvalue(y, @varname(b))
+        @test getvalue(y, @varname(b)) == y.b
+        @test hasvalue(y, @varname(b[1, 2]))
+        @test getvalue(y, @varname(b[1, 2])) == y.b[1, 2]
+        @test hasvalue(y, @varname(b[:]))
+        @test getvalue(y, @varname(b[:])) == y.b[:]
+        @test hasvalue(y, @varname(b[DD.X(1)]))
+        @test getvalue(y, @varname(b[DD.X(1)])) == y.b[DD.X(1)]
+        @test hasvalue(y, @varname(b[DD.X(1), DD.Y(2)]))
+        @test getvalue(y, @varname(b[DD.X(1), DD.Y(2)])) == y.b[DD.X(1), DD.Y(2)]
+    end
 end
 
 @testset "with Distributions: getvalue + hasvalue" begin
@@ -214,4 +325,6 @@ end
         )
         @test !hasvalue(d, @varname(y), LKJCholesky(3, 1.0, :U); error_on_incomplete=true)
     end
+end
+
 end

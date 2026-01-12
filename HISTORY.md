@@ -1,3 +1,56 @@
+## 0.14.0
+
+This release overhauls the `VarName` type.
+Much of the external API for traversing and manipulating `VarName`s (once they have been constructed) has been preserved, but if you use the `VarName` type directly, there are significant changes.
+
+**Internal representation**
+
+The `optic` field of VarName now uses our hand-rolled optic types, which are subtypes of `AbstractPPL.AbstractOptic`.
+Previously these were optics from Accessors.jl.
+
+This change was made for two reasons: firstly, it is easier to provide custom behaviour for VarNames as we avoid running into possible type piracy issues, and secondly, the linked-list data structure used in `AbstractOptic` is easier to work with than Accessors.jl, which used `Base.ComposedFunction` to represent optic compositions and required a lot of care to avoid a litany of issues with associativity and identity optics (see e.g. https://github.com/JuliaLang/julia/pull/54877).
+
+To construct an optic, the easiest way is to use the `@opticof` macro, which superficially behaves similarly to `Accessors.@optic` (for example, you can write `@opticof _[1].y.z`), but also supports automatic concretization by passing a second parameter (just like `@varname`).
+
+**Concretization**
+
+VarNames using 'dynamic' indices, i.e., `begin` and `end`, are now instantiated in a 'dynamic' form, meaning that these indices are unresolved.
+These indices need to be resolved, or concretized, against the actual container.
+For example, `@varname(x[end])` is dynamic, but when concretized against `x = randn(3)`, this becomes `@varname(x[3])`.
+This can be done using `concretize(varname, x)`.
+
+The idea of concretization is not new to AbstractPPL.
+However, there are some differences:
+
+  - Colons are no longer concretized: they *always* remain as Colons, even after calling `concretize`.
+  - Previously, AbstractPPL would refuse to allow you to construct unconcretized versions of `begin` and `end`. This is no longer the case; you can now create such VarNames in their unconcretized forms.
+    This is useful, for example, when indexing into a chain that contains `x` as a variable-length vector. This change allows you to write `chain[@varname(x[end])]` without having AbstractPPL throw an error.
+
+**Keyword arguments to `getindex`**
+
+VarNames can now be constructed with keyword arguments in `Index` optics, for example `@varname(x[i=1])`.
+This is specifically implemented to support DimensionalData.jl's DimArrays.
+
+**Other interface functions**
+
+The `vsym` function (and `@vsym`) has been removed; you should use `getsym(vn)` instead.
+
+The `Base.get` and `Accessors.set` methods for VarNames have been removed (these were responsible for method ambiguities).
+Instead of using these methods you can first convert the `VarName` to an optic using `varname_to_optic(vn)`, and then use the getter and setter methods on the optics.
+
+VarNames cannot be composed with optics now (compose the optics yourself).
+
+The `inspace` function has been removed.
+It used to be relevant for Turing's old Gibbs sampler; but now it no longer serves any use.
+
+`ConcretizedSlice` has been removed (since colons are no longer concretized).
+
+The subsumption interface has been pared down to just a single function, `subsumes`.
+All other functions, such as `subsumedby`, `uncomparable`, and the Unicode operators, have been removed.
+
+Serialization still works exactly as before.
+However, you will see differences in the serialization output compared to previous versions, due to the changes in the internal structure.
+
 ## 0.13.6
 
 Fix a missing qualifier in AbstractPPLDistributionsExt.

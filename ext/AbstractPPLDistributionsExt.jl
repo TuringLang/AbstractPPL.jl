@@ -49,35 +49,9 @@ This decision may be revisited in the future.
 
 module AbstractPPLDistributionsExt
 
-using AbstractPPL: AbstractPPL, VarName, Accessors, LinearAlgebra
+using AbstractPPL: AbstractPPL, VarName, Accessors
 using Distributions: Distributions
 using LinearAlgebra: Cholesky, LowerTriangular, UpperTriangular
-
-#=
-This section is copied from Accessors.jl's documentation:
-https://juliaobjects.github.io/Accessors.jl/stable/examples/custom_macros/
-
-It defines a wrapper that, when called with `set`, mutates the original value
-rather than returning a new value. We need this because the non-mutating optics
-don't work for triangular matrices (and hence LKJCholesky): see
-https://github.com/JuliaObjects/Accessors.jl/issues/203
-=#
-struct Lens!{L}
-    pure::L
-end
-(l::Lens!)(o) = l.pure(o)
-function Accessors.set(o, l::Lens!{<:ComposedFunction}, val)
-    o_inner = l.pure.inner(o)
-    return Accessors.set(o_inner, Lens!(l.pure.outer), val)
-end
-function Accessors.set(o, l::Lens!{Accessors.PropertyLens{prop}}, val) where {prop}
-    setproperty!(o, prop, val)
-    return o
-end
-function Accessors.set(o, l::Lens!{<:Accessors.IndexLens}, val)
-    o[l.pure.indices...] = val
-    return o
-end
 
 """
     get_optics(dist::MultivariateDistribution)
@@ -90,7 +64,7 @@ function get_optics(
     dist::Union{Distributions.MultivariateDistribution,Distributions.MatrixDistribution}
 )
     indices = CartesianIndices(size(dist))
-    return map(idx -> Accessors.IndexLens(idx.I), indices)
+    return map(idx -> AbstractPPL.Index(idx.I, (;), AbstractPPL.Iden()), indices)
 end
 function get_optics(dist::Distributions.LKJCholesky)
     is_up = dist.uplo == 'U'
@@ -100,8 +74,14 @@ function get_optics(dist::Distributions.LKJCholesky)
     end
     # there is an additional layer as we need to access `.L` or `.U` before we
     # can index into it
-    field_lens = is_up ? (Accessors.@o _.U) : (Accessors.@o _.L)
-    return map(idx -> Accessors.IndexLens(idx.I) ∘ field_lens, cartesian_indices)
+    function make_lens(idx)
+        if is_up
+            AbstractPPL.Property{:U}(AbstractPPL.Index(idx.I, (;), AbstractPPL.Iden()))
+        else
+            AbstractPPL.Property{:L}(AbstractPPL.Index(idx.I, (;), AbstractPPL.Iden()))
+        end
+    end
+    return map(make_lens, cartesian_indices)
 end
 
 """
@@ -311,10 +291,10 @@ function AbstractPPL.getvalue(
             # Retrieve the value of this given index
             sub_value = AbstractPPL.getvalue(vals, sub_vn)
             # Set it inside the value we're reconstructing.
-            # Note: `o` is normally non-mutating. We have to wrap it in `Lens!`
-            # to make it mutating, because Cholesky distributions are broken
-            # by https://github.com/JuliaObjects/Accessors.jl/issues/203.
-            Accessors.set(value, Lens!(o), sub_value)
+            # Note: `o` is normally non-mutating. We have to use the mutating version,
+            # because Cholesky distributions are broken by
+            # https://github.com/JuliaObjects/Accessors.jl/issues/203.
+            Accessors.set(value, AbstractPPL.with_mutation(o), sub_value)
         end
         return value
     else

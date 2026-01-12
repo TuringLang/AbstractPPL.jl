@@ -7,9 +7,13 @@ const GROUP = get(ENV, "GROUP", "All")
 @testset "AbstractPPL.jl" begin
     if GROUP == "All" || GROUP == "Tests"
         include("Aqua.jl")
-        include("varname.jl")
         include("abstractprobprog.jl")
-        include("hasvalue.jl")
+        include("varname/optic.jl")
+        include("varname/varname.jl")
+        include("varname/subsumes.jl")
+        include("varname/hasvalue.jl")
+        include("varname/leaves.jl")
+        include("varname/serialize.jl")
     end
 
     if GROUP == "All" || GROUP == "Doctests"
