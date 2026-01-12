@@ -66,6 +66,17 @@ using Test
         @test canview(@opticof(_.b.d[1]), x)
         @test canview(@opticof(_.b.d[2]), x)
     end
+
+    @testset "Dynamic lenses" begin
+        x = randn(2, 2)
+        @test canview(@opticof(_[begin]), x)
+        @test canview(@opticof(_[end]), x)
+        @test canview(@opticof(_[1:end]), x)
+        @test canview(@opticof(_[begin, end]), x)
+        @test canview(@opticof(_[begin + 1, end - 1]), x)
+        @test canview(@opticof(_[begin, :]), x)
+        @test canview(@opticof(_[:, begin]), x)
+    end
 end
 
 @testset "base getvalue + hasvalue" begin

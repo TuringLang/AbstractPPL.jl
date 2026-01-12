@@ -24,10 +24,12 @@ function canview(prop::Property{field}, x) where {field}
     return hasproperty(x, field) && canview(prop.child, getproperty(x, field))
 end
 function canview(optic::Index, x::AbstractArray)
-    return if isempty(optic.kw)
-        checkbounds(Bool, x, optic.ix...) && canview(optic.child, getindex(x, optic.ix...))
+    coptic = concretize(optic, x)
+    return if isempty(coptic.kw)
+        checkbounds(Bool, x, coptic.ix...) &&
+            canview(coptic.child, getindex(x, coptic.ix...))
     else
-        _canview_fallback_kw(optic, x)
+        _canview_fallback_kw(coptic, x)
     end
 end
 # Handle some other edge cases.
