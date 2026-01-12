@@ -24,7 +24,7 @@ function canview(prop::Property{field}, x) where {field}
     return hasproperty(x, field) && canview(prop.child, getproperty(x, field))
 end
 function canview(optic::Index, x::AbstractArray)
-    coptic = concretize(optic, x)
+    coptic = concretize_top_level(optic, x)
     return if isempty(coptic.kw)
         checkbounds(Bool, x, coptic.ix...) &&
             canview(coptic.child, getindex(x, coptic.ix...))

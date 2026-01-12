@@ -241,6 +241,23 @@ _maybe_view(val::AbstractArray, i::Int...) = getindex(val, i...)
 # Other things like dictionaries can't be `view`ed into.
 _maybe_view(val, i...; k...) = getindex(val, i...; k...)
 
+"""
+    concretize_top_level(idx::Index, val)
+
+Concretise only the indices of `idx` against `val`, leaving the child optic unconcretised.
+
+This function is unexported and is only used internally in `canview` (for now).
+"""
+function concretize_top_level(idx::Index, val)
+    concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
+    return Index(concretized_indices, idx.kw, idx.child)
+end
+"""
+    concretize(idx::Index, val)
+
+Recursively concretize all dynamic indices in `idx` (including its child optics) against
+`val`.
+"""
 function concretize(idx::Index, val)
     concretized_indices = tuple(map(Base.Fix2(_concretize_index, val), idx.ix)...)
     inner_concretized = if idx.child isa Iden
