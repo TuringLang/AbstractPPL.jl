@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Interface (outdated) · AbstractPPL</title><meta name="title" content="Interface (outdated) · AbstractPPL"/><meta property="og:title" content="Interface (outdated) · AbstractPPL"/><meta property="twitter:title" content="Interface (outdated) · AbstractPPL"/><meta name="description" content="Documentation for AbstractPPL."/><meta property="og:description" content="Documentation for AbstractPPL."/><meta property="twitter:description" content="Documentation for AbstractPPL."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body>
+<!-- NAVBAR START -->
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro&display=swap');
+
+    /* Documenter.jl CSS Overrides */
+    html {
+        scroll-padding-top: calc(var(--navbar-height) + 1rem);
+    }
+    .docs-sidebar, #documenter {
+        margin-top: var(--navbar-height);
+    }
+    .docs-version-selector {
+        margin-bottom: 60px !important;
+    }
+    @media screen and (max-width: 1056px) {
+        .docs-version-selector {
+            margin-bottom: 60px !important;
+        }
+        .docs-sidebar {
+            margin-top: 0 !important;
+        }
+    }
+    /* End of Documenter.jl Tweaks */
+
+    /* Color and Font Variables */
+    :root {
+        --heading-color: #6c757d;
+        --item-color: rgb(165, 165, 165);
+        --primary-bg: white;
+        --hover-color: #8faad2;
+        --deprecated-bg: #ff4d4d;
+        --deprecated-text: white;
+        --icon-color: #6c757d;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+        --dropdown-hover-bg: #e9ecef;
+        
+        /* Typography */
+        --font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        --nav-link-font-size: 1.0625rem;
+        --turing-title-font-size: 21.25px;
+        --icon-font-size: 1.25rem;
+        --dropdown-arrow-font-size: 0.6875rem;
+        --badge-font-size: 0.75rem;
+
+        /* Sizing and Spacing */
+        --navbar-height: 3.75rem;
+        --logo-height: 31px;
+        --logo-width: auto;
+        --logo-padding-top: 7px;
+        --logo-margin-left: 0.8rem;
+        --title-margin-left: 0.4px;
+        --title-nav-spacing: 1.1rem;
+        --nav-item-margin-left: 1.3rem;
+        --icon-margin-left: 1rem;
+        --dropdown-padding: 1.875rem;
+        --dropdown-item-width: 12.5rem;
+        --dropdown-subitem-width: 15.625rem;
+        --dropdown-subitem-padding: 0.125rem 0.625rem;
+    }
+
+    /* Dark Theme Variable Overrides */
+    html.theme--documenter-dark {
+        --heading-color: #e0e0e0;
+        --item-color: #bdbdbd;
+        --primary-bg: #1f2424;
+        --hover-color: #ffffff;
+        --icon-color: #e0e0e0;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #424242;
+    }
+
+    /* Catppuccin Theme Overrides */
+    html.theme--catppuccin-latte {
+        --heading-color: #4c4f69;
+        --primary-bg: #eff1f5;
+        --icon-color: #4c4f69;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+        --dropdown-hover-bg: #e6e9ef;
+    }
+    html.theme--catppuccin-frappe {
+        --heading-color: #c6d0f5;
+        --primary-bg: #303446;
+        --icon-color: #c6d0f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #51576d;
+    }
+    html.theme--catppuccin-macchiato {
+        --heading-color: #cad3f5;
+        --primary-bg: #24273a;
+        --icon-color: #cad3f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #494d64;
+    }
+    html.theme--catppuccin-mocha {
+        --heading-color: #cad3f5;
+        --primary-bg: #1e1e2e;
+        --icon-color: #cad3f5;
+        --shadow-color: rgba(255, 255, 255, 0.1);
+        --dropdown-hover-bg: #45475a;
+    }
+
+
+    /* Main Navigation Bar */
+    .ext-navigation {
+        font-family: var(--font-family);
+        position: fixed;
+        height: var(--navbar-height);
+        top: 0;
+        width: 100%;
+        background-color: var(--primary-bg);
+        z-index: 1000;
+        box-shadow: 0 2px 4px var(--shadow-color);
+        display: flex;
+        align-items: center;
+        padding: 0 1.0625rem;
+        transition: transform 0.3s, background-color 0.3s;
+    }
+
+    nav.ext-navigation .ext-navbar-logo {
+        margin-left: var(--logo-margin-left);
+        height: auto;
+        max-height: var(--logo-height);
+        width: auto;
+        padding-top: var(--logo-padding-top);
+    }
+    
+    /* Theme-aware logo text color */
+    .ext-navbar-logo .logo-text {
+        fill: var(--heading-color);
+    }
+    
+    .ext-navbar-title {
+        color: var(--heading-color) !important;
+        font-size: var(--turing-title-font-size) !important;
+        margin-left: var(--title-margin-left);
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    
+    .ext-navbar-title:hover {
+        color: var(--hover-color) !important;
+    }
+
+    .ext-nav-links {
+        display: flex;
+        align-items: center;
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        flex-grow: 1;
+        margin-left: var(--title-nav-spacing);
+    }
+
+    .ext-nav-links li:first-child {
+        margin-left: 0 !important;
+    }
+
+    .ext-nav-links li {
+        margin-left: var(--nav-item-margin-left) !important;
+    }
+
+    .ext-nav-link {
+        color: var(--heading-color) !important;
+        text-decoration: none;
+        font-size: var(--nav-link-font-size) !important;
+        transition: color 0.2s ease;
+        cursor: pointer;
+    }
+
+    .ext-nav-link:hover,
+    .ext-navbar-item-single a:hover,
+    .ext-navbar-icons a:hover {
+        color: var(--hover-color) !important;
+    }
+
+    .ext-navbar-item-single a {
+        color: var(--heading-color) !important;
+    }
+    
+    .ext-navbar-icons {
+        display: flex;
+        align-items: center;
+    }
+
+    .ext-navbar-icons a {
+        color: var(--icon-color) !important;
+        font-size: var(--icon-font-size) !important;
+        transition: color 0.2s ease;
+        margin-left: var(--icon-margin-left);
+    }
+
+    .ext-menu-toggle {
+        display: none;
+        font-size: 1.5rem;
+        color: var(--heading-color);
+        cursor: pointer;
+    }
+
+    .ext-dropdown {
+        display: none;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        padding: var(--dropdown-padding);
+        position: absolute;
+        top: var(--navbar-height);
+        width: 100%;
+        left: 0;
+        background-color: var(--primary-bg);
+        line-height: 1.875rem;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, background-color 0.3s;
+        transform: translateY(-0.625rem);
+        box-shadow: 0 4px 6px var(--shadow-color);
+    }
+
+    #library-handler::after {
+        content: "▼";
+        font-size: var(--dropdown-arrow-font-size);
+        margin-left: 0.3125rem;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    #library-handler.open::after {
+        content: "▲";
+    }
+
+    .ext-dropdown.show {
+        display: grid;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .ext-dropdown ul {
+        width: var(--dropdown-item-width);
+        margin-bottom: 1.25rem;
+    }
+
+    .ext-dropdown ul li {
+        text-align: left;
+        display: flex;
+        align-items: center;
+    }
+
+    .ext-dropdown ul a li {
+        color: var(--item-color);
+        width: var(--dropdown-subitem-width);
+        border-radius: 3px;
+        padding: var(--dropdown-subitem-padding);
+        transition: background-color 0.2s ease;
+    }
+
+    .ext-dropdown ul a li:hover {
+        background-color: var(--dropdown-hover-bg);
+    }
+
+    .ext-dropdown-item-heading {
+        color: var(--heading-color);
+        text-align: center;
+    }
+
+    .deprecated-badge {
+        background-color: var(--deprecated-bg);
+        color: var(--deprecated-text);
+        font-size: var(--badge-font-size);
+        padding: .1rem;
+        border-radius: 3px;
+        margin-left: 0.5rem;
+        line-height: 1;
+    }
+
+    @media (max-width: 966px) {
+        .ext-dropdown {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .ext-nav-links {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            background-color: var(--primary-bg);
+            position: absolute;
+            top: var(--navbar-height);
+            left: 0;
+            padding: 0.625rem 0;
+            height: auto;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px var(--shadow-color);
+            margin-left: 0;
+        }
+
+        .ext-nav-links.show {
+            display: flex;
+        }
+
+        .ext-nav-links li {
+            margin: 0.625rem 0 !important;
+            text-align: center;
+        }
+        
+        .ext-menu-toggle {
+            display: block;
+            margin-left: auto;
+        }
+
+        .ext-navigation.hide {
+            transform: translateY(calc(-1 * var(--navbar-height)));
+        }
+
+        .ext-dropdown {
+            position: static;
+            display: block;
+            opacity: 1;
+            transform: none;
+            box-shadow: none;
+            grid-template-columns: 1fr;
+            padding: 0.625rem;
+            text-align: center;
+        }
+
+        .ext-dropdown ul {
+            width: auto;
+            display: inline-block;
+            margin: 0 auto 0.3125rem;
+            text-align: left;
+        }
+    }
+</style>
+<nav class="ext-navigation">
+    <a href="https://turinglang.org/">
+        <svg width="4333" height="1145" viewBox="0 0 4333 1145" fill="none" xmlns="http://www.w3.org/2000/svg" class="ext-navbar-logo">
+            <path class="logo-text" d="M0.44603 193.181V66.9868H663.471V193.181H406.62V898H257.297V193.181H0.44603ZM1097.24 635.874V274.74H1244.13V898H1101.7V787.225H1095.21C1081.14 822.121 1058.01 850.66 1025.82 872.842C993.902 895.024 954.542 906.115 907.744 906.115C866.896 906.115 830.783 897.053 799.403 878.929C768.295 860.534 743.948 833.889 726.365 798.993C708.782 763.826 699.99 721.356 699.99 671.581V274.74H846.878V648.858C846.878 688.353 857.699 719.733 879.34 742.997C900.981 766.261 929.385 777.893 964.551 777.893C986.192 777.893 1007.16 772.618 1027.45 762.068C1047.73 751.518 1064.37 735.828 1077.35 714.999C1090.61 693.899 1097.24 667.524 1097.24 635.874ZM1395.17 898V274.74H1537.6V378.617H1544.09C1555.45 342.639 1574.93 314.911 1602.52 295.434C1630.38 275.687 1662.17 265.813 1697.88 265.813C1705.99 265.813 1715.05 266.219 1725.06 267.031C1735.34 267.572 1743.86 268.518 1750.63 269.871V404.992C1744.4 402.828 1734.53 400.934 1721 399.311C1707.75 397.417 1694.9 396.471 1682.46 396.471C1655.68 396.471 1631.6 402.287 1610.23 413.919C1589.13 425.28 1572.49 441.105 1560.32 461.393C1548.15 481.682 1542.06 505.081 1542.06 531.591V898H1395.17ZM1848.21 898V274.74H1995.1V898H1848.21ZM1922.06 186.283C1898.8 186.283 1878.78 178.573 1862.01 163.154C1845.24 147.464 1836.85 128.664 1836.85 106.752C1836.85 84.5701 1845.24 65.7695 1862.01 50.3503C1878.78 34.6606 1898.8 26.8158 1922.06 26.8158C1945.6 26.8158 1965.61 34.6606 1982.12 50.3503C1998.89 65.7695 2007.27 84.5701 2007.27 106.752C2007.27 128.664 1998.89 147.464 1982.12 163.154C1965.61 178.573 1945.6 186.283 1922.06 186.283ZM2293.04 532.809V898H2146.15V274.74H2286.54V380.646H2293.85C2308.18 345.75 2331.04 318.022 2362.42 297.463C2394.07 276.904 2433.16 266.625 2479.69 266.625C2522.7 266.625 2560.17 275.822 2592.09 294.217C2624.28 312.612 2649.17 339.257 2666.75 374.153C2684.6 409.049 2693.39 451.385 2693.12 501.159V898H2546.24V523.882C2546.24 482.223 2535.41 449.626 2513.77 426.092C2492.4 402.557 2462.78 390.79 2424.91 390.79C2399.21 390.79 2376.35 396.471 2356.34 407.832C2336.59 418.923 2321.03 435.019 2309.67 456.119C2298.58 477.218 2293.04 502.782 2293.04 532.809ZM3113.5 1144.71C3060.75 1144.71 3015.44 1137.54 2977.57 1123.2C2939.7 1109.13 2909.26 1090.2 2886.27 1066.39C2863.28 1042.59 2847.32 1016.21 2838.39 987.269L2970.67 955.213C2976.62 967.386 2985.28 979.424 2996.64 991.327C3008 1003.5 3023.28 1013.51 3042.49 1021.35C3061.97 1029.47 3086.45 1033.53 3115.93 1033.53C3157.59 1033.53 3192.08 1023.38 3219.4 1003.09C3246.73 983.076 3260.39 950.074 3260.39 904.087V786.008H3253.08C3245.51 801.157 3234.42 816.711 3219.81 832.671C3205.47 848.632 3186.4 862.022 3162.6 872.842C3139.06 883.663 3109.44 889.073 3073.73 889.073C3025.85 889.073 2982.44 877.847 2943.48 855.394C2904.8 832.671 2873.96 798.857 2850.97 753.952C2828.24 708.777 2816.88 652.24 2816.88 584.341C2816.88 515.902 2828.24 458.147 2850.97 411.078C2873.96 363.739 2904.93 327.896 2943.89 303.55C2982.84 278.933 3026.26 266.625 3074.14 266.625C3110.66 266.625 3140.69 272.847 3164.22 285.29C3188.03 297.463 3206.96 312.206 3221.03 329.519C3235.09 346.561 3245.78 362.657 3253.08 377.805H3261.2V274.74H3406.06V908.144C3406.06 961.435 3393.34 1005.53 3367.92 1040.42C3342.49 1075.32 3307.73 1101.43 3263.63 1118.74C3219.54 1136.05 3169.5 1144.71 3113.5 1144.71ZM3114.72 773.835C3145.83 773.835 3172.34 766.261 3194.25 751.112C3216.16 735.963 3232.79 714.187 3244.16 685.783C3255.52 657.379 3261.2 623.295 3261.2 583.53C3261.2 544.305 3255.52 509.95 3244.16 480.465C3233.07 450.979 3216.56 428.12 3194.65 411.89C3173.01 395.389 3146.37 387.138 3114.72 387.138C3081.98 387.138 3054.66 395.659 3032.75 412.701C3010.84 429.744 2994.34 453.143 2983.25 482.899C2972.16 512.385 2966.61 545.929 2966.61 583.53C2966.61 621.672 2972.16 655.08 2983.25 683.754C2994.61 712.158 3011.25 734.34 3033.16 750.3C3055.34 765.99 3082.53 773.835 3114.72 773.835ZM3647.08 906.927C3622.47 906.927 3601.37 898.271 3583.78 880.958C3566.2 863.645 3557.54 842.545 3557.82 817.658C3557.54 793.312 3566.2 772.482 3583.78 755.17C3601.37 737.857 3622.47 729.2 3647.08 729.2C3670.89 729.2 3691.58 737.857 3709.17 755.17C3727.02 772.482 3736.08 793.312 3736.35 817.658C3736.08 834.159 3731.75 849.173 3723.37 862.698C3715.25 876.224 3704.43 887.044 3690.91 895.16C3677.65 903.004 3663.04 906.927 3647.08 906.927ZM3888.01 274.74H4034.9V933.708C4034.9 978.613 4026.38 1015.67 4009.33 1044.89C3992.29 1074.1 3967.67 1095.88 3935.48 1110.22C3903.29 1124.55 3864.2 1131.72 3818.22 1131.72C3812.81 1131.72 3807.8 1131.59 3803.2 1131.32C3798.6 1131.32 3793.6 1131.18 3788.19 1130.91V1011.21C3792.25 1011.48 3795.9 1011.62 3799.15 1011.62C3802.39 1011.89 3805.77 1012.02 3809.29 1012.02C3837.42 1012.02 3857.58 1005.12 3869.75 991.327C3881.92 977.801 3888.01 957.918 3888.01 931.679V274.74ZM3961.05 186.283C3937.51 186.283 3917.36 178.573 3900.59 163.154C3884.09 147.464 3875.84 128.664 3875.84 106.752C3875.84 84.5701 3884.09 65.7695 3900.59 50.3503C3917.36 34.6606 3937.51 26.8158 3961.05 26.8158C3984.31 26.8158 4004.19 34.6606 4020.7 50.3503C4037.47 65.7695 4045.85 84.5701 4045.85 106.752C4045.85 128.664 4037.47 147.464 4020.7 163.154C4004.19 178.573 3984.31 186.283 3961.05 186.283ZM4332.83 66.9868V898H4185.94V66.9868H4332.83Z" fill="currentColor"/>
+            <path d="M4076 108.5C4076 168.424 4027.42 217 3967.5 217C3907.58 217 3859 168.424 3859 108.5C3859 48.5762 3907.58 0 3967.5 0C4027.42 0 4076 48.5762 4076 108.5Z" fill="#389725"/>
+            <path d="M3755 814.5C3755 874.424 3706.42 923 3646.5 923C3586.58 923 3538 874.424 3538 814.5C3538 754.576 3586.58 706 3646.5 706C3706.42 706 3755 754.576 3755 814.5Z" fill="#9457B1"/>
+            <path d="M2030 108.5C2030 168.424 1981.42 217 1921.5 217C1861.58 217 1813 168.424 1813 108.5C1813 48.5762 1861.58 0 1921.5 0C1981.42 0 2030 48.5762 2030 108.5Z" fill="#CA3B33"/>
+        </svg>
+    </a>
+    <!-- <a class="ext-navbar-title" href="https://turinglang.org/">Turing.jl</a> -->
+    
+    <ul class="ext-nav-links">
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/getting-started/">Get Started</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/tutorials/">Tutorials</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/docs/faq/">FAQ</a></li>
+        <li>
+            <p class="ext-nav-link" id="library-handler">Libraries</p>
+            <div class="ext-dropdown" id="ext-dropdown-items">
+                <ul>
+                    <li class="ext-dropdown-item-heading">Modelling Languages</li>
+                    <a href="https://turinglang.org/DynamicPPL.jl/"><li>DynamicPPL</li></a>
+                    <a href="https://turinglang.org/JuliaBUGS.jl/"><li>JuliaBUGS</li></a>
+                    <a href="https://turinglang.org/TuringGLM.jl/"><li>TuringGLM</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">MCMC</li>
+                    <a href="https://turinglang.org/AdvancedHMC.jl/"><li>AdvancedHMC</li></a>
+                    <a href="https://turinglang.org/AbstractMCMC.jl/"><li>AbstractMCMC</li></a>
+                    <a href="https://github.com/theogf/ThermodynamicIntegration.jl"><li>ThermodynamicIntegration</li></a>
+                    <a href="https://turinglang.org/AdvancedPS.jl/"><li>AdvancedPS</li></a>
+                    <a href="https://turinglang.org/SliceSampling.jl/"><li>SliceSampling</li></a>
+                    <a href="https://turinglang.org/EllipticalSliceSampling.jl/"><li>EllipticalSliceSampling</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Diagnostics</li>
+                    <a href="https://turinglang.org/MCMCChains.jl/"><li>MCMCChains</li></a>
+                    <a href="https://turinglang.org/MCMCDiagnosticTools.jl/"><li>MCMCDiagnosticTools</li></a>
+                    <a href="https://turinglang.org/ParetoSmooth.jl/"><li>ParetoSmooth</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Gaussian Processes</li>
+                    <a href="https://juliagaussianprocesses.github.io/AbstractGPs.jl/"><li>AbstractGPs</li></a>
+                    <a href="https://juliagaussianprocesses.github.io/KernelFunctions.jl/"><li>KernelFunctions</li></a>
+                    <a href="https://juliagaussianprocesses.github.io/ApproximateGPs.jl/"><li>ApproximateGPs</li></a>
+                </ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/Bijectors.jl/">Bijectors</a></li></ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/TuringCallbacks.jl/">TuringCallbacks</a></li></ul>
+                <ul><li class="ext-dropdown-item-heading ext-navbar-item-single"><a href="https://turinglang.org/Deprecated/TuringBenchmarking/">TuringBenchmarking</a><span class="deprecated-badge">Deprecated</span></li></ul>
+            </div>
+        </li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/news/">News</a></li>
+        <li><a class="ext-nav-link" href="https://turinglang.org/team/">Team</a></li>
+    </ul>
+
+    <div class="ext-navbar-icons">
+        <a href="https://x.com/TuringLang" aria-label="Turing on X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="https://discourse.julialang.org/c/domain/probprog/48" aria-label="Turing on Discourse"><i class="fa-brands fa-discourse"></i></a>
+        <a href="https://julialang.slack.com/archives/CCYDC34A0" aria-label="Turing on Slack"><i class="fa-brands fa-slack"></i></a>
+        <a href="https://github.com/TuringLang/" aria-label="Turing.jl on GitHub"><i class="fa-brands fa-github"></i></a>
+    </div>
+
+    <span class="ext-menu-toggle"><i class="fa-solid fa-bars"></i></span>
+</nav>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuToggle = document.querySelector(".ext-menu-toggle");
+        const navLinks = document.querySelector(".ext-nav-links");
+        const nav = document.querySelector(".ext-navigation");
+        const libraryHandler = document.getElementById("library-handler");
+        const dropdownContainer = document.getElementById("ext-dropdown-items");
+        let lastScrollY = window.scrollY;
+
+        function closeDropdown() {
+            if (dropdownContainer.classList.contains("show")) {
+                libraryHandler.classList.remove("open");
+                dropdownContainer.classList.remove("show");
+                setTimeout(() => {
+                    if (!dropdownContainer.classList.contains("show")) {
+                        dropdownContainer.style.display = "none";
+                    }
+                }, 300);
+            }
+        }
+
+        function openDropdown() {
+            dropdownContainer.style.display = "grid";
+            libraryHandler.classList.add("open");
+            setTimeout(() => {
+                dropdownContainer.classList.add("show");
+            }, 10);
+        }
+
+        function setAppropriateHeight() {
+            if (window.innerWidth <= 768) {
+                const viewportHeight = window.innerHeight;
+                const navHeight = nav.offsetHeight;
+                navLinks.style.maxHeight = `${viewportHeight - navHeight}px`;
+                navLinks.style.overflowY = "auto";
+            } else {
+                navLinks.style.maxHeight = "";
+                navLinks.style.overflowY = "";
+            }
+        }
+
+        menuToggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            navLinks.classList.toggle("show");
+            if (navLinks.classList.contains("show")) {
+                setAppropriateHeight();
+                closeDropdown();
+                dropdownContainer.style.display = "none";
+            }
+        });
+
+        libraryHandler.addEventListener("click", (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            if (dropdownContainer.classList.contains("show")) {
+                closeDropdown();
+            } else {
+                openDropdown();
+            }
+            setAppropriateHeight();
+        });
+
+        // Close all menus if a click is registered outside the navigation bar.
+        document.addEventListener("click", (event) => {
+            if (!nav.contains(event.target)) {
+                navLinks.classList.remove("show");
+                closeDropdown();
+            }
+        });
+
+        // Hide navigation bar on scroll down in mobile view.
+        window.addEventListener("scroll", () => {
+            if (window.innerWidth <= 768) {
+                if (window.scrollY > lastScrollY && window.scrollY > nav.offsetHeight){
+                    nav.classList.add("hide");
+                } else {
+                    nav.classList.remove("hide");
+                }
+                lastScrollY = window.scrollY;
+            }
+        });
+
+        window.addEventListener("resize", setAppropriateHeight);
+    });
+</script>
+<!-- NAVBAR END -->
+
+
+<div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">AbstractPPL</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">AbstractPPL.jl</a></li><li><a class="tocitem" href="../varname/">VarNames and optics</a></li><li><a class="tocitem" href="../pplapi/">Probabilistic programming API</a></li><li class="is-active"><a class="tocitem" href>Interface (outdated)</a><ul class="internal"><li><a class="tocitem" href="#AbstractProbabilisticProgram-interface-(still-somewhat-drafty)"><span><code>AbstractProbabilisticProgram</code> interface (still somewhat drafty)</span></a></li><li><a class="tocitem" href="#AbstractModelTrace/VarInfo-interface-draft"><span><code>AbstractModelTrace</code>/<code>VarInfo</code> interface draft</span></a></li><li><a class="tocitem" href="#VarName-based-axioms"><span><code>VarName</code>-based axioms</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Interface (outdated)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Interface (outdated)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/TuringLang/AbstractPPL.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/TuringLang/AbstractPPL.jl/blob/main/docs/src/interface.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Interface-(outdated)"><a class="docs-heading-anchor" href="#Interface-(outdated)">Interface (outdated)</a><a id="Interface-(outdated)-1"></a><a class="docs-heading-anchor-permalink" href="#Interface-(outdated)" title="Permalink"></a></h1><p>The original goal of AbstractPPL.jl was to provide a common interface for probabilistic programming. This should facilitate reuse of functions in modelling languages, to allow end users to handle models in a consistent way, and to simplify interaction between different languages and sampler implementations, from very rich, dynamic languages like Turing.jl to highly constrained or simplified models such as GPs, GLMs, or plain log-density problems.</p><p>Whilst its current implementation does not do this, there are certain desiderata for such an interface, which are outlined in this page.</p><div class="admonition is-danger" id="Danger-c24e95e120bf7809"><header class="admonition-header">Danger<a class="admonition-anchor" href="#Danger-c24e95e120bf7809" title="Permalink"></a></header><div class="admonition-body"><p>Please note that this page reflects a discussion as of several years ago, and the implementation of DynamicPPL.jl has evolved not totally in sync with the ideas presented here. This page should be considered more aspirational rather than an accurate reflection of the current DynamicPPL.jl codebase.</p></div></div><h2 id="AbstractProbabilisticProgram-interface-(still-somewhat-drafty)"><a class="docs-heading-anchor" href="#AbstractProbabilisticProgram-interface-(still-somewhat-drafty)"><code>AbstractProbabilisticProgram</code> interface (still somewhat drafty)</a><a id="AbstractProbabilisticProgram-interface-(still-somewhat-drafty)-1"></a><a class="docs-heading-anchor-permalink" href="#AbstractProbabilisticProgram-interface-(still-somewhat-drafty)" title="Permalink"></a></h2><p>There are at least two somewhat incompatible conventions used for the term &quot;model&quot;. None of this is particularly exact, but:</p><ul><li>In Turing.jl, if you write down a <code>@model</code> function and call it on arguments, you get a model object paired with (a possibly empty set of) observations. This can be treated as instantiated &quot;conditioned&quot; object with fixed values for parameters and observations.</li><li>In Soss.jl, &quot;model&quot; is used for a symbolic &quot;generative&quot; object from which concrete functions, such as densities and sampling functions, can be derived, <em>and</em> which you can later condition on (and in turn get a conditional density etc.).</li></ul><p>Relevant discussions: <a href="https://julialang.zulipchat.com/#narrow/stream/234072-probprog/topic/Naming.20the.20.22likelihood.22.20thingy">1</a>, <a href="https://github.com/TuringLang/AbstractPPL.jl/discussions/10">2</a>.</p><h3 id="TL/DR:"><a class="docs-heading-anchor" href="#TL/DR:">TL/DR:</a><a id="TL/DR:-1"></a><a class="docs-heading-anchor-permalink" href="#TL/DR:" title="Permalink"></a></h3><p>There are three interrelating aspects that this interface intends to standardize:</p><ul><li>Density calculation</li><li>Sampling</li><li>&quot;Conversions&quot; between different conditionings of models</li></ul><p>Therefore, the interface consists of an <code>AbstractProbabilisticProgram</code> supertype, together with functions</p><ul><li><code>condition(::Model, ::Trace) -&gt; ConditionedModel</code></li><li><code>decondition(::ConditionedModel) -&gt; GenerativeModel</code></li><li><code>sample(::Model, ::Sampler = Exact(), [Int])</code> (from <code>AbstractMCMC.sample</code>)</li><li><code>logdensityof(::Model, ::Trace)</code> and <code>densityof(::Model, ::Trace)</code> (from <a href="https://github.com/JuliaMath/DensityInterface.jl">DensityInterface.jl</a>)</li></ul><h3 id="Traces-and-probability-expressions"><a class="docs-heading-anchor" href="#Traces-and-probability-expressions">Traces and probability expressions</a><a id="Traces-and-probability-expressions-1"></a><a class="docs-heading-anchor-permalink" href="#Traces-and-probability-expressions" title="Permalink"></a></h3><p>First, an infrastructural requirement which we will need below to write things out.</p><p>The kinds of models we consider are, at least in a theoretical sense, distributions over <em>traces</em> – types which carry collections of values together with their names. Existing realizations of these are <code>VarInfo</code> in Turing.jl, choice maps in Gen.jl, and the usage of named tuples in Soss.jl.</p><p>Traces solve the problem of having to name random variables in function calls, and in samples from models. In essence, every concrete trace type will just be a fancy kind of dictionary from variable names (ideally, <code>VarName</code>s) to values.</p><p>Since we have to use this kind of mapping a lot in the specification of the interface, let&#39;s for now just choose some arbitrary macro-like syntax like the following:</p><pre><code class="language-julia hljs">@T(Y[1] = …, Z = …)</code></pre><p>Some more ideas for this kind of object can be found at the end.</p><h3 id="&quot;Conversions&quot;"><a class="docs-heading-anchor" href="#&quot;Conversions&quot;">&quot;Conversions&quot;</a><a id="&quot;Conversions&quot;-1"></a><a class="docs-heading-anchor-permalink" href="#&quot;Conversions&quot;" title="Permalink"></a></h3><p>The purpose of this part is to provide common names for how we want a model instance to be understood. As we have seen, in some modelling languages, model instances are primarily generative, with some parameters fixed, while other instance types pair model instances conditioned on observations. What I call &quot;conversions&quot; here is just an interface to transform between these two views and unify the involved objects under one language.</p><p>Let&#39;s start from a generative model with parameter <code>μ</code>:</p><pre><code class="language-julia hljs"># (hypothetical) generative spec a la Soss
+@generative_model function foo_gen(μ)
+    X ~ Normal(0, μ)
+    Y[1] ~ Normal(X)
+    return Y[2] ~ Normal(X + 1)
+end</code></pre><p>Applying the &quot;constructor&quot; <code>foo_gen</code> now means to fix the parameter, and should return a concrete object of the generative type:</p><pre><code class="language-julia hljs">g = foo_gen(; μ=…)::SomeGenerativeModel</code></pre><p>With this kind of object, we should be able to sample and calculate joint log-densities from, i.e., over the combined trace space of <code>X</code>, <code>Y[1]</code>, and <code>Y[2]</code> – either directly, or by deriving the respective functions (e.g., by converting form a symbolic representation).</p><p>For model types that contain enough structural information, it should then be possible to condition on observed values and obtain a conditioned model:</p><pre><code class="language-julia hljs">condition(g, @T(Y = …))::SomeConditionedModel</code></pre><p>For this operation, there will probably exist syntactic sugar in the form of</p><pre><code class="language-julia hljs">g | @T(Y = …)</code></pre><p>Now, if we start from a Turing.jl-like model instead, with the &quot;observation part&quot; already specified, we have a situation like this, with the observations <code>Y</code> fixed in the instantiation:</p><pre><code class="language-julia hljs"># conditioned spec a la DynamicPPL
+@model function foo(Y, μ)
+    X ~ Normal(0, μ)
+    Y[1] ~ Normal(X)
+    return Y[2] ~ Normal(X + 1)
+end
+
+m = foo(; Y=…, μ=…)::SomeConditionedModel</code></pre><p>From this we can, if supported, go back to the generative form via <code>decondition</code>, and back via <code>condition</code>:</p><pre><code class="language-julia hljs">decondition(m) == g::SomeGenerativeModel
+m == condition(g, @T(Y = …))</code></pre><p>(with equality in distribution).</p><p>In the case of Turing.jl, the object <code>m</code> would at the same time contain the information about the generative and posterior distribution <code>condition</code> and <code>decondition</code> can simply return different kinds of &quot;tagged&quot; model types which put the model specification into a certain context.</p><p>Soss.jl pretty much already works like the examples above, with one model object being either a <code>JointModel</code> or a <code>ConditionedModel</code>, and the <code>|</code> syntax just being sugar for the latter.</p><p>A hypothetical <code>DensityModel</code>, or something like the types from LogDensityProblems.jl, would be a case for a model type that does not support the structural operations <code>condition</code> and <code>decondition</code>.</p><p>The invariances between these operations should follow normal rules of probability theory. Not all methods or directions need to be supported for every modelling language; in this case, a <code>MethodError</code> or some other runtime error should be raised.</p><p>There is no strict requirement for generative models and conditioned models to have different types or be tagged with variable names etc. This is a choice to be made by the concrete implementation.</p><p>Decomposing models into prior and observation distributions is not yet specified; the former is rather easy, since it is only a marginal of the generative distribution, while the latter requires more structural information. Perhaps both can be generalized under the <code>query</code> function I discuss at the end.</p><h3 id="Sampling"><a class="docs-heading-anchor" href="#Sampling">Sampling</a><a id="Sampling-1"></a><a class="docs-heading-anchor-permalink" href="#Sampling" title="Permalink"></a></h3><p>Sampling in this case refers to producing values from the distribution specified in a model instance, either following the distribution exactly, or approximating it through a Monte Carlo algorithm.</p><p>All sampleable model instances are assumed to implement <a href="https://turinglang.org/AbstractMCMC.jl/stable/api/">the <code>AbstractMCMC</code> interface</a>. The most important aspect is <code>sample</code>, though, which plays the role of <code>rand</code> for distributions.</p><p>The results of <code>sample</code> generalize <code>rand</code> – while <code>rand(d, N)</code> is assumed to give you iid samples, <code>sample(m, sampler, N)</code> returns a sample from a sequence (known as chain in the case of MCMC) of length <code>N</code> approximating <code>m</code>&#39;s distribution by a specific sampling algorithm (which of course subsumes the case that <code>m</code> can be sampled from exactly, in which case the &quot;chain&quot; actually is iid).</p><p>Depending on which kind of sampling is supported, several methods may be supported. In the case of a (posterior) conditioned model with no known sampling procedure, we just have what is given through <code>AbstractMCMC</code>:</p><pre><code class="language-julia hljs">sample([rng], m, N, sampler; [args]) # chain of length N using `sampler`</code></pre><p>In the case of a generative model, or a posterior model with exact solution, we can have some more methods without the need to specify a sampler:</p><pre><code class="language-julia hljs">sample([rng], m; [args])    # one random sample
+sample([rng], m, N; [args]) # N iid samples; equivalent to `rand` in certain cases</code></pre><p>It should be possible to implement this by a special sampler, say, <code>Exact</code> (name still to be discussed), that can then also be reused for generative sampling:</p><pre><code class="nohighlight hljs">step(g, spl = Exact(), state = nothing) # IID sample from exact distribution with trivial state
+sample(g, Exact(), [N]) </code></pre><p>with dispatch failing for models types for which exact sampling is not possible (or not implemented).</p><p>This could even be useful for Monte Carlo methods not being based on Markov chains, e.g., particle-based sampling using a return type with weights, or rejection sampling.</p><p>Not all variants need to be supported – for example, a posterior model might not support <code>sample(m)</code> when exact sampling is not possible, only <code>sample(m, N, alg)</code> for Markov chains.</p><p><code>rand</code> is then just a special case when &quot;trivial&quot; exact sampling works for a model, e.g. a joint model.</p><h3 id="Density-Evaluation"><a class="docs-heading-anchor" href="#Density-Evaluation">Density Evaluation</a><a id="Density-Evaluation-1"></a><a class="docs-heading-anchor-permalink" href="#Density-Evaluation" title="Permalink"></a></h3><div class="admonition is-danger" id="Danger-939a0aa2392da768"><header class="admonition-header">Danger<a class="admonition-anchor" href="#Danger-939a0aa2392da768" title="Permalink"></a></header><div class="admonition-body"><p>Note that DensityInterface.jl has not had any substantial updates since 2021. As such, this section should be considered in a more general sense without ties to any particular package. DynamicPPL.jl does not make use of DensityInterface.jl; instead, DynamicPPL currently uses the interface specified by LogDensityProblems.jl.</p></div></div><p>Since the different &quot;versions&quot; of how a model is to be understood as generative or conditioned are to be expressed in the type or dispatch they support, there should be no need for separate functions <code>logjoint</code>, <code>loglikelihood</code>, etc., which force these semantic distinctions on the implementor; we therefore adapt the interface of <a href="https://github.com/JuliaMath/DensityInterface.jl">DensityInterface.jl</a>. Its main function <code>logdensityof</code> should suffice for variants, with the distinction being made by the capabilities of the concrete model instance.</p><p>DensityInterface.jl also requires the trait function <code>DensityKind</code>, which is set to <code>HasDensity()</code> for the <code>AbstractProbabilisticProgram</code> type.  Additional functions</p><pre><code class="nohighlight hljs">DensityInterface.densityof(d, x) = exp(logdensityof(d, x))
+DensityInterface.logdensityof(d) = Base.Fix1(logdensityof, d)
+DensityInterface.densityof(d) = Base.Fix1(densityof, d)</code></pre><p>are provided automatically (repeated here for clarity).</p><p>Note that <code>logdensityof</code> strictly generalizes <code>logpdf</code>, since the posterior density will of course in general be unnormalized and hence not a probability density.</p><p>The evaluation will usually work with the internal, concrete trace type, like <code>VarInfo</code> in Turing.jl:</p><pre><code class="language-julia hljs">logdensityof(m, vi)</code></pre><p>But the user will more likely work on the interface using probability expressions:</p><pre><code class="language-julia hljs">logdensityof(m, @T(X = …))</code></pre><p>Densities need (and usually, will) not be normalized.</p><h4 id="Implementation-notes"><a class="docs-heading-anchor" href="#Implementation-notes">Implementation notes</a><a id="Implementation-notes-1"></a><a class="docs-heading-anchor-permalink" href="#Implementation-notes" title="Permalink"></a></h4><p>It should be able to make this fall back on the internal method with the right definition and implementation of <code>maketrace</code>:</p><pre><code class="language-julia hljs">logdensityof(m, t::ProbabilityExpression) = logdensityof(m, maketrace(m, t))</code></pre><p>There is one open question – should normalized and unnormalized densities be able to be distinguished? This could be done by dispatch as well, e.g., if the caller wants to ensure normalization:</p><pre><code class="nohighlight hljs">logdensityof(g, @T(X = …, Y = …, Z = …); normalized=Val{true})</code></pre><p>Although there is proably a better way through traits; maybe like for arrays, with <code>NormalizationStyle(g, t) = IsNormalized()</code>?</p><h4 id="More-on-probability-expressions"><a class="docs-heading-anchor" href="#More-on-probability-expressions">More on probability expressions</a><a id="More-on-probability-expressions-1"></a><a class="docs-heading-anchor-permalink" href="#More-on-probability-expressions" title="Permalink"></a></h4><p>Note that this needs to be a macro, if written this way, since the keys may themselves be more complex than just symbols (e.g., indexed variables.) (Don&#39;t hang yourselves up on that <code>@T</code> name though, this is just a working draft.)</p><p>The idea here is to standardize the construction (and manipulation) of <em>abstract probability expressions</em>, plus the interface for turning them into concrete traces for a specific model – like <a href="https://juliastats.org/StatsModels.jl/stable/formula/#Modeling-tabular-data"><code>@formula</code></a> and <a href="https://juliastats.org/StatsModels.jl/stable/internals/#Semantics-time-(apply_schema)"><code>apply_schema</code></a> from StatsModels.jl are doing.</p><p>Maybe the following would suffice to do that:</p><pre><code class="language-julia hljs">maketrace(m, t)::tracetype(m, t)</code></pre><p>where <code>maketrace</code> produces a concrete trace corresponding to <code>t</code> for the model <code>m</code>, and <code>tracetype</code> is the corresponding <code>eltype</code>–like function giving you the concrete trace type for a certain model and probability expression combination.</p><p>Possible extensions of this idea:</p><ul><li>Perl-style do-notation: <code>@T(Y = y | do(X = x))</code></li><li>Allowing free variables, to specify model transformations: <code>query(m, @T(X | Y))</code></li><li>&quot;Graph queries&quot;: <code>@T(X | Parents(X))</code>, <code>@T(Y | Not(X))</code> (a nice way to express Gibbs conditionals!)</li><li>Predicate style for &quot;measure queries&quot;: <code>@T(X &lt; Y + Z)</code></li></ul><p>The latter applications are the reason I originally liked the idea of the macro being called <code>@P</code> (or even <code>@𝓅</code> or <code>@ℙ</code>), since then it would look like a &quot;Bayesian probability expression&quot;: <code>@P(X &lt; Y + Z)</code>. But this would not be so meaningful in the case of representing a trace instance.</p><p>Perhaps both <code>@T</code> and <code>@P</code> can coexist, and both produce different kinds of <code>ProbabilityExpression</code> objects?</p><p>NB: the exact details of this kind of &quot;schema application&quot;, and what results from it, will need to be specified in the interface of <code>AbstractModelTrace</code>, aka &quot;the new <code>VarInfo</code>&quot;.</p><h2 id="AbstractModelTrace/VarInfo-interface-draft"><a class="docs-heading-anchor" href="#AbstractModelTrace/VarInfo-interface-draft"><code>AbstractModelTrace</code>/<code>VarInfo</code> interface draft</a><a id="AbstractModelTrace/VarInfo-interface-draft-1"></a><a class="docs-heading-anchor-permalink" href="#AbstractModelTrace/VarInfo-interface-draft" title="Permalink"></a></h2><h3 id="Background"><a class="docs-heading-anchor" href="#Background">Background</a><a id="Background-1"></a><a class="docs-heading-anchor-permalink" href="#Background" title="Permalink"></a></h3><h4 id="Why-do-we-do-this?"><a class="docs-heading-anchor" href="#Why-do-we-do-this?">Why do we do this?</a><a id="Why-do-we-do-this?-1"></a><a class="docs-heading-anchor-permalink" href="#Why-do-we-do-this?" title="Permalink"></a></h4><p>As I have said before:</p><blockquote><p>There are many aspects that make VarInfo a very complex data structure.</p></blockquote><p>Currently, there is an insane amount of complexity and implementation details in DynamicPPL.jl&#39;s <code>varinfo.jl</code>, which has been rewritten multiple times with different concerns in mind – most times to improve concrete needs of Turing.jl, such as type stability, or requirements of specific samplers.</p><p>This unfortunately makes <code>VarInfo</code> extremely opaque: it is hard to refactor without breaking anything (nobody really dares touching it), and a lot of knowledge about Turing.jl/DynamicPPL.jl internals is needed in order to judge the effects of changes.</p><h4 id="Design-choices"><a class="docs-heading-anchor" href="#Design-choices">Design choices</a><a id="Design-choices-1"></a><a class="docs-heading-anchor-permalink" href="#Design-choices" title="Permalink"></a></h4><p>Recently, @torfjelde <a href="https://github.com/TuringLang/DynamicPPL.jl/pull/267/files">has shown</a> that a much simpler implementation is feasible – basically, just a wrapped <code>NamedTuple</code> with a minimal interface.</p><p>The purpose of this proposal is twofold: first, to think about what a sufficient interface for <code>AbstractModelTrace</code>, the abstract supertype of <code>VarInfo</code>, should be, to allow multiple specialized variants and refactor the existing ones (typed/untyped and simple). Second, to view the problem as the design of an abstract data type: the specification of construction and modification mechanisms for a dictionary-like structure.</p><p>Related previous discussions:</p><ul><li><a href="https://github.com/TuringLang/AbstractPPL.jl/discussions/7">Discussion about <code>VarName</code></a></li><li><a href="https://github.com/TuringLang/AbstractPPL.jl/discussions/5"><code>AbstractVarInfo</code> representation</a></li></ul><p>Additionally (but closely related), the second part tries to formalize the &quot;subsumption&quot; mechanism of <code>VarName</code>s, and its interaction with using <code>VarName</code>s as keys/indices.</p><p>Our discussions take place in what is a bit of a fuzzy zone between the part that is really &quot;abstract&quot;, and meant for the wider purpuse of AbstractPPL.jl – the implementation of probabilistic programming systems in general – and our concrete needs within DPPL. I hope to always stay abstract and reusable; and there are already a couple of candidates for APPL clients other than DPPL, which will hopefully keep us focused: simulation based calibration, SimplePPL (a BUGS-like frontend), and ParetoSmoothing.jl.</p><h4 id="What-is-going-to-change?"><a class="docs-heading-anchor" href="#What-is-going-to-change?">What is going to change?</a><a id="What-is-going-to-change?-1"></a><a class="docs-heading-anchor-permalink" href="#What-is-going-to-change?" title="Permalink"></a></h4><ul><li>For the end user of Turing.jl: nothing. You usually don&#39;t use <code>VarInfo</code>, or the raw evaluator interface, anyways. (Although if the newer data structures are more user-friendly, they might occur in more places in the future?)</li><li>For people having a look into code using <code>VarInfo</code>, or starting to hack on Turing.jl/DPPL.jl: a huge reduction in cognitive complexity. <code>VarInfo</code> implementations should be readable on their own, and the implemented functions layed out somewhere. Its usages should look like for any other nice, normal data structure.</li><li>For core DPPL.jl implementors: same as the previous, plus: a standard against which to improve and test <code>VarInfo</code>, and a clearly defined design space for new data structures.</li><li>For AbstractPPL.jl clients/PPL implementors: an interface to program against (as with the rest of APPL), and an existing set of well-specified, flexible trace data types with different characteristics.</li></ul><p>And in terms of implementation work in DPPL.jl: once the interface is fixed (or even during fixing it), varinfo.jl will undergo a heavy refactoring – which should make it <em>simpler</em>! (No three different getter functions with slightly different semantics, etc…).</p><h3 id="Property-interface"><a class="docs-heading-anchor" href="#Property-interface">Property interface</a><a id="Property-interface-1"></a><a class="docs-heading-anchor-permalink" href="#Property-interface" title="Permalink"></a></h3><p>The basic idea is for all <code>VarInfo</code>s to behave like ordered dictionaries with <code>VarName</code> keys – all common operations should just work. There are two things that make them more special, though:</p><ol><li><p>&quot;Fancy indexing&quot;: since <code>VarName</code>s are structured themselves, the <code>VarInfo</code> should be have a bit like a trie, in the sense that all prefixes of stored keys should be retrievable.  Also, subsumption of <code>VarName</code>s should be respected (see end of this document):</p><pre><code class="language-julia hljs">vi[@varname(x.a)] = [1, 2, 3]
+vi[@varname(x.b)] = [4, 5, 6]
+vi[@varname(x.a[2])] == 2
+vi[@varname(x)] == (; a=[1, 2, 3], b=[4, 5, 6])</code></pre><p>Generalizations that go beyond simple cases (those that you can imagine by storing individual <code>setfield!</code>s in a tree) need not be implemented in the beginning; e.g.,</p><pre><code class="language-julia hljs">vi[@varname(x[1])] = 1
+vi[@varname(x[2])] = 2
+keys(vi) == [x[1], x[2]]
+
+vi[@varname(x)] = [1, 2]
+keys(vi) == [x]</code></pre></li><li><p>(<em>This has to be discussed further.</em>)  Information other than the sampled values, such as flags, metadata, pointwise likelihoods, etc., can in principle be stored in multiple of these &quot;<code>VarInfo</code> dicts&quot; with parallel structure.  For efficiency, it is thinkable to devise a design such that multiple fields can be stored under the same indexing structure.</p><pre><code class="language-julia hljs">vi[@varname(x[1])] == 1
+vi[@varname(x[1])].meta[&quot;bla&quot;] == false</code></pre><p>or something in that direction.</p><p>(This is logically equivalent to a dictionary with named tuple values.  Maybe we can do what <a href="https://github.com/JuliaData/TypedTables.jl/blob/main/src/DictTable.jl"><code>DictTable</code></a> does?)</p><p>The old <code>order</code> field, indicating at which position in the evaluator function a variable has been added (essentially a counter of insertions) can actually be left out completely, since the dictionary is specified to be ordered by insertion.</p><p>The important question here is: should the &quot;joint data structure&quot; behave like a dictionary of <code>NamedTuple</code>s (<code>eltype(vi) == @NamedTuple{value::T, ℓ::Float64, meta}</code>), or like a struct of dicts with shared keys (<code>eltype(vi.value) &lt;: T</code>, <code>eltype(vi.ℓ) &lt;: Float64</code>, …)?</p></li></ol><p>The required dictionary functions are about the following:</p><ul><li><p>Pure functions:</p><ul><li><code>iterate</code>, yielding pairs of <code>VarName</code> and the stored value</li><li><code>IteratorEltype == HasEltype()</code>, <code>IteratorSize = HasLength()</code></li><li><code>keys</code>, <code>values</code>, <code>pairs</code>, <code>length</code> consistent with <code>iterate</code></li><li><code>eltype</code>, <code>keytype</code>, <code>valuetype</code></li><li><code>get</code>, <code>getindex</code>, <code>haskey</code> for indexing by <code>VarName</code></li><li><code>merge</code> to join two <code>VarInfo</code>s</li></ul></li><li><p>Mutating functions:</p><ul><li><code>insert!!</code>, <code>set!!</code></li><li><code>merge!!</code> to add and join elements (TODO: think about <code>merge</code>)</li><li><code>setindex!!</code></li><li><code>empty!!</code>, <code>delete!!</code>, <code>unset!!</code> (<em>Are these really used anywhere? Not having them makes persistent implementations much easier!</em>)</li></ul></li></ul><p>I believe that adopting the interface of <a href="https://github.com/andyferris/Dictionaries.jl">Dictionaries.jl</a>, not <code>Base.AbstractDict</code>, would be ideal, since their approach make key sharing and certain operations naturally easy (particularly &quot;broadcast-style&quot;, i.e., transformations on the values, but not the keys).</p><p>Other <code>Base</code> functions, like <code>enumerate</code>, should follow from the above.</p><p><code>length</code> might appear weird – but it should definitely be consistent with the iterator.</p><p>It would be really cool if <code>merge</code> supported the combination of distinct types of implementations, e.g., a dynamic and a tuple-based part.</p><p>To support both mutable and immutable/persistent implementations, let&#39;s require consistent BangBang.jl style mutators throughout.</p><h3 id="Transformations/Bijectors"><a class="docs-heading-anchor" href="#Transformations/Bijectors">Transformations/Bijectors</a><a id="Transformations/Bijectors-1"></a><a class="docs-heading-anchor-permalink" href="#Transformations/Bijectors" title="Permalink"></a></h3><p>Transformations should ideally be handled explicitly and from outside: automatically by the compiler macro, or at the places required by samplers.</p><p>Implementation-wise, they can probably be expressed as folds?</p><pre><code class="language-julia hljs">map(v -&gt; link(v.dist, v.value), vi)</code></pre><h3 id="Linearization"><a class="docs-heading-anchor" href="#Linearization">Linearization</a><a id="Linearization-1"></a><a class="docs-heading-anchor-permalink" href="#Linearization" title="Permalink"></a></h3><p>There are multiple possible approaches to handle this:</p><ol><li>As a special case of conversion: <code>Vector(vi)</code></li><li><code>copy!(vals_array, vi)</code>.</li><li>As a fold: <code>mapreduce(v -&gt; vec(v.value), append!, vi, init=Float64[])</code></li></ol><p>Also here, I think that the best implementation would be through a fold. Variants (1) or (2) might additionally be provided as syntactic sugar.</p><h2 id="VarName-based-axioms"><a class="docs-heading-anchor" href="#VarName-based-axioms"><code>VarName</code>-based axioms</a><a id="VarName-based-axioms-1"></a><a class="docs-heading-anchor-permalink" href="#VarName-based-axioms" title="Permalink"></a></h2><p>What follows is mostly an attempt to formalize subsumption.</p><p>First, remember that in Turing.jl we can always work with <em>concretized</em> <code>VarName</code>s: <code>begin</code>/<code>end</code>, <code>:</code>, and boolean indexing are all turned into some form of concrete cartesian or array indexing (assuming <a href="https://github.com/TuringLang/AbstractPPL.jl/issues/35">this suggestion</a> being implemented). This makes all index comparisons static.</p><p>Now, <code>VarName</code>s have a compositional structure: they can be built by composing a root variable with more and more lenses (<code>VarName{v}()</code> starts off with an <code>IdentityLens</code>):</p><pre><code class="language-julia hljs">julia&gt; Accessors.IndexLens((2,)) ∘ Accessors.IndexLens((1:10, 1)) ∘ VarName{:x}()
+x[1:10, 1][2]</code></pre><p>By &quot;subsumption&quot;, we mean the notion of a <code>VarName</code> expressing a more nested path than another one:</p><pre><code class="language-julia hljs">subsumes(@varname(x.a), @varname(x.a[1]))
+@varname(x.a) ⊒ @varname(x.a[1]) # \sqsupseteq
+@varname(x.a) ⋢ @varname(x.a[1]) # \nsqsubseteq</code></pre><p>Thus, we have the following axioms for <code>VarName</code>s (&quot;variables&quot; are <code>VarName{n}()</code>):</p><ol><li><code>x ⊑ x</code> for all variables <code>x</code></li><li><code>x ≍ y</code> for <code>x ≠ y</code> (i.e., distinct variables are incomparable; <code>x ⋢ y</code> and <code>y ⋢ x</code>) (<code>≍</code> is <code>\asymp</code>)</li><li><code>x ∘ ℓ ⊑ x</code> for all variables <code>x</code> and lenses <code>ℓ</code></li><li><code>x ∘ ℓ₁ ⊑ x ∘ ℓ₂ ⇔ ℓ₁ ⊑ ℓ₂</code></li></ol><p>For the last axiom to work, we also have to define subsumption of individual, non-composed lenses:</p><ol><li><code>PropertyLens(a) == PropertyLens(b) ⇔ a == b</code>, for all symbols <code>a</code>, <code>b</code></li><li><code>FunctionLens(f) == FunctionLens(g) ⇔ f == g</code> (under extensional equality; I&#39;m only mentioning this in case we ever generalize to Bijector-ed variables like <code>@varname(log(x))</code>)</li><li><code>IndexLens(ι₁) ⊑ IndexLens(ι₂)</code> if the index tuple <code>ι₂</code> covers all indices in <code>ι₁</code>; for example, <code>_[1, 2:10] ⊑ _[1:10, 1:20]</code>.  (<em>This is a bit fuzzy and not all corner cases have been considered yet!</em>)</li><li><code>IdentityLens() == IdentityLens()</code></li><li><code>ℓ₁ ≍ ℓ₂</code>, otherwise</li></ol><p>Together, this should make <code>VarName</code>s under subsumption a reflexive poset.</p><p>The fundamental requirement for <code>VarInfo</code>s is then:</p><pre><code class="nohighlight hljs">vi[x ∘ ℓ] == get(vi[x], ℓ)</code></pre><p>So we always want the following to work, automatically:</p><pre><code class="language-julia hljs">vi = insert!!(vi, vn, x)
+vi[vn] == x</code></pre><p>(the trivial case), and</p><pre><code class="language-julia hljs">x = set!!(x, ℓ₁, a)
+x = set!!(x, ℓ₂, b)
+vi = insert!!(vi, vn, x)
+vi[vn ∘ ℓ₁] == a
+vi[vn ∘ ℓ₂] == b</code></pre><p>since <code>vn</code> subsumes both <code>vn ∘ ℓ₁</code> and <code>vn ∘ ℓ₂</code>.</p><p>Whether the opposite case is supported may depend on the implementation. The most complicated part is &quot;unification&quot;:</p><pre><code class="language-julia hljs">vi = insert!!(vi, vn ∘ ℓ₁, a)
+vi = insert!!(vi, vn ∘ ℓ₂, b)
+get(vi[vn], ℓ₁) == a
+get(vi[vn], ℓ₂) == b</code></pre><p>where <code>vn ∘ ℓ₁</code> and <code>vn ∘ ℓ₂</code> need to be recognized as &quot;children&quot; of a common parent <code>vn</code>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../pplapi/">« Probabilistic programming API</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Sunday 18 January 2026 03:51">Sunday 18 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
