@@ -66,6 +66,7 @@ vn_conc = concretize(vn_dyn, x)
 
 ```@docs
 concretize
+concretize_top_level
 ```
 
 ## Optics
