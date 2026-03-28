@@ -1,3 +1,7 @@
+## 0.14.1
+
+Export the `concretize_top_level` function, which concretizes only the indices contained in an `AbstractPPL.Index`, and does not recurse into child optics.
+
 ## 0.14.0
 
 This release overhauls the `VarName` type.
