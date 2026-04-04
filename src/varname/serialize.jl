@@ -124,7 +124,7 @@ function optic_to_dict(i::Index)
         # For some reason if you don't do the isempty check, it gets serialised as `{}`
         # rather than `[]`
         "ix" => isempty(i.ix) ? [] : collect(map(index_to_dict, i.ix)),
-        "kw" => OrderedDict(String(x) => index_to_dict(y) for (x, y) in pairs(i.kw)),
+        "kw" => NamedTuple{keys(i.kw)}(map(index_to_dict, values(i.kw))),
         "child" => optic_to_dict(i.child),
     )
 end
