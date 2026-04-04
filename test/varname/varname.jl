@@ -226,6 +226,8 @@ using JET: @test_call
         @test append_optic(@varname(x), @opticof(_[1])) == @varname(x[1])
         @test append_optic(@varname(x.a), @opticof(_[1])) == @varname(x.a[1])
         @test append_optic(@varname(x[1]), @opticof(_.a)) == @varname(x[1].a)
+        @test append_optic(@varname(x), @opticof(_)) == @varname(x)
+        @test append_optic(@varname(x.a), @opticof(_)) == @varname(x.a)
     end
 end
 
