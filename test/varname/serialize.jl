@@ -41,19 +41,11 @@ using Test
             @varname(x[j=2, i=1]),
             @varname(x[i=1, j=2]),
             @varname(x[].a[j=2].b[3, 4, 5, [6]]),
+            @varname(x[[1, 2, 5, 6]]),
         ]
         for vn in vns
             @test string_to_varname(varname_to_string(vn)) == vn
         end
-
-        # For this VarName, the {de,}serialisation works correctly but we must
-        # test in a different way because equality comparison of structs with
-        # vector fields (such as Accessors.IndexLens) compares the memory
-        # addresses rather than the contents (thus vn_vec == vn_vec2 returns
-        # false).
-        vn_vec = @varname(x[[1, 2, 5, 6]])
-        vn_vec2 = string_to_varname(varname_to_string(vn_vec))
-        @test hash(vn_vec) == hash(vn_vec2)
     end
 
     @testset "deserialisation fails for unconcretised dynamic indices" begin
