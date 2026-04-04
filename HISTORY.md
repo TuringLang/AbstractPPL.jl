@@ -1,3 +1,9 @@
+## 0.14.2
+
+Fix string serialisation of VarNames such that the order of keyword arguments is preserved (this was previously guaranteed, but JSON.jl v1.5.0 introduced a change that caused the keyword arguments to always be sorted.)
+
+Minor performance optimisation for `AbstractPPL.append_optic`.
+
 ## 0.14.1
 
 Export the `concretize_top_level` function, which concretizes only the indices contained in an `AbstractPPL.Index`, and does not recurse into child optics.
