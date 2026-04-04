@@ -1,3 +1,7 @@
+## 0.14.2
+
+Minor performance optimisation for `AbstractPPL.append_optic`.
+
 ## 0.14.1
 
 Export the `concretize_top_level` function, which concretizes only the indices contained in an `AbstractPPL.Index`, and does not recurse into child optics.

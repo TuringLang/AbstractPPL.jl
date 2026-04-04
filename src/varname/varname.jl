@@ -400,3 +400,4 @@ x.a.b[1]
 function append_optic(vn::VarName{sym}, optic::AbstractOptic) where {sym}
     return VarName{sym}(cat(getoptic(vn), optic))
 end
+append_optic(vn::VarName, ::Iden) = vn
