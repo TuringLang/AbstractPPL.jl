@@ -4,10 +4,10 @@ using AbstractPPL: AbstractPPL, DerivativeOrder
 using ADTypes: AutoEnzyme
 using Enzyme: Enzyme
 
-struct EnzymePrepared{E,F,P}
+struct EnzymePrepared{E,F,T<:Real,P}
     evaluator::E
     f_vec::F
-    gradient_buffer::Vector{Float64}
+    gradient_buffer::Vector{T}
     prototype::P
     dim::Int
 end
@@ -23,15 +23,13 @@ function (p::EnzymePrepared)(x::AbstractVector)
     return p.f_vec(x)
 end
 
-function AbstractPPL.prepare(
-    ::AutoEnzyme, problem, prototype::NamedTuple
-)
+function AbstractPPL.prepare(::AutoEnzyme, problem, prototype::NamedTuple)
     evaluator = AbstractPPL.prepare(problem, prototype)
     x0 = AbstractPPL.flatten_to_vec(prototype)
     f_vec = let evaluator = evaluator, prototype = prototype
         x -> evaluator(AbstractPPL.unflatten_from_vec(prototype, x))
     end
-    grad_buf = zeros(length(x0))
+    grad_buf = zeros(eltype(x0), length(x0))
     return EnzymePrepared(evaluator, f_vec, grad_buf, prototype, length(x0))
 end
 

@@ -24,9 +24,7 @@ function (p::DIPrepared)(x::AbstractVector)
     return p.f_vec(x)
 end
 
-function AbstractPPL.prepare(
-    adtype::AbstractADType, problem, prototype::NamedTuple
-)
+function AbstractPPL.prepare(adtype::AbstractADType, problem, prototype::NamedTuple)
     evaluator = AbstractPPL.prepare(problem, prototype)
     x0 = AbstractPPL.flatten_to_vec(prototype)
     f_vec = let evaluator = evaluator, prototype = prototype

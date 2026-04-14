@@ -1,3 +1,5 @@
+using ADTypes: ADTypes
+
 """
     DerivativeOrder{K}
 
@@ -6,12 +8,13 @@ Trait indicating the maximum derivative order supported by a prepared evaluator.
 """
 struct DerivativeOrder{K}
     function DerivativeOrder{K}() where {K}
-        K isa Int && 0 <= K <= 2 || throw(ArgumentError(
-            "DerivativeOrder parameter must be 0, 1, or 2, got $K"
-        ))
+        K isa Int && 0 <= K <= 2 ||
+            throw(ArgumentError("DerivativeOrder parameter must be 0, 1, or 2, got $K"))
         return new{K}()
     end
 end
+
+Base.isless(::DerivativeOrder{K}, ::DerivativeOrder{L}) where {K,L} = K < L
 
 """
     capabilities(T::Type)
@@ -48,8 +51,6 @@ Return the number of scalar dimensions in the vector view of a prepared evaluato
 """
 function dimension end
 
-## NamedTuple ↔ flat-vector utilities (used by AD extensions)
-
 _scalar_count(::Real) = 1
 _scalar_count(x::AbstractArray{<:Real}) = length(x)
 function _scalar_count(nt::NamedTuple)
@@ -60,15 +61,20 @@ function _scalar_count(nt::NamedTuple)
     return n
 end
 
+_vec_eltype(x::Real) = typeof(x)
+_vec_eltype(x::AbstractArray{T}) where {T<:Real} = T
+function _vec_eltype(nt::NamedTuple)
+    isempty(nt) && return Float64
+    return mapreduce(_vec_eltype, promote_type, values(nt))
+end
+
 function _flatten!(vec::AbstractVector, s::Real, offset::Int)
     vec[offset] = s
     return offset + 1
 end
 function _flatten!(vec::AbstractVector, a::AbstractArray{<:Real}, offset::Int)
     n = length(a)
-    for (j, v) in enumerate(a)
-        vec[offset + j - 1] = v
-    end
+    copyto!(vec, offset, a, 1, n)
     return offset + n
 end
 function _flatten!(vec::AbstractVector, nt::NamedTuple, offset::Int)
@@ -80,7 +86,7 @@ end
 
 function flatten_to_vec(nt::NamedTuple)
     n = _scalar_count(nt)
-    vec = Vector{Float64}(undef, n)
+    vec = Vector{_vec_eltype(nt)}(undef, n)
     _flatten!(vec, nt, 1)
     return vec
 end
@@ -90,7 +96,7 @@ function _unflatten(::Real, vec::AbstractVector, offset::Int)
 end
 function _unflatten(proto::AbstractArray{<:Real}, vec::AbstractVector, offset::Int)
     n = length(proto)
-    result = reshape(vec[offset:offset + n - 1], size(proto))
+    result = reshape(@view(vec[offset:(offset + n - 1)]), size(proto))
     return result, offset + n
 end
 function _unflatten(proto::NamedTuple, vec::AbstractVector, offset::Int)
@@ -103,6 +109,11 @@ function _unflatten(proto::NamedTuple, vec::AbstractVector, offset::Int)
 end
 
 function unflatten_from_vec(prototype::NamedTuple, vec::AbstractVector)
-    result, _ = _unflatten(prototype, vec, 1)
+    result, offset = _unflatten(prototype, vec, 1)
+    offset == length(vec) + 1 || throw(
+        DimensionMismatch(
+            "vector length $(length(vec)) exceeds prototype dimension $(offset - 1)"
+        ),
+    )
     return result
 end

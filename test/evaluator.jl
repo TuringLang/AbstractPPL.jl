@@ -2,7 +2,6 @@ using AbstractPPL
 using ADTypes: ADTypes
 using Test
 
-# A minimal concrete problem and prepared evaluator for testing the interface.
 struct DummyProblem end
 
 struct DummyPrepared
@@ -14,13 +13,11 @@ function AbstractPPL.prepare(problem::DummyProblem, prototype::NamedTuple)
 end
 
 function (p::DummyPrepared)(values::NamedTuple)
-    keys(values) == p.prototype_keys || error(
-        "expected fields $(p.prototype_keys), got $(keys(values))"
-    )
+    keys(values) == p.prototype_keys ||
+        error("expected fields $(p.prototype_keys), got $(keys(values))")
     return sum(x -> x isa AbstractArray ? sum(x) : x, values)
 end
 
-# A prepared evaluator that also supports gradients.
 struct DummyADPrepared
     prototype_keys::Tuple
 end
@@ -32,9 +29,8 @@ function AbstractPPL.prepare(
 end
 
 function (p::DummyADPrepared)(values::NamedTuple)
-    keys(values) == p.prototype_keys || error(
-        "expected fields $(p.prototype_keys), got $(keys(values))"
-    )
+    keys(values) == p.prototype_keys ||
+        error("expected fields $(p.prototype_keys), got $(keys(values))")
     return sum(x -> x isa AbstractArray ? sum(x) : x, values)
 end
 
@@ -46,7 +42,6 @@ function AbstractPPL.value_and_gradient(p::DummyADPrepared, values::NamedTuple)
     return (v, grad)
 end
 
-# A prepared evaluator with a vector adapter.
 struct DummyVectorPrepared
     dim::Int
 end
@@ -60,11 +55,12 @@ end
 
 @testset "Evaluator interface" begin
     @testset "DerivativeOrder" begin
-        @test DerivativeOrder{0}() isa DerivativeOrder{0}
-        @test DerivativeOrder{1}() isa DerivativeOrder{1}
-        @test DerivativeOrder{2}() isa DerivativeOrder{2}
         @test_throws ArgumentError DerivativeOrder{3}()
         @test_throws ArgumentError DerivativeOrder{-1}()
+        @test DerivativeOrder{0}() < DerivativeOrder{1}()
+        @test DerivativeOrder{1}() >= DerivativeOrder{1}()
+        @test DerivativeOrder{1}() < DerivativeOrder{2}()
+        @test !(DerivativeOrder{2}() < DerivativeOrder{1}())
     end
 
     @testset "capabilities default" begin
@@ -76,33 +72,29 @@ end
 
     @testset "prepare (structural)" begin
         problem = DummyProblem()
-        prototype = (x = 0.0, y = [1.0, 2.0])
+        prototype = (x=0.0, y=[1.0, 2.0])
         prepared = prepare(problem, prototype)
         @test prepared isa DummyPrepared
         @test prepared.prototype_keys == (:x, :y)
 
-        # Callable on matching structure
-        lp = prepared((x = 0.5, y = [1.5, 2.5]))
+        lp = prepared((x=0.5, y=[1.5, 2.5]))
         @test lp ≈ 0.5 + 1.5 + 2.5
 
-        # Structural mismatch throws
-        @test_throws Exception prepared((a = 1.0, b = 2.0))
+        @test_throws Exception prepared((a=1.0, b=2.0))
     end
 
     @testset "prepare (AD-aware)" begin
         problem = DummyProblem()
-        prototype = (x = 0.0, y = [1.0, 2.0])
+        prototype = (x=0.0, y=[1.0, 2.0])
         adtype = ADTypes.AutoForwardDiff()
         prepared = prepare(adtype, problem, prototype)
         @test prepared isa DummyADPrepared
         @test capabilities(prepared) == DerivativeOrder{1}()
 
-        # Callable
-        lp = prepared((x = 0.5, y = [1.5, 2.5]))
+        lp = prepared((x=0.5, y=[1.5, 2.5]))
         @test lp ≈ 0.5 + 1.5 + 2.5
 
-        # value_and_gradient
-        val, grad = value_and_gradient(prepared, (x = 0.5, y = [1.5, 2.5]))
+        val, grad = value_and_gradient(prepared, (x=0.5, y=[1.5, 2.5]))
         @test val ≈ 0.5 + 1.5 + 2.5
         @test grad.x ≈ 1.0
         @test grad.y ≈ [1.0, 1.0]
@@ -115,4 +107,41 @@ end
         @test_throws Exception prepared(ones(5))
     end
 
+    @testset "flatten / unflatten" begin
+        nt = (x=1.0, y=[2.0, 3.0])
+        v = AbstractPPL.flatten_to_vec(nt)
+        @test v == [1.0, 2.0, 3.0]
+        nt2 = AbstractPPL.unflatten_from_vec(nt, v)
+        @test nt2.x == 1.0
+        @test nt2.y == [2.0, 3.0]
+
+        # Nested NamedTuple
+        nt3 = (a=0.5, b=(c=1.0, d=[2.0, 3.0]))
+        v3 = AbstractPPL.flatten_to_vec(nt3)
+        @test v3 == [0.5, 1.0, 2.0, 3.0]
+        nt3r = AbstractPPL.unflatten_from_vec(nt3, v3)
+        @test nt3r.a == 0.5
+        @test nt3r.b.c == 1.0
+        @test nt3r.b.d == [2.0, 3.0]
+
+        # Matrix
+        nt4 = (x=[1.0 2.0; 3.0 4.0],)
+        v4 = AbstractPPL.flatten_to_vec(nt4)
+        @test length(v4) == 4
+        nt4r = AbstractPPL.unflatten_from_vec(nt4, v4)
+        @test nt4r.x == [1.0 2.0; 3.0 4.0]
+
+        # P2: element type is preserved (not coerced to Float64)
+        nt_f32 = (x=Float32(1.0), y=Float32[2.0, 3.0])
+        v_f32 = AbstractPPL.flatten_to_vec(nt_f32)
+        @test eltype(v_f32) == Float32
+        nt_big = (x=big(1.0),)
+        v_big = AbstractPPL.flatten_to_vec(nt_big)
+        @test eltype(v_big) == BigFloat
+
+        # P1: overlong vector is rejected
+        @test_throws DimensionMismatch AbstractPPL.unflatten_from_vec(
+            nt, [1.0, 2.0, 3.0, 99.0]
+        )
+    end
 end

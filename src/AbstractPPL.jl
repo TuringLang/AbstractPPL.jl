@@ -1,7 +1,5 @@
 module AbstractPPL
 
-using ADTypes: ADTypes
-
 # Abstract model functions
 export AbstractProbabilisticProgram,
     condition, decondition, fix, unfix, logdensityof, densityof, AbstractContext, evaluate!!
@@ -10,11 +8,7 @@ export AbstractProbabilisticProgram,
 export AbstractModelTrace
 
 # Evaluator interface
-export DerivativeOrder,
-    capabilities,
-    prepare,
-    value_and_gradient,
-    dimension
+export DerivativeOrder, capabilities, prepare, value_and_gradient, dimension
 
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")

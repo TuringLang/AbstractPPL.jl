@@ -37,10 +37,10 @@ using Test
             @varname(z[:, :], true),
             @varname(z[2:5, :], false),
             @varname(z[2:5, :], true),
-            @varname(x[i=1]),
-            @varname(x[j=2, i=1]),
-            @varname(x[i=1, j=2]),
-            @varname(x[].a[j=2].b[3, 4, 5, [6]]),
+            @varname(x[i = 1]),
+            @varname(x[j = 2, i = 1]),
+            @varname(x[i = 1, j = 2]),
+            @varname(x[].a[j = 2].b[3, 4, 5, [6]]),
             @varname(x[[1, 2, 5, 6]]),
         ]
         for vn in vns
@@ -65,8 +65,9 @@ using Test
             "type" => "InvertedIndices.InvertedIndex",
             "skip" => AbstractPPL.index_to_dict(o.skip),
         )
-        AbstractPPL.dict_to_index(::Val{Symbol("InvertedIndices.InvertedIndex")}, d) =
-            InvertedIndex(AbstractPPL.dict_to_index(d["skip"]))
+        AbstractPPL.dict_to_index(::Val{Symbol("InvertedIndices.InvertedIndex")}, d) = InvertedIndex(
+            AbstractPPL.dict_to_index(d["skip"])
+        )
 
         # Serialisation should now work
         @test string_to_varname(varname_to_string(vn)) == vn
