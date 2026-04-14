@@ -18,3 +18,13 @@ evaluate!!
 ```@docs
 AbstractModelTrace
 ```
+
+## Evaluator interface
+
+```@docs
+DerivativeOrder
+capabilities
+prepare
+value_and_gradient
+dimension
+```

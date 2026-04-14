@@ -10,9 +10,9 @@ function _fd_gradient(f, x::AbstractVector)
     h = cbrt(eps(T))
     grad = Vector{T}(undef, length(x))
     for i in eachindex(x)
-        xp = copy(x);
+        xp = copy(x)
         xp[i] += h
-        xm = copy(x);
+        xm = copy(x)
         xm[i] -= h
         grad[i] = (f(xp) - f(xm)) / (2h)
     end
@@ -34,6 +34,6 @@ function test_autograd(prepared, values::NamedTuple; atol=1e-5, rtol=1e-5)
     grad_fd_nt = AbstractPPL.unflatten_from_vec(values, _fd_gradient(f, x))
     @test val_ad ≈ f(x)
     for k in keys(values)
-        @test getfield(grad_ad, k) ≈ getfield(grad_fd_nt, k) atol=atol rtol=rtol
+        @test getfield(grad_ad, k) ≈ getfield(grad_fd_nt, k) atol = atol rtol = rtol
     end
 end

@@ -40,9 +40,9 @@ const adtype = ADTypes.AutoFiniteDifferences(; fdm)
     @test prepared([3.0, 1.0, 2.0]) ≈ 14.0
 
     val, grad = AbstractPPL.value_and_gradient(prepared, values)
-    @test val ≈ 14.0 atol=1e-6
-    @test grad.x ≈ 6.0 atol=1e-6
-    @test grad.y ≈ [2.0, 4.0] atol=1e-6
+    @test val ≈ 14.0 atol = 1e-6
+    @test grad.x ≈ 6.0 atol = 1e-6
+    @test grad.y ≈ [2.0, 4.0] atol = 1e-6
     test_autograd(prepared, values; atol=1e-4, rtol=1e-4)
 
     # Overlong vector is rejected
