@@ -316,7 +316,7 @@ There are two things that make them more special, though:
     vi[@varname(x[1])] = 1
     vi[@varname(x[2])] = 2
     keys(vi) == [x[1], x[2]]
-
+    
     vi[@varname(x)] = [1, 2]
     keys(vi) == [x]
     ```

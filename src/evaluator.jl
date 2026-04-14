@@ -99,13 +99,15 @@ function _unflatten(proto::AbstractArray{<:Real}, vec::AbstractVector, offset::I
     result = reshape(@view(vec[offset:(offset + n - 1)]), size(proto))
     return result, offset + n
 end
-function _unflatten(proto::NamedTuple, vec::AbstractVector, offset::Int)
-    rebuilt = Any[]
-    for v in values(proto)
-        val, offset = _unflatten(v, vec, offset)
-        push!(rebuilt, val)
-    end
-    return NamedTuple{keys(proto)}(Tuple(rebuilt)), offset
+# Recursive peel keeps this type-stable (Enzyme needs it).
+function _unflatten(::NamedTuple{(),Tuple{}}, ::AbstractVector, offset::Int)
+    return NamedTuple(), offset
+end
+function _unflatten(proto::NamedTuple{K}, vec::AbstractVector, offset::Int) where {K}
+    first_val, offset = _unflatten(first(values(proto)), vec, offset)
+    rest_proto = NamedTuple{Base.tail(K)}(Base.tail(values(proto)))
+    rest_nt, offset = _unflatten(rest_proto, vec, offset)
+    return merge(NamedTuple{(first(K),)}((first_val,)), rest_nt), offset
 end
 
 function unflatten_from_vec(prototype::NamedTuple, vec::AbstractVector)

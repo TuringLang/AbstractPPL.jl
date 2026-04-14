@@ -20,6 +20,8 @@ function (p::MooncakePrepared)(values::NamedTuple)
 end
 
 function (p::MooncakePrepared)(x::AbstractVector)
+    length(x) == p.dim ||
+        throw(DimensionMismatch("expected vector of length $(p.dim), got $(length(x))"))
     return p.f_vec(x)
 end
 
@@ -33,7 +35,7 @@ function AbstractPPL.prepare(adtype::AutoMooncake, problem, prototype::NamedTupl
     return MooncakePrepared(evaluator, f_vec, cache, prototype, length(x0))
 end
 
-function AbstractPPL.value_and_gradient(p::MooncakePrepared, values::NamedTuple)
+@inline function AbstractPPL.value_and_gradient(p::MooncakePrepared, values::NamedTuple)
     x = AbstractPPL.flatten_to_vec(values)
     val, (_, dx) = Mooncake.value_and_gradient!!(p.cache, p.f_vec, x)
     grad_nt = AbstractPPL.unflatten_from_vec(p.prototype, dx)

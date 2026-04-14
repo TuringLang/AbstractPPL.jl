@@ -21,6 +21,8 @@ function (p::DIPrepared)(values::NamedTuple)
 end
 
 function (p::DIPrepared)(x::AbstractVector)
+    length(x) == p.dim ||
+        throw(DimensionMismatch("expected vector of length $(p.dim), got $(length(x))"))
     return p.f_vec(x)
 end
 
@@ -34,7 +36,7 @@ function AbstractPPL.prepare(adtype::AbstractADType, problem, prototype::NamedTu
     return DIPrepared(evaluator, f_vec, adtype, prep, prototype, length(x0))
 end
 
-function AbstractPPL.value_and_gradient(p::DIPrepared, values::NamedTuple)
+@inline function AbstractPPL.value_and_gradient(p::DIPrepared, values::NamedTuple)
     x = AbstractPPL.flatten_to_vec(values)
     val, dx = DI.value_and_gradient(p.f_vec, p.prep, p.backend, x)
     grad_nt = AbstractPPL.unflatten_from_vec(p.prototype, dx)

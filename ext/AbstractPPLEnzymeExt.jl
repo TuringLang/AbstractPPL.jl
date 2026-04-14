@@ -20,6 +20,8 @@ function (p::EnzymePrepared)(values::NamedTuple)
 end
 
 function (p::EnzymePrepared)(x::AbstractVector)
+    length(x) == p.dim ||
+        throw(DimensionMismatch("expected vector of length $(p.dim), got $(length(x))"))
     return p.f_vec(x)
 end
 
@@ -33,7 +35,7 @@ function AbstractPPL.prepare(::AutoEnzyme, problem, prototype::NamedTuple)
     return EnzymePrepared(evaluator, f_vec, grad_buf, prototype, length(x0))
 end
 
-function AbstractPPL.value_and_gradient(p::EnzymePrepared, values::NamedTuple)
+@inline function AbstractPPL.value_and_gradient(p::EnzymePrepared, values::NamedTuple)
     x = AbstractPPL.flatten_to_vec(values)
     fill!(p.gradient_buffer, 0.0)
     result = Enzyme.autodiff(

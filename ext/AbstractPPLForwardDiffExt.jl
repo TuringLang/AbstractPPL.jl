@@ -21,6 +21,8 @@ function (p::ForwardDiffPrepared)(values::NamedTuple)
 end
 
 function (p::ForwardDiffPrepared)(x::AbstractVector)
+    length(x) == p.dim ||
+        throw(DimensionMismatch("expected vector of length $(p.dim), got $(length(x))"))
     return p.f_vec(x)
 end
 
@@ -36,7 +38,7 @@ function AbstractPPL.prepare(::AutoForwardDiff, problem, prototype::NamedTuple)
     return ForwardDiffPrepared(evaluator, f_vec, cfg, result, prototype, length(x0))
 end
 
-function AbstractPPL.value_and_gradient(p::ForwardDiffPrepared, values::NamedTuple)
+@inline function AbstractPPL.value_and_gradient(p::ForwardDiffPrepared, values::NamedTuple)
     x = AbstractPPL.flatten_to_vec(values)
     ForwardDiff.gradient!(p.result, p.f_vec, x, p.config)
     val = ForwardDiff.DiffResults.value(p.result)

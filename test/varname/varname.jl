@@ -40,8 +40,8 @@ using JET: @test_call
         check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.a[1]), true)
         check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.a[2]), false)
         check_doubleeq_and_hash(@varname(x.a[1]), @varname(x.b[1]), false)
-        check_doubleeq_and_hash(@varname(x[1, i=2]), @varname(x[1, i=2]), true)
-        check_doubleeq_and_hash(@varname(x[i=2, 4]), @varname(x[4, i=2]), true)
+        check_doubleeq_and_hash(@varname(x[1, i = 2]), @varname(x[1, i = 2]), true)
+        check_doubleeq_and_hash(@varname(x[i = 2, 4]), @varname(x[4, i = 2]), true)
 
         @testset "dynamic indices" begin
             check_doubleeq_and_hash(@varname(x[begin]), @varname(x[begin]), true)
@@ -90,7 +90,7 @@ using JET: @test_call
         @test string(@varname(x[begin])) == "x[DynamicIndex(begin)]"
         @test string(@varname(x[end])) == "x[DynamicIndex(end)]"
         @test string(@varname(x[:])) == "x[:]"
-        @test string(@varname(x[1, i=3])) == "x[1, i=3]"
+        @test string(@varname(x[1, i = 3])) == "x[1, i=3]"
     end
 
     @testset "dynamic indices and manual concretization" begin
@@ -148,7 +148,7 @@ using JET: @test_call
         @test !is_dynamic(@varname(x[1:3, 3, 2 + 9]))
         i = 10
         @test !is_dynamic(@varname(x[1:3, 3, 2 + 9, 1:3:i]))
-        @test !is_dynamic(@varname(x[k=i]))
+        @test !is_dynamic(@varname(x[k = i]))
     end
 
     @testset "automatic concretization" begin
@@ -187,8 +187,8 @@ using JET: @test_call
             @test @varname(x[idx]) == @varname(x[3])
             @test @varname(x[2 * idx]) == @varname(x[6])
             @test @varname(x[1:idx]) == @varname(x[1:3])
-            @test @varname(x[k=idx]) == @varname(x[k=3])
-            @test @varname(x[k=2 * idx]) == @varname(x[k=6])
+            @test @varname(x[k = idx]) == @varname(x[k = 3])
+            @test @varname(x[k = 2 * idx]) == @varname(x[k = 6])
         end
 
         @testset "with dynamic indices" begin

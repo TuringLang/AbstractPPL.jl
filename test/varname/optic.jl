@@ -31,7 +31,7 @@ using AbstractPPL
             @opticof(_.a[2]),
             @opticof(_.a[1, :]),
             @opticof(_[1].a),
-            @opticof(_[1, x=1].a),
+            @opticof(_[1, x = 1].a),
         )
         for (i, optic1) in enumerate(optics)
             for (j, optic2) in enumerate(optics)
@@ -103,7 +103,7 @@ using AbstractPPL
                 @opticof(_.a),
                 @opticof(_.a.b),
                 @opticof(_[1].a),
-                @opticof(_[1, x=1].a),
+                @opticof(_[1, x = 1].a),
                 @opticof(_[].a[:]),
             )
             for optic in optics
@@ -196,8 +196,8 @@ using AbstractPPL
 
         @testset "keyword arguments to getindex" begin
             dimarray = DD.DimArray([0.0 1.0; 2.0 3.0], (:x, :y))
-            @test @opticof(_[x=1])(dimarray) == dimarray[x=1]
-            @test set(dimarray, @opticof(_[y=2]), [9.0; 8.0]) ==
+            @test @opticof(_[x = 1])(dimarray) == dimarray[x = 1]
+            @test set(dimarray, @opticof(_[y = 2]), [9.0; 8.0]) ==
                 DD.DimArray([0.0 9.0; 2.0 8.0], (:x, :y))
         end
 
@@ -288,10 +288,10 @@ using AbstractPPL
             @testset "keyword index" begin
                 x = DD.DimArray(zeros(2, 2), (:x, :y))
                 old_objid = objectid(x)
-                optic = with_mutation(@opticof(_[x=1, y=2]))
-                @test optic(x) === x[x=1, y=2]
+                optic = with_mutation(@opticof(_[x = 1, y = 2]))
+                @test optic(x) === x[x = 1, y = 2]
                 set(x, optic, 2.0)
-                @test x[x=1, y=2] == 2.0
+                @test x[x = 1, y = 2] == 2.0
                 @test collect(x) == [0.0 2.0; 0.0 0.0]
                 @test objectid(x) == old_objid
             end
