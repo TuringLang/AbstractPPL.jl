@@ -9,7 +9,7 @@ struct ForwardDiffPrepared{E,F,C,R,P}
     f_vec::F
     config::C
     result::R
-    prototype::P
+    values::P
     dim::Int
 end
 
@@ -20,30 +20,30 @@ function (p::ForwardDiffPrepared)(values::NamedTuple)
     return p.evaluator(values)
 end
 
-function (p::ForwardDiffPrepared)(x::AbstractVector)
+function (p::ForwardDiffPrepared)(x::AbstractVector{<:AbstractFloat})
     length(x) == p.dim ||
         throw(DimensionMismatch("expected vector of length $(p.dim), got $(length(x))"))
     return p.f_vec(x)
 end
 
-function AbstractPPL.prepare(::AutoForwardDiff, problem, prototype::NamedTuple)
-    evaluator = AbstractPPL.prepare(problem, prototype)
-    x0 = AbstractPPL.flatten_to_vec(prototype)
-    f_vec = let evaluator = evaluator, prototype = prototype
-        x -> evaluator(AbstractPPL.unflatten_from_vec(prototype, x))
+function AbstractPPL.prepare(::AutoForwardDiff, problem, values::NamedTuple)
+    evaluator = AbstractPPL.prepare(problem, values)
+    x0 = AbstractPPL.flatten_to_vec(values)
+    f_vec = let evaluator = evaluator, values = values
+        x -> evaluator(AbstractPPL.unflatten_from_vec(values, x))
     end
     cfg = ForwardDiff.GradientConfig(f_vec, x0)
     grad_buf = similar(x0)
     result = ForwardDiff.DiffResults.MutableDiffResult(zero(eltype(x0)), (grad_buf,))
-    return ForwardDiffPrepared(evaluator, f_vec, cfg, result, prototype, length(x0))
+    return ForwardDiffPrepared(evaluator, f_vec, cfg, result, values, length(x0))
 end
 
 @inline function AbstractPPL.value_and_gradient(p::ForwardDiffPrepared, values::NamedTuple)
-    x = AbstractPPL.flatten_to_vec(values)
+    x = AbstractPPL.flatten_to_vec(p.values, values)
     ForwardDiff.gradient!(p.result, p.f_vec, x, p.config)
     val = ForwardDiff.DiffResults.value(p.result)
     dx = ForwardDiff.DiffResults.gradient(p.result)
-    grad_nt = AbstractPPL.unflatten_from_vec(p.prototype, dx)
+    grad_nt = AbstractPPL.unflatten_from_vec(p.values, values, dx)
     return (val, grad_nt)
 end
 

@@ -13,7 +13,7 @@ include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
 struct QuadraticProblem end
 struct QuadraticPrepared end
 
-function AbstractPPL.prepare(::QuadraticProblem, prototype::NamedTuple)
+function AbstractPPL.prepare(::QuadraticProblem, values::NamedTuple)
     return QuadraticPrepared()
 end
 
@@ -23,9 +23,9 @@ end
 
 @testset "AbstractPPLFiniteDifferencesExt" begin
     problem = QuadraticProblem()
-    prototype = (x=0.0, y=[0.0, 0.0])
+    values = (x=0.0, y=[0.0, 0.0])
     fdm = FiniteDifferences.central_fdm(5, 1)
-    prepared = AbstractPPL.prepare(ADTypes.AutoFiniteDifferences(; fdm), problem, prototype)
+    prepared = AbstractPPL.prepare(ADTypes.AutoFiniteDifferences(; fdm), problem, values)
 
     @test AbstractPPL.capabilities(prepared) >= AbstractPPL.DerivativeOrder{1}()
     @test AbstractPPL.dimension(prepared) == 3
@@ -39,4 +39,9 @@ end
     test_autograd(prepared, values)
 
     @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
+    @test_throws MethodError prepared([3, 1, 2])
+    @test_throws MethodError prepared((x=3.0, z=[1.0, 2.0]))
+    @test_throws DimensionMismatch AbstractPPL.value_and_gradient(
+        prepared, (x=3.0, y=[1.0, 2.0, 3.0])
+    )
 end

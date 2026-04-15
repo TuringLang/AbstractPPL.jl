@@ -8,8 +8,8 @@ struct DummyPrepared
     prototype_keys::Tuple
 end
 
-function AbstractPPL.prepare(problem::DummyProblem, prototype::NamedTuple)
-    return DummyPrepared(keys(prototype))
+function AbstractPPL.prepare(problem::DummyProblem, values::NamedTuple)
+    return DummyPrepared(keys(values))
 end
 
 function (p::DummyPrepared)(values::NamedTuple)
@@ -23,9 +23,9 @@ struct DummyADPrepared
 end
 
 function AbstractPPL.prepare(
-    ::ADTypes.AbstractADType, problem::DummyProblem, prototype::NamedTuple
+    ::ADTypes.AbstractADType, problem::DummyProblem, values::NamedTuple
 )
-    return DummyADPrepared(keys(prototype))
+    return DummyADPrepared(keys(values))
 end
 
 function (p::DummyADPrepared)(values::NamedTuple)
@@ -64,16 +64,16 @@ end
     end
 
     @testset "capabilities default" begin
-        # Any type without a capabilities method should return DerivativeOrder{0}
-        @test capabilities(Int) == DerivativeOrder{0}()
-        @test capabilities(42) == DerivativeOrder{0}()
-        @test capabilities(DummyPrepared((:x,))) == DerivativeOrder{0}()
+        # Any type without a capabilities method should return nothing
+        @test isnothing(capabilities(Int))
+        @test isnothing(capabilities(42))
+        @test isnothing(capabilities(DummyPrepared((:x,))))
     end
 
     @testset "prepare (structural)" begin
         problem = DummyProblem()
-        prototype = (x=0.0, y=[1.0, 2.0])
-        prepared = prepare(problem, prototype)
+        values = (x=0.0, y=[1.0, 2.0])
+        prepared = prepare(problem, values)
         @test prepared isa DummyPrepared
         @test prepared.prototype_keys == (:x, :y)
 
@@ -85,9 +85,9 @@ end
 
     @testset "prepare (AD-aware)" begin
         problem = DummyProblem()
-        prototype = (x=0.0, y=[1.0, 2.0])
+        values = (x=0.0, y=[1.0, 2.0])
         adtype = ADTypes.AutoForwardDiff()
-        prepared = prepare(adtype, problem, prototype)
+        prepared = prepare(adtype, problem, values)
         @test prepared isa DummyADPrepared
         @test capabilities(prepared) == DerivativeOrder{1}()
 
@@ -139,9 +139,26 @@ end
         v_big = AbstractPPL.flatten_to_vec(nt_big)
         @test eltype(v_big) == BigFloat
 
-        # P1: overlong vector is rejected
+        # P1: mismatched vector length is rejected
+        @test_throws DimensionMismatch AbstractPPL.unflatten_from_vec(nt, [1.0, 2.0])
         @test_throws DimensionMismatch AbstractPPL.unflatten_from_vec(
             nt, [1.0, 2.0, 3.0, 99.0]
+        )
+
+        # Runtime inputs must match prepare-time type/size expectations when using
+        # the compatibility-aware flatten/unflatten paths.
+        @test AbstractPPL.flatten_to_vec(nt, nt) == v
+        @test_throws DimensionMismatch AbstractPPL.flatten_to_vec(
+            nt, (x=1.0, y=[2.0, 3.0, 4.0])
+        )
+        @test_throws MethodError AbstractPPL.flatten_to_vec(
+            nt, (x=1.0, y=reshape([2.0, 3.0], 1, 2))
+        )
+        @test_throws DimensionMismatch AbstractPPL.unflatten_from_vec(
+            nt, (x=1.0, y=[2.0, 3.0, 4.0]), v
+        )
+        @test_throws MethodError AbstractPPL.check_runtime_type(
+            nt, (x=1.0, y=reshape([2.0, 3.0], 1, 2))
         )
     end
 end
