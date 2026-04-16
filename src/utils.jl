@@ -110,7 +110,7 @@ function _unflatten(x::Tuple, buf::AbstractVector, offset::Int)
 end
 
 function _unflatten(::NamedTuple{(),Tuple{}}, buf::AbstractVector, offset::Int)
-    NamedTuple(), offset
+    return NamedTuple(), offset
 end
 
 function _unflatten(x::NamedTuple{Names}, buf::AbstractVector, offset::Int) where {Names}

@@ -65,14 +65,12 @@ using Test
         end
 
         @testset "keyword indices" begin
-            @test strictly_subsumes(@varname(x), @varname(x[a = 1]))
-            @test strictly_subsumes(@varname(x[a = 1:10, b = 1:10]), @varname(x[a = 1:10]))
-            @test strictly_subsumes(
-                @varname(x[a = 1:10, b = 1:10]), @varname(x[a = 1:5, b = 1:5])
-            )
-            @test strictly_subsumes(@varname(x[a=:]), @varname(x[a = 1]))
-            @test uncomparable(@varname(x[a = 1:10, b = 5]), @varname(x[a = 5, b = 1:10]))
-            @test uncomparable(@varname(x[a = 1]), @varname(x[b = 1]))
+            @test strictly_subsumes(@varname(x), @varname(x[a=1]))
+            @test strictly_subsumes(@varname(x[a=1:10, b=1:10]), @varname(x[a=1:10]))
+            @test strictly_subsumes(@varname(x[a=1:10, b=1:10]), @varname(x[a=1:5, b=1:5]))
+            @test strictly_subsumes(@varname(x[a=:]), @varname(x[a=1]))
+            @test uncomparable(@varname(x[a=1:10, b=5]), @varname(x[a=5, b=1:10]))
+            @test uncomparable(@varname(x[a=1]), @varname(x[b=1]))
         end
     end
 end

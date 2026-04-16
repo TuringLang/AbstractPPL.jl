@@ -6,7 +6,7 @@ This should facilitate reuse of functions in modelling languages, to allow end u
 Whilst its current implementation does not do this, there are certain desiderata for such an interface, which are outlined in this page.
 
 !!! danger
-
+    
     Please note that this page reflects a discussion as of several years ago, and the implementation of DynamicPPL.jl has evolved not totally in sync with the ideas presented here. This page should be considered more aspirational rather than an accurate reflection of the current DynamicPPL.jl codebase.
 
 ## `AbstractProbabilisticProgram` interface (still somewhat drafty)
@@ -170,7 +170,7 @@ Not all variants need to be supported – for example, a posterior model might n
 ### Density Evaluation
 
 !!! danger
-
+    
     Note that DensityInterface.jl has not had any substantial updates since 2021. As such, this section should be considered in a more general sense without ties to any particular package. DynamicPPL.jl does not make use of DensityInterface.jl; instead, DynamicPPL currently uses the interface specified by LogDensityProblems.jl.
 
 Since the different "versions" of how a model is to be understood as generative or conditioned are to be expressed in the type or dispatch they support, there should be no need for separate functions `logjoint`, `loglikelihood`, etc., which force these semantic distinctions on the implementor; we therefore adapt the interface of [DensityInterface.jl](https://github.com/JuliaMath/DensityInterface.jl).
@@ -301,17 +301,17 @@ There are two things that make them more special, though:
  1. "Fancy indexing": since `VarName`s are structured themselves, the `VarInfo` should be have a bit
     like a trie, in the sense that all prefixes of stored keys should be retrievable.  Also,
     subsumption of `VarName`s should be respected (see end of this document):
-
+    
     ```julia
     vi[@varname(x.a)] = [1, 2, 3]
     vi[@varname(x.b)] = [4, 5, 6]
     vi[@varname(x.a[2])] == 2
     vi[@varname(x)] == (; a=[1, 2, 3], b=[4, 5, 6])
     ```
-
+    
     Generalizations that go beyond simple cases (those that you can imagine by storing individual
     `setfield!`s in a tree) need not be implemented in the beginning; e.g.,
-
+    
     ```julia
     vi[@varname(x[1])] = 1
     vi[@varname(x[2])] = 2
@@ -325,21 +325,21 @@ There are two things that make them more special, though:
     metadata, pointwise likelihoods, etc., can in principle be stored in multiple of these "`VarInfo`
     dicts" with parallel structure.  For efficiency, it is thinkable to devise a design such that
     multiple fields can be stored under the same indexing structure.
-
+    
     ```julia
     vi[@varname(x[1])] == 1
     vi[@varname(x[1])].meta["bla"] == false
     ```
-
+    
     or something in that direction.
-
+    
     (This is logically equivalent to a dictionary with named tuple values.  Maybe we can do what
     [`DictTable`](https://github.com/JuliaData/TypedTables.jl/blob/main/src/DictTable.jl) does?)
-
+    
     The old `order` field, indicating at which position in the evaluator function a variable has
     been added (essentially a counter of insertions) can actually be left out completely, since the
     dictionary is specified to be ordered by insertion.
-
+    
     The important question here is: should the "joint data structure" behave like a dictionary of
     `NamedTuple`s (`eltype(vi) == @NamedTuple{value::T, ℓ::Float64, meta}`), or like a struct of
     dicts with shared keys (`eltype(vi.value) <: T`, `eltype(vi.ℓ) <: Float64`, …)?
@@ -347,7 +347,7 @@ There are two things that make them more special, though:
 The required dictionary functions are about the following:
 
   - Pure functions:
-
+    
       + `iterate`, yielding pairs of `VarName` and the stored value
       + `IteratorEltype == HasEltype()`, `IteratorSize = HasLength()`
       + `keys`, `values`, `pairs`, `length` consistent with `iterate`
@@ -356,7 +356,7 @@ The required dictionary functions are about the following:
       + `merge` to join two `VarInfo`s
 
   - Mutating functions:
-
+    
       + `insert!!`, `set!!`
       + `merge!!` to add and join elements (TODO: think about `merge`)
       + `setindex!!`
