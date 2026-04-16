@@ -14,6 +14,10 @@ end
 
 AbstractPPL.capabilities(::Type{<:FDPrepared}) = DerivativeOrder{1}()
 
+function AbstractPPL.test_grad(f, x::AbstractVector{<:AbstractFloat})
+    return FiniteDifferences.grad(FiniteDifferences.central_fdm(5, 1), f, x)[1]
+end
+
 function AbstractPPL.dimension(::FDPrepared{<:Any,<:Any,<:NamedTuple})
     throw(
         ArgumentError(

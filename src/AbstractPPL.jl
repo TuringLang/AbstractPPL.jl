@@ -8,7 +8,7 @@ export AbstractProbabilisticProgram,
 export AbstractModelTrace
 
 # Evaluator interface
-export DerivativeOrder, capabilities, prepare, value_and_gradient, dimension
+export DerivativeOrder, capabilities, prepare, value_and_gradient, test_grad, dimension
 
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")

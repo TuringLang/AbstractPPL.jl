@@ -63,6 +63,21 @@ function value_and_gradient(prepared, x::AbstractVector{<:AbstractFloat})
 end
 
 """
+    test_grad(f, x::AbstractVector{<:AbstractFloat})
+
+Return a finite-difference reference gradient for a scalar-valued callable `f`
+evaluated at the vector input `x`.
+
+If the FiniteDifferences extension is not loaded, this warns and returns `nothing`.
+"""
+function test_grad end
+
+function test_grad(f, x)
+    @warn "Finite-difference reference gradients require `using FiniteDifferences`; skipping test_grad."
+    return nothing
+end
+
+"""
     dimension(prepared)::Int
 
 Return the number of scalar entries in the vector input expected by a prepared evaluator.
