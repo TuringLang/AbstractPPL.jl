@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   test:
-    name: Tests (${{ matrix.runner.version }}, ${{ matrix.runner.os }})
+    name: test (${{ matrix.runner.version }}, ${{ matrix.runner.os }})
     runs-on: ${{ matrix.runner.os }}
     strategy:
       fail-fast: false
@@ -20,7 +20,7 @@ jobs:
         runner:
           - version: '1'
             os: ubuntu-latest
-          - version: 'lts'
+          - version: 'min'
             os: ubuntu-latest
           - version: '1.11'
             os: ubuntu-latest

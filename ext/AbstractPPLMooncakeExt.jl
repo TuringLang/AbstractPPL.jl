@@ -4,39 +4,75 @@ using AbstractPPL: AbstractPPL, DerivativeOrder
 using ADTypes: AutoMooncake
 using Mooncake: Mooncake
 
-struct MooncakePrepared{E,F,C,P}
+struct MooncakePrepared{E,C,P}
     evaluator::E
-    f_vec::F
     cache::C
-    values::P
+    inputspec::P
 end
 
 AbstractPPL.capabilities(::Type{<:MooncakePrepared}) = DerivativeOrder{1}()
-AbstractPPL.dimension(p::MooncakePrepared) = AbstractPPL._scalar_count(p.values)
 
-function (p::MooncakePrepared)(values::NamedTuple)
+function AbstractPPL.dimension(::MooncakePrepared{<:Any,<:Any,<:NamedTuple})
+    throw(
+        ArgumentError(
+            "`dimension` is only available for evaluators prepared with a vector of floating-point numbers.",
+        ),
+    )
+end
+function AbstractPPL.dimension(p::MooncakePrepared{<:Any,<:Any,<:AbstractVector})
+    return length(p.inputspec)
+end
+
+function (p::MooncakePrepared{<:Any,<:Any,<:NamedTuple})(values::NamedTuple)
     return p.evaluator(values)
+end
+
+function (p::MooncakePrepared{<:Any,<:Any,<:AbstractVector})(
+    x::AbstractVector{<:AbstractFloat}
+)
+    length(x) == length(p.inputspec) || throw(
+        DimensionMismatch(
+            "Expected a vector of length $(length(p.inputspec)), but got length $(length(x)).",
+        ),
+    )
+    return p.evaluator(x)
 end
 
 function AbstractPPL.prepare(adtype::AutoMooncake, problem, values::NamedTuple)
     evaluator = AbstractPPL.prepare(problem, values)
-    f_vec = let evaluator = evaluator, values = values
-        x -> evaluator(AbstractPPL.unflatten_from_vec(values, x))
-    end
     cache = Mooncake.prepare_gradient_cache(evaluator, values; config=adtype.config)
-    return MooncakePrepared(evaluator, f_vec, cache, values)
+    return MooncakePrepared(evaluator, cache, values)
 end
 
-function (p::MooncakePrepared)(x::AbstractVector{<:AbstractFloat})
-    dim = AbstractPPL.dimension(p)
-    length(x) == dim ||
-        throw(DimensionMismatch("expected vector of length $(dim), got $(length(x))"))
-    return p.f_vec(x)
+function AbstractPPL.prepare(
+    adtype::AutoMooncake, problem, x::AbstractVector{<:AbstractFloat}
+)
+    evaluator = AbstractPPL.prepare(problem, x)
+    cache = Mooncake.prepare_gradient_cache(evaluator, x; config=adtype.config)
+    return MooncakePrepared(evaluator, cache, x)
 end
 
-@inline function AbstractPPL.value_and_gradient(p::MooncakePrepared, values::NamedTuple)
-    AbstractPPL.check_runtime_type(p.values, values)
+@inline function AbstractPPL.value_and_gradient(
+    p::MooncakePrepared{<:Any,<:Any,<:NamedTuple}, values::NamedTuple
+)
+    typeof(values) === typeof(p.inputspec) || throw(
+        ArgumentError(
+            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
+        ),
+    )
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
+    return (val, grad)
+end
+
+@inline function AbstractPPL.value_and_gradient(
+    p::MooncakePrepared{<:Any,<:Any,<:AbstractVector}, x::AbstractVector{<:AbstractFloat}
+)
+    length(x) == length(p.inputspec) || throw(
+        DimensionMismatch(
+            "Expected a vector of length $(length(p.inputspec)), but got length $(length(x)).",
+        ),
+    )
+    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, x)
     return (val, grad)
 end
 

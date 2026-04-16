@@ -20,20 +20,14 @@ function _fd_gradient(f, x::AbstractVector)
 end
 
 """
-    test_autograd(prepared, values; atol=1e-5, rtol=1e-5)
+    test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5)
 
-Compare `value_and_gradient(prepared, values)` against a central finite-difference
-reference computed via the vector adapter `prepared(x::AbstractVector)`.
-Calls `@test` internally; use inside a `@testset` block.
+Compare `value_and_gradient(prepared, x)` against a central finite-difference
+reference. Calls `@test` internally; use inside a `@testset` block.
 """
-function test_autograd(prepared, values::NamedTuple; atol=1e-5, rtol=1e-5)
-    values = deepcopy(values)
-    x = AbstractPPL.flatten_to_vec(values)
-    f = x′ -> prepared(AbstractPPL.unflatten_from_vec(values, x′))
-    val_ad, grad_ad = AbstractPPL.value_and_gradient(prepared, values)
-    grad_fd_nt = AbstractPPL.unflatten_from_vec(values, _fd_gradient(f, x))
-    @test val_ad ≈ f(x)
-    for k in keys(values)
-        @test getfield(grad_ad, k) ≈ getfield(grad_fd_nt, k) atol = atol rtol = rtol
-    end
+function test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5)
+    val_ad, grad_ad = AbstractPPL.value_and_gradient(prepared, x)
+    grad_fd = _fd_gradient(prepared, x)
+    @test val_ad ≈ prepared(x)
+    @test grad_ad ≈ grad_fd atol = atol rtol = rtol
 end

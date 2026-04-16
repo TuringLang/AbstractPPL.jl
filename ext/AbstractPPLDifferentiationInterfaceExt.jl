@@ -4,49 +4,45 @@ using AbstractPPL: AbstractPPL, DerivativeOrder
 using ADTypes
 using DifferentiationInterface: DifferentiationInterface as DI
 
-struct DIPrepared{E,F,B,C,P}
+struct DIPrepared{E,B,C}
     evaluator::E
-    f_vec::F
     backend::B
     prep::C
-    values::P
     dim::Int
 end
 
 AbstractPPL.capabilities(::Type{<:DIPrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::DIPrepared) = p.dim
 
-function (p::DIPrepared)(values::NamedTuple)
-    return p.evaluator(values)
-end
-
 function (p::DIPrepared)(x::AbstractVector{<:AbstractFloat})
-    length(x) == p.dim ||
-        throw(DimensionMismatch("expected vector of length $(p.dim), got $(length(x))"))
-    return p.f_vec(x)
+    length(x) == p.dim || throw(
+        DimensionMismatch(
+            "Expected a vector of length $(p.dim), but got length $(length(x))."
+        ),
+    )
+    return p.evaluator(x)
 end
 
-function AbstractPPL.prepare(adtype::ADTypes.AbstractADType, problem, values::NamedTuple)
-    adtype isa Union{
-        ADTypes.AutoFiniteDifferences,
-        ADTypes.AutoForwardDiff,
-        ADTypes.AutoEnzyme,
-        ADTypes.AutoMooncake,
-    } && throw(MethodError(AbstractPPL.prepare, (adtype, problem, values)))
-    evaluator = AbstractPPL.prepare(problem, values)
-    x0 = AbstractPPL.flatten_to_vec(values)
-    f_vec = let evaluator = evaluator, values = values
-        x -> evaluator(AbstractPPL.unflatten_from_vec(values, x))
-    end
-    prep = DI.prepare_gradient(f_vec, adtype, x0)
-    return DIPrepared(evaluator, f_vec, adtype, prep, values, length(x0))
+# This extension handles the generic `AbstractADType` vector path directly so
+# DifferentiationInterface backends can opt in without a fallback method in
+# `src/evaluator.jl` forcing a precompile-time method overwrite.
+function AbstractPPL.prepare(
+    adtype::ADTypes.AbstractADType, problem, x::AbstractVector{<:AbstractFloat}
+)
+    evaluator = AbstractPPL.prepare(problem, x)
+    prep = DI.prepare_gradient(evaluator, adtype, x)
+    return DIPrepared(evaluator, adtype, prep, length(x))
 end
 
-@inline function AbstractPPL.value_and_gradient(p::DIPrepared, values::NamedTuple)
-    x = AbstractPPL.flatten_to_vec(p.values, values)
-    val, dx = DI.value_and_gradient(p.f_vec, p.prep, p.backend, x)
-    grad_nt = AbstractPPL.unflatten_from_vec(p.values, values, dx)
-    return (val, grad_nt)
+@inline function AbstractPPL.value_and_gradient(
+    p::DIPrepared, x::AbstractVector{<:AbstractFloat}
+)
+    length(x) == p.dim || throw(
+        DimensionMismatch(
+            "Expected a vector of length $(p.dim), but got length $(length(x))."
+        ),
+    )
+    return DI.value_and_gradient(p.evaluator, p.prep, p.backend, x)
 end
 
 end # module

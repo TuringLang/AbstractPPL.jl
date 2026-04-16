@@ -14,6 +14,8 @@ include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
 include("evaluator.jl")
+include("utils.jl")
+
 include("varname/optic.jl")
 include("varname/varname.jl")
 include("varname/subsumes.jl")

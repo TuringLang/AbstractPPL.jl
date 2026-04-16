@@ -19,27 +19,26 @@ function (p::DummyPrepared)(values::NamedTuple)
 end
 
 struct DummyADPrepared
-    prototype_keys::Tuple
+    dim::Int
 end
 
 function AbstractPPL.prepare(
-    ::ADTypes.AbstractADType, problem::DummyProblem, values::NamedTuple
+    ::ADTypes.AbstractADType, problem::DummyProblem, x::AbstractVector{<:AbstractFloat}
 )
-    return DummyADPrepared(keys(values))
+    return DummyADPrepared(length(x))
 end
 
-function (p::DummyADPrepared)(values::NamedTuple)
-    keys(values) == p.prototype_keys ||
-        error("expected fields $(p.prototype_keys), got $(keys(values))")
-    return sum(x -> x isa AbstractArray ? sum(x) : x, values)
+function (p::DummyADPrepared)(x::AbstractVector{<:AbstractFloat})
+    length(x) == p.dim || error("expected vector of length $(p.dim)")
+    return sum(x)
 end
 
 AbstractPPL.capabilities(::Type{DummyADPrepared}) = DerivativeOrder{1}()
 
-function AbstractPPL.value_and_gradient(p::DummyADPrepared, values::NamedTuple)
-    v = p(values)
-    grad = map(x -> x isa AbstractArray ? ones(size(x)) : 1.0, values)
-    return (v, grad)
+function AbstractPPL.value_and_gradient(
+    p::DummyADPrepared, x::AbstractVector{<:AbstractFloat}
+)
+    return (sum(x), ones(length(x)))
 end
 
 struct DummyVectorPrepared
@@ -55,7 +54,14 @@ end
 
 @testset "Evaluator interface" begin
     @testset "DerivativeOrder" begin
-        @test_throws ArgumentError DerivativeOrder{3}()
+        err = try
+            DerivativeOrder{3}()
+            nothing
+        catch err
+            err
+        end
+        @test err isa ArgumentError
+        @test occursin("must be 0, 1, or 2", sprint(showerror, err))
         @test_throws ArgumentError DerivativeOrder{-1}()
         @test DerivativeOrder{0}() < DerivativeOrder{1}()
         @test DerivativeOrder{1}() >= DerivativeOrder{1}()
@@ -64,10 +70,10 @@ end
     end
 
     @testset "capabilities default" begin
-        # Any type without a capabilities method should return nothing
-        @test isnothing(capabilities(Int))
-        @test isnothing(capabilities(42))
-        @test isnothing(capabilities(DummyPrepared((:x,))))
+        @test capabilities(Int) == DerivativeOrder{0}()
+        @test capabilities(42) == DerivativeOrder{0}()
+        @test capabilities(DummyPrepared((:x,))) == DerivativeOrder{0}()
+        @test capabilities(DummyPrepared((:x,))) < DerivativeOrder{1}()
     end
 
     @testset "prepare (structural)" begin
@@ -85,19 +91,18 @@ end
 
     @testset "prepare (AD-aware)" begin
         problem = DummyProblem()
-        values = (x=0.0, y=[1.0, 2.0])
+        x0 = zeros(3)
         adtype = ADTypes.AutoForwardDiff()
-        prepared = prepare(adtype, problem, values)
+        prepared = prepare(adtype, problem, x0)
         @test prepared isa DummyADPrepared
         @test capabilities(prepared) == DerivativeOrder{1}()
 
-        lp = prepared((x=0.5, y=[1.5, 2.5]))
-        @test lp ≈ 0.5 + 1.5 + 2.5
+        x = [0.5, 1.5, 2.5]
+        @test prepared(x) ≈ 0.5 + 1.5 + 2.5
 
-        val, grad = value_and_gradient(prepared, (x=0.5, y=[1.5, 2.5]))
+        val, grad = value_and_gradient(prepared, x)
         @test val ≈ 0.5 + 1.5 + 2.5
-        @test grad.x ≈ 1.0
-        @test grad.y ≈ [1.0, 1.0]
+        @test grad ≈ [1.0, 1.0, 1.0]
     end
 
     @testset "dimension and vector adapter" begin
@@ -107,58 +112,16 @@ end
         @test_throws Exception prepared(ones(5))
     end
 
-    @testset "flatten / unflatten" begin
-        nt = (x=1.0, y=[2.0, 3.0])
-        v = AbstractPPL.flatten_to_vec(nt)
-        @test v == [1.0, 2.0, 3.0]
-        nt2 = AbstractPPL.unflatten_from_vec(nt, v)
-        @test nt2.x == 1.0
-        @test nt2.y == [2.0, 3.0]
+    @testset "flatten / unflatten edge cases" begin
+        empty = NamedTuple()
+        @test AbstractPPL.Utils.flatten_to!!(nothing, empty) == Float64[]
+        @test AbstractPPL.Utils.unflatten_to!!(empty, Float64[]) == empty
 
-        # Nested NamedTuple
-        nt3 = (a=0.5, b=(c=1.0, d=[2.0, 3.0]))
-        v3 = AbstractPPL.flatten_to_vec(nt3)
-        @test v3 == [0.5, 1.0, 2.0, 3.0]
-        nt3r = AbstractPPL.unflatten_from_vec(nt3, v3)
-        @test nt3r.a == 0.5
-        @test nt3r.b.c == 1.0
-        @test nt3r.b.d == [2.0, 3.0]
-
-        # Matrix
-        nt4 = (x=[1.0 2.0; 3.0 4.0],)
-        v4 = AbstractPPL.flatten_to_vec(nt4)
-        @test length(v4) == 4
-        nt4r = AbstractPPL.unflatten_from_vec(nt4, v4)
-        @test nt4r.x == [1.0 2.0; 3.0 4.0]
-
-        # P2: element type is preserved (not coerced to Float64)
-        nt_f32 = (x=Float32(1.0), y=Float32[2.0, 3.0])
-        v_f32 = AbstractPPL.flatten_to_vec(nt_f32)
-        @test eltype(v_f32) == Float32
-        nt_big = (x=big(1.0),)
-        v_big = AbstractPPL.flatten_to_vec(nt_big)
-        @test eltype(v_big) == BigFloat
-
-        # P1: mismatched vector length is rejected
-        @test_throws DimensionMismatch AbstractPPL.unflatten_from_vec(nt, [1.0, 2.0])
-        @test_throws DimensionMismatch AbstractPPL.unflatten_from_vec(
-            nt, [1.0, 2.0, 3.0, 99.0]
-        )
-
-        # Runtime inputs must match prepare-time type/size expectations when using
-        # the compatibility-aware flatten/unflatten paths.
-        @test AbstractPPL.flatten_to_vec(nt, nt) == v
-        @test_throws DimensionMismatch AbstractPPL.flatten_to_vec(
-            nt, (x=1.0, y=[2.0, 3.0, 4.0])
-        )
-        @test_throws MethodError AbstractPPL.flatten_to_vec(
-            nt, (x=1.0, y=reshape([2.0, 3.0], 1, 2))
-        )
-        @test_throws DimensionMismatch AbstractPPL.unflatten_from_vec(
-            nt, (x=1.0, y=[2.0, 3.0, 4.0]), v
-        )
-        @test_throws MethodError AbstractPPL.check_runtime_type(
-            nt, (x=1.0, y=reshape([2.0, 3.0], 1, 2))
-        )
+        view_values = (x=@view([1.0, 2.0, 3.0][2:3]),)
+        flat = AbstractPPL.Utils.flatten_to!!(nothing, view_values)
+        rebuilt = AbstractPPL.Utils.unflatten_to!!(view_values, flat)
+        @test collect(rebuilt.x) == [2.0, 3.0]
+        @test axes(rebuilt.x) == axes(view_values.x)
+        @test parent(rebuilt.x) == [2.0, 3.0]
     end
 end
