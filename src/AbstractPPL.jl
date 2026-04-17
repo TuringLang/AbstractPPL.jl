@@ -7,13 +7,14 @@ export AbstractProbabilisticProgram,
 # Abstract traces
 export AbstractModelTrace
 
-# Evaluator interface
-export DerivativeOrder, capabilities, prepare, value_and_gradient, test_grad, dimension
-
+# ADProblem interface
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
-include("evaluator.jl")
+include("ADProblems.jl")
+using .ADProblems:
+    DerivativeOrder, capabilities, prepare, value_and_gradient, test_autograd, dimension
+export DerivativeOrder, capabilities, prepare, value_and_gradient, test_autograd, dimension
 include("utils.jl")
 
 include("varname/optic.jl")

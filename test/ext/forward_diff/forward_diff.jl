@@ -30,6 +30,12 @@ function (::QuadraticVecPrepared)(x::AbstractVector{<:Real})
     return sum(xi -> xi^2, x)
 end
 
+function AbstractPPL.ADProblems.prepare_for_test_autograd(
+    ::AbstractPPL.ForwardDiffPrepared{<:Any,<:Any,<:Any,<:AbstractVector}, x::AbstractVector
+)
+    return (QuadraticProblem(), x)
+end
+
 @testset "AbstractPPLForwardDiffExt" begin
     @testset "NamedTuple path" begin
         problem = QuadraticProblem()

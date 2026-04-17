@@ -16,7 +16,7 @@ AbstractPPL.jl is a Julia interface package for probabilistic programming. It is
 
   - Preserve the model invariants documented in `src/abstractprobprog.jl`: `condition`/`decondition` and `fix`/`unfix` are intended to round-trip when supported.
   - `rand(model)` and `predict(model, params)` have default RNG/type forwarding behaviour covered by tests; changes here should stay consistent with `AbstractMCMC` expectations.
-  - The evaluator API in `src/evaluator.jl` is structural. `prepare(..., prototype::NamedTuple)` fixes field structure, `capabilities` defaults conservatively to `DerivativeOrder{0}()`, and AD-aware prepared objects are expected to return gradients with the same named structure as inputs.
+  - The ADProblem API in `src/ADProblems.jl` is structural. `prepare(..., prototype::NamedTuple)` fixes field structure, `capabilities` defaults conservatively to `DerivativeOrder{0}()`, and AD-aware prepared objects are expected to return gradients with the same named structure as inputs.
   - `VarName` and optics are the main complexity in this repo. Preserve equality, hashing, pretty-printing, composition/decomposition, and type-stability behaviour.
   - Dynamic indices (`begin`, `end`, expressions containing them) are intentionally deferred until `concretize`; do not silently erase that distinction.
   - Unconcretized dynamic indices must not be serialised. If serialization changes, keep `varname_to_string` / `string_to_varname` round-tripping for supported index types.

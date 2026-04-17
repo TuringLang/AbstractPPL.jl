@@ -25,7 +25,7 @@ end
 
 # This extension handles the generic `AbstractADType` vector path directly so
 # DifferentiationInterface backends can opt in without a fallback method in
-# `src/evaluator.jl` forcing a precompile-time method overwrite.
+# `src/ADProblems.jl` forcing a precompile-time method overwrite.
 function AbstractPPL.prepare(
     adtype::ADTypes.AbstractADType, problem, x::AbstractVector{<:AbstractFloat}
 )

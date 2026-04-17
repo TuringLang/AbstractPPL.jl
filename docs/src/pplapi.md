@@ -19,7 +19,7 @@ evaluate!!
 AbstractModelTrace
 ```
 
-## Evaluator interface
+## ADProblem interface
 
 ```@docs
 DerivativeOrder

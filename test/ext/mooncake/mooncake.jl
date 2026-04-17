@@ -30,6 +30,12 @@ function (::QuadraticVecPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(xi -> xi^2, x)
 end
 
+function AbstractPPL.ADProblems.prepare_for_test_autograd(
+    ::AbstractPPL.MooncakePrepared{<:Any,<:Any,<:AbstractVector}, x::AbstractVector
+)
+    return (QuadraticProblem(), x)
+end
+
 const config = ADTypes.AutoMooncake(; config=Mooncake.Config())
 
 @testset "AbstractPPLMooncakeExt" begin

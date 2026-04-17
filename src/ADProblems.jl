@@ -1,4 +1,8 @@
+module ADProblems
+
 using ADTypes: ADTypes
+
+export DerivativeOrder, capabilities, prepare, value_and_gradient, test_autograd, dimension
 
 """
     DerivativeOrder{K}
@@ -63,17 +67,48 @@ function value_and_gradient(prepared, x::AbstractVector{<:AbstractFloat})
 end
 
 """
-    test_grad(f, x::AbstractVector{<:AbstractFloat})
+    test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5, finite_difference_kwargs...)
 
-Return a finite-difference reference gradient for a scalar-valued callable `f`
-evaluated at the vector input `x`.
+Compare `value_and_gradient(prepared, x)` against a finite-difference reference
+computed via `value_and_gradient(prepare(AutoFiniteDifferences(...), problem, x), x)`.
+Throws an informative error on mismatch. Returns `nothing`.
 
-If the FiniteDifferences extension is not loaded, this warns and returns `nothing`.
+Backends that want this helper should define `prepare_for_test_autograd(prepared, x)`
+to return a pair `(problem, prototype)` suitable for `prepare(AutoFiniteDifferences(...), ...)`.
+Additional keyword arguments are forwarded to `ADTypes.AutoFiniteDifferences`.
 """
-function test_grad end
+function test_autograd end
 
-function test_grad(f, x)
-    @warn "Finite-difference reference gradients require `using FiniteDifferences`; skipping test_grad."
+function prepare_for_test_autograd end
+
+function prepare_for_test_autograd(prepared, x)
+    throw(
+        ArgumentError(
+            "`test_autograd` needs a finite-difference preparation path for $(typeof(prepared)). Define `prepare_for_test_autograd(prepared, x)` to return `(problem, prototype)`.",
+        ),
+    )
+end
+
+function test_autograd(
+    prepared, x::AbstractVector; atol=1e-5, rtol=1e-5, finite_difference_kwargs...
+)
+    val_ad, grad_ad = value_and_gradient(prepared, x)
+    problem, prototype = prepare_for_test_autograd(prepared, x)
+    fd_prepared = prepare(
+        ADTypes.AutoFiniteDifferences(; finite_difference_kwargs...), problem, prototype
+    )
+    val_fd, grad_fd = value_and_gradient(fd_prepared, x)
+
+    isapprox(val_ad, val_fd) || throw(
+        ArgumentError(
+            "Value mismatch against finite differences: got $val_ad, expected $val_fd."
+        ),
+    )
+    isapprox(grad_ad, grad_fd; atol=atol, rtol=rtol) || throw(
+        ArgumentError(
+            "Gradient mismatch against finite differences with atol=$atol and rtol=$rtol.",
+        ),
+    )
     return nothing
 end
 
@@ -83,3 +118,5 @@ end
 Return the number of scalar entries in the vector input expected by a prepared evaluator.
 """
 function dimension end
+
+end # module

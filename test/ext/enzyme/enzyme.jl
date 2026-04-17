@@ -21,6 +21,12 @@ function (::QuadraticPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(xi -> xi^2, x)
 end
 
+function AbstractPPL.ADProblems.prepare_for_test_autograd(
+    ::AbstractPPL.EnzymePrepared, x::AbstractVector
+)
+    return (QuadraticProblem(), x)
+end
+
 @testset "AbstractPPLEnzymeExt" begin
     problem = QuadraticProblem()
     x0 = zeros(3)

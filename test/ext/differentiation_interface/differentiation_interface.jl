@@ -23,6 +23,12 @@ function (::QuadraticPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(xi -> xi^2, x)
 end
 
+function AbstractPPL.ADProblems.prepare_for_test_autograd(
+    ::AbstractPPL.DIPrepared, x::AbstractVector
+)
+    return (QuadraticProblem(), x)
+end
+
 # Use a backend without a native AbstractPPL extension so this test exercises
 # AbstractPPLDifferentiationInterfaceExt dispatch directly.
 const fdm = FiniteDifferences.central_fdm(5, 1)
