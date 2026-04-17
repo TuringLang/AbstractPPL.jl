@@ -6,34 +6,25 @@ using Enzyme: Enzyme
 
 struct EnzymePrepared{E}
     evaluator::E
-    dim::Int
 end
 
 AbstractPPL.capabilities(::Type{<:EnzymePrepared}) = DerivativeOrder{1}()
-AbstractPPL.dimension(p::EnzymePrepared) = p.dim
+AbstractPPL.dimension(p::EnzymePrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::EnzymePrepared)(x::AbstractVector{<:AbstractFloat})
-    length(x) == p.dim || throw(
-        DimensionMismatch(
-            "Expected a vector of length $(p.dim), but got length $(length(x))."
-        ),
-    )
+function (p::EnzymePrepared)(x)
     return p.evaluator(x)
 end
 
 function AbstractPPL.prepare(::AutoEnzyme, problem, x::AbstractVector{<:AbstractFloat})
-    evaluator = AbstractPPL.prepare(problem, x)
-    return EnzymePrepared(evaluator, length(x))
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator(
+        AbstractPPL.prepare(problem, x), length(x)
+    )
+    return EnzymePrepared(evaluator)
 end
 
 @inline function AbstractPPL.value_and_gradient(
     p::EnzymePrepared, x::AbstractVector{<:AbstractFloat}
 )
-    length(x) == p.dim || throw(
-        DimensionMismatch(
-            "Expected a vector of length $(p.dim), but got length $(length(x))."
-        ),
-    )
     dx = zero(x)
     result = Enzyme.autodiff(
         Enzyme.set_runtime_activity(Enzyme.ReverseWithPrimal),

@@ -26,5 +26,6 @@ DerivativeOrder
 capabilities
 prepare
 value_and_gradient
+test_autograd
 dimension
 ```

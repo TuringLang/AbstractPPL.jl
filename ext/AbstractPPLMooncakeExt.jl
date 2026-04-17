@@ -1,61 +1,61 @@
 module AbstractPPLMooncakeExt
 
 using AbstractPPL: AbstractPPL, DerivativeOrder
-using ADTypes: AutoMooncake
+using ADTypes: AutoMooncake, AutoMooncakeForward
 using Mooncake: Mooncake
 
-struct MooncakePrepared{E,C,P}
+struct MooncakePrepared{E,C}
     evaluator::E
     cache::C
-    inputspec::P
 end
 
 AbstractPPL.capabilities(::Type{<:MooncakePrepared}) = DerivativeOrder{1}()
+AbstractPPL.dimension(p::MooncakePrepared) = AbstractPPL.dimension(p.evaluator)
 
-function AbstractPPL.dimension(::MooncakePrepared{<:Any,<:Any,<:NamedTuple})
-    throw(
-        ArgumentError(
-            "`dimension` is only available for evaluators prepared with a vector of floating-point numbers.",
-        ),
-    )
-end
-function AbstractPPL.dimension(p::MooncakePrepared{<:Any,<:Any,<:AbstractVector})
-    return length(p.inputspec)
-end
-
-function (p::MooncakePrepared{<:Any,<:Any,<:NamedTuple})(values::NamedTuple)
-    return p.evaluator(values)
-end
-
-function (p::MooncakePrepared{<:Any,<:Any,<:AbstractVector})(
-    x::AbstractVector{<:AbstractFloat}
-)
-    length(x) == length(p.inputspec) || throw(
-        DimensionMismatch(
-            "Expected a vector of length $(length(p.inputspec)), but got length $(length(x)).",
-        ),
-    )
+function (p::MooncakePrepared)(x)
     return p.evaluator(x)
 end
 
-function AbstractPPL.prepare(adtype::AutoMooncake, problem, values::NamedTuple)
-    evaluator = AbstractPPL.prepare(problem, values)
+function _prepare(adtype, problem, values::NamedTuple)
+    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(
+        AbstractPPL.prepare(problem, values), values
+    )
     cache = Mooncake.prepare_gradient_cache(evaluator, values; config=adtype.config)
-    return MooncakePrepared(evaluator, cache, values)
+    return MooncakePrepared(evaluator, cache)
+end
+
+function _prepare(adtype, problem, x::AbstractVector{<:AbstractFloat})
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator(
+        AbstractPPL.prepare(problem, x), length(x)
+    )
+    cache = Mooncake.prepare_gradient_cache(evaluator, x; config=adtype.config)
+    return MooncakePrepared(evaluator, cache)
+end
+
+function AbstractPPL.prepare(adtype::AutoMooncake, problem, values::NamedTuple)
+    return _prepare(adtype, problem, values)
+end
+
+function AbstractPPL.prepare(adtype::AutoMooncakeForward, problem, values::NamedTuple)
+    return _prepare(adtype, problem, values)
 end
 
 function AbstractPPL.prepare(
     adtype::AutoMooncake, problem, x::AbstractVector{<:AbstractFloat}
 )
-    evaluator = AbstractPPL.prepare(problem, x)
-    cache = Mooncake.prepare_gradient_cache(evaluator, x; config=adtype.config)
-    return MooncakePrepared(evaluator, cache, x)
+    return _prepare(adtype, problem, x)
+end
+
+function AbstractPPL.prepare(
+    adtype::AutoMooncakeForward, problem, x::AbstractVector{<:AbstractFloat}
+)
+    return _prepare(adtype, problem, x)
 end
 
 @inline function AbstractPPL.value_and_gradient(
-    p::MooncakePrepared{<:Any,<:Any,<:NamedTuple}, values::NamedTuple
+    p::MooncakePrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator}, values::NamedTuple
 )
-    typeof(values) === typeof(p.inputspec) || throw(
+    typeof(values) === typeof(p.evaluator.inputspec) || throw(
         ArgumentError(
             "Expected the same NamedTuple structure that was used to prepare this evaluator.",
         ),
@@ -65,11 +65,12 @@ end
 end
 
 @inline function AbstractPPL.value_and_gradient(
-    p::MooncakePrepared{<:Any,<:Any,<:AbstractVector}, x::AbstractVector{<:AbstractFloat}
+    p::MooncakePrepared{<:AbstractPPL.ADProblems.VectorEvaluator},
+    x::AbstractVector{<:AbstractFloat},
 )
-    length(x) == length(p.inputspec) || throw(
+    AbstractPPL.dimension(p.evaluator) == length(x) || throw(
         DimensionMismatch(
-            "Expected a vector of length $(length(p.inputspec)), but got length $(length(x)).",
+            "Expected a vector of length $(AbstractPPL.dimension(p.evaluator)), but got length $(length(x)).",
         ),
     )
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, x)

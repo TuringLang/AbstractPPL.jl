@@ -22,8 +22,10 @@ struct DummyADPrepared
     dim::Int
 end
 
+struct DummyADType <: ADTypes.AbstractADType end
+
 function AbstractPPL.prepare(
-    ::ADTypes.AbstractADType, problem::DummyProblem, x::AbstractVector{<:AbstractFloat}
+    ::DummyADType, problem::DummyProblem, x::AbstractVector{<:AbstractFloat}
 )
     return DummyADPrepared(length(x))
 end
@@ -53,6 +55,31 @@ function (p::DummyVectorPrepared)(x::AbstractVector)
 end
 
 @testset "ADProblem interface" begin
+    @testset "explicit evaluator shapes" begin
+        ve = AbstractPPL.ADProblems.VectorEvaluator(sum, 3)
+        @test ve([1.0, 2.0, 3.0]) == 6.0
+        @test dimension(ve) == 3
+        @test_throws DimensionMismatch ve([1.0, 2.0])
+        @test_throws MethodError ve([1, 2, 3])
+
+        ne = AbstractPPL.ADProblems.NamedTupleEvaluator(
+            x -> x.a + sum(x.b), (a=0.0, b=zeros(2))
+        )
+        @test ne((a=1.0, b=[2.0, 3.0])) == 6.0
+        @test ne.inputspec == (a=0.0, b=zeros(2))
+        err = try
+            dimension(ne)
+            nothing
+        catch err
+            err
+        end
+        @test err isa ArgumentError
+        @test occursin(
+            "only available for evaluators prepared with a vector", sprint(showerror, err)
+        )
+        @test_throws MethodError ne([1.0, 2.0, 3.0])
+    end
+
     @testset "DerivativeOrder" begin
         err = try
             DerivativeOrder{3}()
@@ -92,7 +119,7 @@ end
     @testset "prepare (AD-aware)" begin
         problem = DummyProblem()
         x0 = zeros(3)
-        adtype = ADTypes.AutoForwardDiff()
+        adtype = DummyADType()
         prepared = prepare(adtype, problem, x0)
         @test prepared isa DummyADPrepared
         @test capabilities(prepared) == DerivativeOrder{1}()
@@ -103,6 +130,28 @@ end
         val, grad = value_and_gradient(prepared, x)
         @test val ≈ 0.5 + 1.5 + 2.5
         @test grad ≈ [1.0, 1.0, 1.0]
+    end
+
+    @testset "missing AD package extensions" begin
+        problem = DummyProblem()
+        x0 = zeros(3)
+
+        for (adtype, pkgname) in (
+            (ADTypes.AutoForwardDiff(), "ForwardDiff"),
+            (ADTypes.AutoEnzyme(), "Enzyme"),
+            (ADTypes.AutoMooncake(), "Mooncake"),
+            (ADTypes.AutoMooncakeForward(), "Mooncake"),
+        )
+            err = try
+                AbstractPPL.ADProblems.prepare(adtype, problem, x0)
+                nothing
+            catch err
+                err
+            end
+            @test err isa ArgumentError
+            @test sprint(showerror, err) ==
+                "ArgumentError: `prepare($(nameof(typeof(adtype)))(), ...)` requires loading $pkgname."
+        end
     end
 
     @testset "dimension and vector adapter" begin

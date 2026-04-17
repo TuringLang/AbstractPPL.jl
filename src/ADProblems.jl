@@ -48,6 +48,89 @@ function prepare(problem, x::AbstractVector{<:AbstractFloat})
     throw(MethodError(prepare, (problem, x)))
 end
 
+# Stub methods: give helpful errors when AD packages aren't loaded.
+# Extensions replace these with working implementations on package load.
+function prepare(adtype::ADTypes.AutoEnzyme, problem, x::AbstractVector{<:AbstractFloat})
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Enzyme."
+        ),
+    )
+end
+function prepare(adtype::ADTypes.AutoEnzyme, problem, values::NamedTuple)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Enzyme."
+        ),
+    )
+end
+
+function prepare(
+    adtype::ADTypes.AutoForwardDiff, problem, x::AbstractVector{<:AbstractFloat}
+)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading ForwardDiff."
+        ),
+    )
+end
+function prepare(adtype::ADTypes.AutoForwardDiff, problem, values::NamedTuple)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading ForwardDiff."
+        ),
+    )
+end
+
+function prepare(
+    adtype::ADTypes.AutoFiniteDifferences, problem, x::AbstractVector{<:AbstractFloat}
+)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading FiniteDifferences.",
+        ),
+    )
+end
+function prepare(adtype::ADTypes.AutoFiniteDifferences, problem, values::NamedTuple)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading FiniteDifferences.",
+        ),
+    )
+end
+
+function prepare(adtype::ADTypes.AutoMooncake, problem, x::AbstractVector{<:AbstractFloat})
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
+        ),
+    )
+end
+function prepare(adtype::ADTypes.AutoMooncake, problem, values::NamedTuple)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
+        ),
+    )
+end
+
+function prepare(
+    adtype::ADTypes.AutoMooncakeForward, problem, x::AbstractVector{<:AbstractFloat}
+)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
+        ),
+    )
+end
+function prepare(adtype::ADTypes.AutoMooncakeForward, problem, values::NamedTuple)
+    throw(
+        ArgumentError(
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
+        ),
+    )
+end
+
 """
     value_and_gradient(prepared, x::AbstractVector{<:AbstractFloat})
 
@@ -74,28 +157,99 @@ computed via `value_and_gradient(prepare(AutoFiniteDifferences(...), problem, x)
 Throws an informative error on mismatch. Returns `nothing`.
 
 Backends that want this helper should define `prepare_for_test_autograd(prepared, x)`
-to return a pair `(problem, prototype)` suitable for `prepare(AutoFiniteDifferences(...), ...)`.
+to return `(problem, prototype, fdm)` suitable for `prepare(AutoFiniteDifferences(...), ...)`.
 Additional keyword arguments are forwarded to `ADTypes.AutoFiniteDifferences`.
 """
 function test_autograd end
+
+"""
+    dimension(prepared)::Int
+
+Return the number of scalar entries in the vector input expected by a prepared evaluator.
+"""
+function dimension end
+
+"""
+    VectorEvaluator(f, dim)
+
+Internal evaluator shape for scalar functions of a floating-point vector input.
+Used by AbstractPPL's AD extensions; this is not part of the public API.
+"""
+struct VectorEvaluator{F}
+    f::F
+    dim::Int
+end
+
+"""
+    NamedTupleEvaluator(f, prototype)
+
+Internal evaluator shape for scalar functions of a `NamedTuple` input with a
+stable prototype. Used by AbstractPPL's AD extensions; this is not part of the
+public API.
+"""
+struct NamedTupleEvaluator{F,P<:NamedTuple}
+    f::F
+    inputspec::P
+end
+
+prepare(problem, evaluator::NamedTupleEvaluator) = evaluator
+prepare(problem, evaluator::VectorEvaluator) = evaluator
+
+dimension(e::VectorEvaluator) = e.dim
+function dimension(::NamedTupleEvaluator)
+    throw(
+        ArgumentError(
+            "`dimension` is only available for evaluators prepared with a vector of floating-point numbers.",
+        ),
+    )
+end
 
 function prepare_for_test_autograd end
 
 function prepare_for_test_autograd(prepared, x)
     throw(
         ArgumentError(
-            "`test_autograd` needs a finite-difference preparation path for $(typeof(prepared)). Define `prepare_for_test_autograd(prepared, x)` to return `(problem, prototype)`.",
+            "`test_autograd` needs a finite-difference preparation path for $(typeof(prepared)). Define `prepare_for_test_autograd(prepared, x)` to return `(problem, prototype, fdm)`.",
         ),
     )
+end
+
+function (e::VectorEvaluator)(x::AbstractVector)
+    length(x) == e.dim || throw(
+        DimensionMismatch(
+            "Expected a vector of length $(e.dim), but got length $(length(x))."
+        ),
+    )
+    return e.f(x)
+end
+
+(e::NamedTupleEvaluator)(values::NamedTuple) = e.f(values)
+
+function (e::NamedTupleEvaluator)(x::AbstractVector)
+    throw(MethodError(e, (x,)))
+end
+
+function (e::VectorEvaluator)(x::AbstractVector{<:Integer})
+    throw(MethodError(e, (x,)))
+end
+
+function (e::VectorEvaluator)(x)
+    throw(MethodError(e, (x,)))
+end
+
+function (e::NamedTupleEvaluator)(x)
+    throw(MethodError(e, (x,)))
 end
 
 function test_autograd(
     prepared, x::AbstractVector; atol=1e-5, rtol=1e-5, finite_difference_kwargs...
 )
     val_ad, grad_ad = value_and_gradient(prepared, x)
-    problem, prototype = prepare_for_test_autograd(prepared, x)
+    problem, prototype, fdm = prepare_for_test_autograd(prepared, x)
     fd_prepared = prepare(
-        ADTypes.AutoFiniteDifferences(; finite_difference_kwargs...), problem, prototype
+        ADTypes.AutoFiniteDifferences(; fdm, finite_difference_kwargs...),
+        problem,
+        prototype,
     )
     val_fd, grad_fd = value_and_gradient(fd_prepared, x)
 
@@ -111,12 +265,5 @@ function test_autograd(
     )
     return nothing
 end
-
-"""
-    dimension(prepared)::Int
-
-Return the number of scalar entries in the vector input expected by a prepared evaluator.
-"""
-function dimension end
 
 end # module

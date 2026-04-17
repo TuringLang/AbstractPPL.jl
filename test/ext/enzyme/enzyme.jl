@@ -6,6 +6,7 @@ Pkg.instantiate()
 using AbstractPPL
 using ADTypes: ADTypes
 using Enzyme
+using FiniteDifferences
 using Test
 
 include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
@@ -21,10 +22,13 @@ function (::QuadraticPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(xi -> xi^2, x)
 end
 
-function AbstractPPL.ADProblems.prepare_for_test_autograd(
-    ::AbstractPPL.EnzymePrepared, x::AbstractVector
-)
-    return (QuadraticProblem(), x)
+function AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x::AbstractVector)
+    fdm = FiniteDifferences.central_fdm(5, 1)
+    prepared isa typeof(AbstractPPL.prepare(ADTypes.AutoEnzyme(), QuadraticProblem(), x)) ||
+        return invoke(
+            AbstractPPL.ADProblems.prepare_for_test_autograd, Tuple{Any,Any}, prepared, x
+        )
+    return (QuadraticProblem(), x, fdm)
 end
 
 @testset "AbstractPPLEnzymeExt" begin
@@ -45,7 +49,4 @@ end
 
     @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
     @test_throws MethodError prepared([3, 1, 2])
-    @test_throws DimensionMismatch AbstractPPL.value_and_gradient(
-        prepared, [3.0, 1.0, 2.0, 3.0]
-    )
 end

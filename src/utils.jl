@@ -13,8 +13,10 @@ flat_length(x) = throw(ArgumentError("This value cannot be flattened into a vect
 
 flat_eltype(x::Union{Real,Complex}) = typeof(x)
 flat_eltype(x::AbstractArray{T}) where {T<:Union{Real,Complex}} = T
-flat_eltype(x::Tuple) = mapreduce(flat_eltype, promote_type, x; init=Float64)
-flat_eltype(x::NamedTuple) = mapreduce(flat_eltype, promote_type, values(x); init=Float64)
+flat_eltype(::Tuple{}) = Float64
+flat_eltype(x::Tuple) = mapreduce(flat_eltype, promote_type, x)
+flat_eltype(::NamedTuple{(),Tuple{}}) = Float64
+flat_eltype(x::NamedTuple) = mapreduce(flat_eltype, promote_type, values(x))
 flat_eltype(x) = throw(ArgumentError("This value cannot be flattened into a vector."))
 
 """

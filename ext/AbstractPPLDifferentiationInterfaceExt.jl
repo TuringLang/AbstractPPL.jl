@@ -8,40 +8,28 @@ struct DIPrepared{E,B,C}
     evaluator::E
     backend::B
     prep::C
-    dim::Int
 end
 
 AbstractPPL.capabilities(::Type{<:DIPrepared}) = DerivativeOrder{1}()
-AbstractPPL.dimension(p::DIPrepared) = p.dim
+AbstractPPL.dimension(p::DIPrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::DIPrepared)(x::AbstractVector{<:AbstractFloat})
-    length(x) == p.dim || throw(
-        DimensionMismatch(
-            "Expected a vector of length $(p.dim), but got length $(length(x))."
-        ),
-    )
+function (p::DIPrepared)(x)
     return p.evaluator(x)
 end
 
-# This extension handles the generic `AbstractADType` vector path directly so
-# DifferentiationInterface backends can opt in without a fallback method in
-# `src/ADProblems.jl` forcing a precompile-time method overwrite.
 function AbstractPPL.prepare(
     adtype::ADTypes.AbstractADType, problem, x::AbstractVector{<:AbstractFloat}
 )
-    evaluator = AbstractPPL.prepare(problem, x)
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator(
+        AbstractPPL.prepare(problem, x), length(x)
+    )
     prep = DI.prepare_gradient(evaluator, adtype, x)
-    return DIPrepared(evaluator, adtype, prep, length(x))
+    return DIPrepared(evaluator, adtype, prep)
 end
 
 @inline function AbstractPPL.value_and_gradient(
     p::DIPrepared, x::AbstractVector{<:AbstractFloat}
 )
-    length(x) == p.dim || throw(
-        DimensionMismatch(
-            "Expected a vector of length $(p.dim), but got length $(length(x))."
-        ),
-    )
     return DI.value_and_gradient(p.evaluator, p.prep, p.backend, x)
 end
 
