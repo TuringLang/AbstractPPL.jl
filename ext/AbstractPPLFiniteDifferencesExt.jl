@@ -23,9 +23,7 @@ function (p::FDPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(values::N
     return p.evaluator(values)
 end
 
-function (p::FDPrepared)(x)
-    return p.evaluator(x)
-end
+(p::FDPrepared)(x) = p.evaluator(x)
 
 function AbstractPPL.prepare(adtype::AutoFiniteDifferences, problem, values::NamedTuple)
     evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(

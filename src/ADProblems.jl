@@ -48,85 +48,19 @@ function prepare(problem, x::AbstractVector{<:AbstractFloat})
     throw(MethodError(prepare, (problem, x)))
 end
 
-# Stub methods: give helpful errors when AD packages aren't loaded.
-# Extensions replace these with working implementations on package load.
-function prepare(adtype::ADTypes.AutoEnzyme, problem, x::AbstractVector{<:AbstractFloat})
+# Generic fallback: give a helpful error when the required AD package isn't loaded.
+# AD backend extensions add more specific methods without overwriting this fallback.
+function prepare(adtype, problem, x::AbstractVector{<:AbstractFloat})
     throw(
         ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Enzyme."
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading the corresponding AD backend.",
         ),
     )
 end
-function prepare(adtype::ADTypes.AutoEnzyme, problem, values::NamedTuple)
+function prepare(adtype, problem, values::NamedTuple)
     throw(
         ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Enzyme."
-        ),
-    )
-end
-
-function prepare(
-    adtype::ADTypes.AutoForwardDiff, problem, x::AbstractVector{<:AbstractFloat}
-)
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading ForwardDiff."
-        ),
-    )
-end
-function prepare(adtype::ADTypes.AutoForwardDiff, problem, values::NamedTuple)
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading ForwardDiff."
-        ),
-    )
-end
-
-function prepare(
-    adtype::ADTypes.AutoFiniteDifferences, problem, x::AbstractVector{<:AbstractFloat}
-)
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading FiniteDifferences.",
-        ),
-    )
-end
-function prepare(adtype::ADTypes.AutoFiniteDifferences, problem, values::NamedTuple)
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading FiniteDifferences.",
-        ),
-    )
-end
-
-function prepare(adtype::ADTypes.AutoMooncake, problem, x::AbstractVector{<:AbstractFloat})
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
-        ),
-    )
-end
-function prepare(adtype::ADTypes.AutoMooncake, problem, values::NamedTuple)
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
-        ),
-    )
-end
-
-function prepare(
-    adtype::ADTypes.AutoMooncakeForward, problem, x::AbstractVector{<:AbstractFloat}
-)
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
-        ),
-    )
-end
-function prepare(adtype::ADTypes.AutoMooncakeForward, problem, values::NamedTuple)
-    throw(
-        ArgumentError(
-            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading Mooncake."
+            "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading the corresponding AD backend.",
         ),
     )
 end
@@ -191,9 +125,6 @@ struct NamedTupleEvaluator{F,P<:NamedTuple}
     f::F
     inputspec::P
 end
-
-prepare(problem, evaluator::NamedTupleEvaluator) = evaluator
-prepare(problem, evaluator::VectorEvaluator) = evaluator
 
 dimension(e::VectorEvaluator) = e.dim
 function dimension(::NamedTupleEvaluator)

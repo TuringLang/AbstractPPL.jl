@@ -12,15 +12,31 @@ end
 AbstractPPL.capabilities(::Type{<:MooncakePrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::MooncakePrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::MooncakePrepared)(x)
-    return p.evaluator(x)
+function (p::MooncakePrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(
+    values::NamedTuple
+)
+    typeof(values) === typeof(p.evaluator.inputspec) || throw(
+        ArgumentError(
+            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
+        ),
+    )
+    return p.evaluator(values)
+end
+
+(p::MooncakePrepared)(x) = p.evaluator(x)
+
+function _mooncake_config(adtype)
+    config = adtype.config
+    return config === nothing ? Mooncake.Config() : config
 end
 
 function _prepare(adtype, problem, values::NamedTuple)
     evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(
         AbstractPPL.prepare(problem, values), values
     )
-    cache = Mooncake.prepare_gradient_cache(evaluator, values; config=adtype.config)
+    cache = Mooncake.prepare_gradient_cache(
+        evaluator, values; config=_mooncake_config(adtype)
+    )
     return MooncakePrepared(evaluator, cache)
 end
 
@@ -28,7 +44,7 @@ function _prepare(adtype, problem, x::AbstractVector{<:AbstractFloat})
     evaluator = AbstractPPL.ADProblems.VectorEvaluator(
         AbstractPPL.prepare(problem, x), length(x)
     )
-    cache = Mooncake.prepare_gradient_cache(evaluator, x; config=adtype.config)
+    cache = Mooncake.prepare_gradient_cache(evaluator, x; config=_mooncake_config(adtype))
     return MooncakePrepared(evaluator, cache)
 end
 
@@ -68,11 +84,6 @@ end
     p::MooncakePrepared{<:AbstractPPL.ADProblems.VectorEvaluator},
     x::AbstractVector{<:AbstractFloat},
 )
-    AbstractPPL.dimension(p.evaluator) == length(x) || throw(
-        DimensionMismatch(
-            "Expected a vector of length $(AbstractPPL.dimension(p.evaluator)), but got length $(length(x)).",
-        ),
-    )
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, x)
     return (val, grad)
 end

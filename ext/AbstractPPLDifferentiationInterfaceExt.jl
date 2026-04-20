@@ -13,9 +13,7 @@ end
 AbstractPPL.capabilities(::Type{<:DIPrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::DIPrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::DIPrepared)(x)
-    return p.evaluator(x)
-end
+(p::DIPrepared)(x) = p.evaluator(x)
 
 function AbstractPPL.prepare(
     adtype::ADTypes.AbstractADType, problem, x::AbstractVector{<:AbstractFloat}

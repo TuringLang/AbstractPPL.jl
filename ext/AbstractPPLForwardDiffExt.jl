@@ -30,9 +30,7 @@ function (p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(
     return p.evaluator(values)
 end
 
-function (p::ForwardDiffPrepared)(x)
-    return p.evaluator(x)
-end
+(p::ForwardDiffPrepared)(x) = p.evaluator(x)
 
 function AbstractPPL.prepare(::AutoForwardDiff, problem, values::NamedTuple)
     evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(

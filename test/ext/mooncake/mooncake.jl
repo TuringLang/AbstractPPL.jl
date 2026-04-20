@@ -73,7 +73,14 @@ const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
                 @test grad.x ≈ 6.0
                 @test grad.y ≈ [2.0, 4.0]
 
-                @test_throws MethodError prepared((x=3.0, z=[1.0, 2.0]))
+                err = try
+                    prepared((x=3.0, z=[1.0, 2.0]))
+                    nothing
+                catch err
+                    err
+                end
+                @test err isa ArgumentError
+                @test occursin("same NamedTuple structure", sprint(showerror, err))
                 err = try
                     AbstractPPL.value_and_gradient(
                         prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
@@ -114,7 +121,7 @@ const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
                     sprint(showerror, err),
                 )
                 @test_throws MethodError prepared([3, 1, 2])
-                @test_throws DimensionMismatch AbstractPPL.value_and_gradient(
+                @test_throws Mooncake.PreparedCacheSpecError AbstractPPL.value_and_gradient(
                     prepared, [3.0, 1.0, 2.0, 3.0]
                 )
             end

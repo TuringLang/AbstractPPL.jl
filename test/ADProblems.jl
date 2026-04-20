@@ -136,11 +136,11 @@ end
         problem = DummyProblem()
         x0 = zeros(3)
 
-        for (adtype, pkgname) in (
-            (ADTypes.AutoForwardDiff(), "ForwardDiff"),
-            (ADTypes.AutoEnzyme(), "Enzyme"),
-            (ADTypes.AutoMooncake(), "Mooncake"),
-            (ADTypes.AutoMooncakeForward(), "Mooncake"),
+        for adtype in (
+            ADTypes.AutoForwardDiff(),
+            ADTypes.AutoEnzyme(),
+            ADTypes.AutoMooncake(),
+            ADTypes.AutoMooncakeForward(),
         )
             err = try
                 AbstractPPL.ADProblems.prepare(adtype, problem, x0)
@@ -149,8 +149,9 @@ end
                 err
             end
             @test err isa ArgumentError
-            @test sprint(showerror, err) ==
-                "ArgumentError: `prepare($(nameof(typeof(adtype)))(), ...)` requires loading $pkgname."
+            @test occursin(
+                "requires loading the corresponding AD backend", sprint(showerror, err)
+            )
         end
     end
 
