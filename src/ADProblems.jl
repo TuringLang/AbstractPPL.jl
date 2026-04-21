@@ -43,10 +43,11 @@ backend-specific three-argument methods.
 """
 function prepare end
 
-prepare(problem, values::NamedTuple) = throw(MethodError(prepare, (problem, values)))
-function prepare(problem, x::AbstractVector{<:AbstractFloat})
-    throw(MethodError(prepare, (problem, x)))
-end
+# Identity defaults: AD backend extensions call the 2-arg form to obtain a
+# callable from the problem. Downstream packages (e.g. DynamicPPL) pass
+# already-callable objects, so the safe default is to return them unchanged.
+prepare(problem, values::NamedTuple) = problem
+prepare(problem, x::AbstractVector{<:AbstractFloat}) = problem
 
 # Generic fallback: give a helpful error when the required AD package isn't loaded.
 # AD backend extensions add more specific methods without overwriting this fallback.
