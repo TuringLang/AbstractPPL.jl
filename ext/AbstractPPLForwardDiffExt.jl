@@ -32,7 +32,24 @@ end
 
 (p::ForwardDiffPrepared)(x) = p.evaluator(x)
 
-function AbstractPPL.prepare(::AutoForwardDiff, problem, values::NamedTuple)
+function _forwarddiff_chunk(::AutoForwardDiff{nothing}, x)
+    return ForwardDiff.Chunk(x)
+end
+function _forwarddiff_chunk(::AutoForwardDiff{chunksize}, x) where {chunksize}
+    return ForwardDiff.Chunk{chunksize}()
+end
+
+function _forwarddiff_tag(adtype::AutoForwardDiff, f, x)
+    return adtype.tag === nothing ? ForwardDiff.Tag(f, eltype(x)) : adtype.tag
+end
+
+function _forwarddiff_config(adtype::AutoForwardDiff, f, x)
+    return ForwardDiff.GradientConfig(
+        f, x, _forwarddiff_chunk(adtype, x), _forwarddiff_tag(adtype, f, x)
+    )
+end
+
+function AbstractPPL.prepare(adtype::AutoForwardDiff, problem, values::NamedTuple)
     evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(
         AbstractPPL.prepare(problem, values), values
     )
@@ -41,15 +58,17 @@ function AbstractPPL.prepare(::AutoForwardDiff, problem, values::NamedTuple)
         x -> evaluator(unflatten_to!!(values, x))
     end
     result = ForwardDiff.DiffResults.MutableDiffResult(zero(eltype(x)), (similar(x),))
-    cfg = ForwardDiff.GradientConfig(f, x)
+    cfg = _forwarddiff_config(adtype, f, x)
     return ForwardDiffPrepared(evaluator, f, cfg, result)
 end
 
-function AbstractPPL.prepare(::AutoForwardDiff, problem, x::AbstractVector{<:AbstractFloat})
+function AbstractPPL.prepare(
+    adtype::AutoForwardDiff, problem, x::AbstractVector{<:AbstractFloat}
+)
     evaluator = AbstractPPL.ADProblems.VectorEvaluator(
         AbstractPPL.prepare(problem, x), length(x)
     )
-    cfg = ForwardDiff.GradientConfig(evaluator, x)
+    cfg = _forwarddiff_config(adtype, evaluator, x)
     grad_buf = similar(x)
     result = ForwardDiff.DiffResults.MutableDiffResult(zero(eltype(x)), (grad_buf,))
     return ForwardDiffPrepared(evaluator, evaluator, cfg, result)
@@ -64,7 +83,9 @@ end
         ),
     )
     x = flatten_to!!(nothing, values)
-    ForwardDiff.gradient!(p.result, p.f, x, p.config)
+    # `Val(false)` skips ForwardDiff's tag check; we built `p.config` from `p.f`
+    # in `_forwarddiff_config`, so caller-supplied custom tags must be honored.
+    ForwardDiff.gradient!(p.result, p.f, x, p.config, Val(false))
     val = ForwardDiff.DiffResults.value(p.result)
     grad = copy(ForwardDiff.DiffResults.gradient(p.result))
     return (val, unflatten_to!!(p.evaluator.inputspec, grad))
@@ -74,7 +95,7 @@ end
     p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.VectorEvaluator},
     x::AbstractVector{<:AbstractFloat},
 )
-    ForwardDiff.gradient!(p.result, p.f, x, p.config)
+    ForwardDiff.gradient!(p.result, p.f, x, p.config, Val(false))
     val = ForwardDiff.DiffResults.value(p.result)
     grad = copy(ForwardDiff.DiffResults.gradient(p.result))
     return (val, grad)

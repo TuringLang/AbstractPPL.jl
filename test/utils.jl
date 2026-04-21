@@ -42,25 +42,13 @@ using Test
     end
 
     @testset "buffer length mismatch" begin
-        err = try
-            flatten_to!!(Vector{Float64}(undef, 3), zeros(2, 2))
-            nothing
-        catch err
-            err
-        end
-        @test err isa DimensionMismatch
-        @test occursin("Expected a vector of length 4", sprint(showerror, err))
+        @test_throws r"Expected a vector of length 4" flatten_to!!(
+            Vector{Float64}(undef, 3), zeros(2, 2)
+        )
     end
 
     @testset "vector length mismatch" begin
         x = (a=1.0, b=[2.0, 3.0])
-        err = try
-            unflatten_to!!(x, [1.0, 2.0])
-            nothing
-        catch err
-            err
-        end
-        @test err isa DimensionMismatch
-        @test occursin("Expected a vector of length 3", sprint(showerror, err))
+        @test_throws r"Expected a vector of length 3" unflatten_to!!(x, [1.0, 2.0])
     end
 end

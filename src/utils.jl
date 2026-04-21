@@ -83,10 +83,7 @@ function unflatten(x, buf::AbstractVector)
     length(buf) == n || throw(
         DimensionMismatch("Expected a vector of length $n, but got length $(length(buf))."),
     )
-    value, offset = _unflatten(x, buf, 1)
-    offset == length(buf) + 1 || throw(
-        DimensionMismatch("Expected a vector of length $n, but got length $(length(buf))."),
-    )
+    value, _ = _unflatten(x, buf, 1)
     return value
 end
 

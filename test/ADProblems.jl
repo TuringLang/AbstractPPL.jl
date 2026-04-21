@@ -67,28 +67,12 @@ end
         )
         @test ne((a=1.0, b=[2.0, 3.0])) == 6.0
         @test ne.inputspec == (a=0.0, b=zeros(2))
-        err = try
-            dimension(ne)
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin(
-            "only available for evaluators prepared with a vector", sprint(showerror, err)
-        )
+        @test_throws r"only available for evaluators prepared with a vector" dimension(ne)
         @test_throws MethodError ne([1.0, 2.0, 3.0])
     end
 
     @testset "DerivativeOrder" begin
-        err = try
-            DerivativeOrder{3}()
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin("must be 0, 1, or 2", sprint(showerror, err))
+        @test_throws r"must be 0, 1, or 2" DerivativeOrder{3}()
         @test_throws ArgumentError DerivativeOrder{-1}()
         @test DerivativeOrder{0}() < DerivativeOrder{1}()
         @test DerivativeOrder{1}() >= DerivativeOrder{1}()
@@ -113,7 +97,7 @@ end
         lp = prepared((x=0.5, y=[1.5, 2.5]))
         @test lp ≈ 0.5 + 1.5 + 2.5
 
-        @test_throws Exception prepared((a=1.0, b=2.0))
+        @test_throws ErrorException prepared((a=1.0, b=2.0))
     end
 
     @testset "prepare (AD-aware)" begin
@@ -142,15 +126,8 @@ end
             ADTypes.AutoMooncake(),
             ADTypes.AutoMooncakeForward(),
         )
-            err = try
-                AbstractPPL.ADProblems.prepare(adtype, problem, x0)
-                nothing
-            catch err
-                err
-            end
-            @test err isa ArgumentError
-            @test occursin(
-                "requires loading the corresponding AD backend", sprint(showerror, err)
+            @test_throws r"requires loading the corresponding AD backend" AbstractPPL.ADProblems.prepare(
+                adtype, problem, x0
             )
         end
     end
@@ -159,7 +136,7 @@ end
         prepared = DummyVectorPrepared(3)
         @test dimension(prepared) == 3
         @test prepared(ones(3)) ≈ 3.0
-        @test_throws Exception prepared(ones(5))
+        @test_throws ErrorException prepared(ones(5))
     end
 
     @testset "flatten / unflatten edge cases" begin

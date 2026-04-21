@@ -49,4 +49,21 @@ end
 
     @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
     @test_throws MethodError prepared([3, 1, 2])
+
+    @testset "honors AutoEnzyme mode" begin
+        fwd = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward))
+        rev = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
+        prepared_fwd = AbstractPPL.prepare(fwd, problem, x0)
+        prepared_rev = AbstractPPL.prepare(rev, problem, x0)
+
+        @test prepared_fwd.mode isa Enzyme.ForwardMode
+        @test prepared_rev.mode isa Enzyme.ReverseMode
+        @test typeof(prepared_fwd) !== typeof(prepared_rev)
+
+        val_fwd, grad_fwd = AbstractPPL.value_and_gradient(prepared_fwd, x)
+        @test val_fwd ≈ 14.0
+        @test grad_fwd ≈ [6.0, 2.0, 4.0]
+
+        @test prepared.mode isa Enzyme.ReverseMode
+    end
 end

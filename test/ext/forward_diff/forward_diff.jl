@@ -14,6 +14,7 @@ include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
 struct QuadraticProblem end
 struct QuadraticNTPrepared end
 struct QuadraticVecPrepared end
+struct RequestedTag end
 
 function AbstractPPL.prepare(::QuadraticProblem, values::NamedTuple)
     return QuadraticNTPrepared()
@@ -48,15 +49,8 @@ end
         prepared = AbstractPPL.prepare(ADTypes.AutoForwardDiff(), problem, values)
 
         @test AbstractPPL.capabilities(prepared) >= AbstractPPL.DerivativeOrder{1}()
-        err = try
-            AbstractPPL.dimension(prepared)
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin(
-            "only available for evaluators prepared with a vector", sprint(showerror, err)
+        @test_throws r"only available for evaluators prepared with a vector" AbstractPPL.dimension(
+            prepared
         )
 
         values = (x=3.0, y=[1.0, 2.0])
@@ -67,22 +61,10 @@ end
         @test grad.x ≈ 6.0
         @test grad.y ≈ [2.0, 4.0]
 
-        err = try
-            prepared((x=3.0, z=[1.0, 2.0]))
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin("same NamedTuple structure", sprint(showerror, err))
-        err = try
-            AbstractPPL.value_and_gradient(prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2)))
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin("same NamedTuple structure", sprint(showerror, err))
+        @test_throws r"same NamedTuple structure" prepared((x=3.0, z=[1.0, 2.0]))
+        @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(
+            prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
+        )
     end
 
     @testset "vector path" begin
@@ -103,5 +85,15 @@ end
 
         @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
         @test_throws MethodError prepared([3, 1, 2])
+
+        @testset "honors caller-provided custom tag" begin
+            ad = ADTypes.AutoForwardDiff(;
+                chunksize=1, tag=ForwardDiff.Tag(RequestedTag(), Float64)
+            )
+            prepared_tagged = AbstractPPL.prepare(ad, problem, x0)
+            val, grad = AbstractPPL.value_and_gradient(prepared_tagged, x)
+            @test val ≈ 14.0
+            @test grad ≈ [6.0, 2.0, 4.0]
+        end
     end
 end

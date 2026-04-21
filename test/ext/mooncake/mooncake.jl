@@ -45,24 +45,16 @@ const config = ADTypes.AutoMooncake(; config=Mooncake.Config())
 const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
 
 @testset "AbstractPPLMooncakeExt" begin
-    for config in (config, config_forward)
-        @testset "$(nameof(typeof(config)))" begin
+    for adtype in (config, config_forward)
+        @testset "$(nameof(typeof(adtype)))" begin
             @testset "NamedTuple path" begin
                 problem = QuadraticProblem()
                 values = (x=0.0, y=[0.0, 0.0])
-                prepared = AbstractPPL.prepare(config, problem, values)
+                prepared = AbstractPPL.prepare(adtype, problem, values)
 
                 @test AbstractPPL.capabilities(prepared) >= AbstractPPL.DerivativeOrder{1}()
-                err = try
-                    AbstractPPL.dimension(prepared)
-                    nothing
-                catch err
-                    err
-                end
-                @test err isa ArgumentError
-                @test occursin(
-                    "only available for evaluators prepared with a vector",
-                    sprint(showerror, err),
+                @test_throws r"only available for evaluators prepared with a vector" AbstractPPL.dimension(
+                    prepared
                 )
 
                 values = (x=3.0, y=[1.0, 2.0])
@@ -73,30 +65,16 @@ const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
                 @test grad.x ≈ 6.0
                 @test grad.y ≈ [2.0, 4.0]
 
-                err = try
-                    prepared((x=3.0, z=[1.0, 2.0]))
-                    nothing
-                catch err
-                    err
-                end
-                @test err isa ArgumentError
-                @test occursin("same NamedTuple structure", sprint(showerror, err))
-                err = try
-                    AbstractPPL.value_and_gradient(
-                        prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
-                    )
-                    nothing
-                catch err
-                    err
-                end
-                @test err isa ArgumentError
-                @test occursin("same NamedTuple structure", sprint(showerror, err))
+                @test_throws r"same NamedTuple structure" prepared((x=3.0, z=[1.0, 2.0]))
+                @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(
+                    prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
+                )
             end
 
             @testset "vector path" begin
                 problem = QuadraticProblem()
                 x0 = zeros(3)
-                prepared = AbstractPPL.prepare(config, problem, x0)
+                prepared = AbstractPPL.prepare(adtype, problem, x0)
 
                 @test AbstractPPL.capabilities(prepared) >= AbstractPPL.DerivativeOrder{1}()
                 @test AbstractPPL.dimension(prepared) == 3
@@ -109,17 +87,9 @@ const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
                 @test grad ≈ [6.0, 2.0, 4.0]
                 test_autograd(prepared, x)
 
-                err = try
-                    prepared([3.0, 1.0, 2.0, 99.0])
-                    nothing
-                catch err
-                    err
-                end
-                @test err isa DimensionMismatch
-                @test occursin(
-                    "Expected a vector of length 3, but got length 4.",
-                    sprint(showerror, err),
-                )
+                @test_throws r"Expected a vector of length 3, but got length 4" prepared([
+                    3.0, 1.0, 2.0, 99.0
+                ])
                 @test_throws MethodError prepared([3, 1, 2])
                 @test_throws Mooncake.PreparedCacheSpecError AbstractPPL.value_and_gradient(
                     prepared, [3.0, 1.0, 2.0, 3.0]

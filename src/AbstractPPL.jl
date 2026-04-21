@@ -7,10 +7,10 @@ export AbstractProbabilisticProgram,
 # Abstract traces
 export AbstractModelTrace
 
-# ADProblem interface
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
+# ADProblem interface
 include("ADProblems.jl")
 using .ADProblems:
     DerivativeOrder, capabilities, prepare, value_and_gradient, test_autograd, dimension

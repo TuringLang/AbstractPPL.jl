@@ -50,15 +50,8 @@ end
         )
 
         @test AbstractPPL.capabilities(prepared) >= AbstractPPL.DerivativeOrder{1}()
-        err = try
-            AbstractPPL.dimension(prepared)
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin(
-            "only available for evaluators prepared with a vector", sprint(showerror, err)
+        @test_throws r"only available for evaluators prepared with a vector" AbstractPPL.dimension(
+            prepared
         )
 
         values = (x=3.0, y=[1.0, 2.0])
@@ -69,22 +62,10 @@ end
         @test grad.x ≈ 6.0 atol = 1e-5
         @test grad.y ≈ [2.0, 4.0] atol = 1e-5
 
-        err = try
-            prepared((x=3.0, z=[1.0, 2.0]))
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin("same NamedTuple structure", sprint(showerror, err))
-        err = try
-            AbstractPPL.value_and_gradient(prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2)))
-            nothing
-        catch err
-            err
-        end
-        @test err isa ArgumentError
-        @test occursin("same NamedTuple structure", sprint(showerror, err))
+        @test_throws r"same NamedTuple structure" prepared((x=3.0, z=[1.0, 2.0]))
+        @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(
+            prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
+        )
     end
 
     @testset "vector path" begin
