@@ -56,6 +56,12 @@ prepare(problem, x::AbstractVector{<:AbstractFloat}) = problem
 
 # Generic fallback: give a helpful error when the required AD package isn't loaded.
 # AD backend extensions add more specific methods without overwriting this fallback.
+#
+# Note for downstream backends: every backend's `prepare(adtype, problem, x)` method
+# must accept `; check_dims::Bool=true` itself. Julia's kwarg dispatch follows the
+# most specific positional method, so a generic kwarg-accepting forwarder here
+# cannot fall through to a backend's no-kwarg method. Each backend owns the kwarg
+# on its own signature.
 function prepare(adtype, problem, x::AbstractVector{<:AbstractFloat}; check_dims::Bool=true)
     throw(
         ArgumentError(
