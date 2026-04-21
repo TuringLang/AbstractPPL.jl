@@ -60,7 +60,9 @@ end
         @test prepared_rev.mode isa Enzyme.ReverseMode
         @test typeof(prepared_fwd) !== typeof(prepared_rev)
 
-        val_fwd, grad_fwd = AbstractPPL.value_and_gradient(prepared_fwd, x)
+        val_fwd, grad_fwd = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
+            prepared_fwd, x
+        )
         @test val_fwd ≈ 14.0
         @test grad_fwd ≈ [6.0, 2.0, 4.0]
 
