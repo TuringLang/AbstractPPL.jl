@@ -64,4 +64,16 @@ end
         @test val_fwd ≈ 14.0
         @test grad_fwd ≈ [6.0, 2.0, 4.0]
     end
+
+    @testset "normalizes single-parameter forward gradients" begin
+        fwd = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward))
+        x1 = [3.0]
+        prepared_fwd = AbstractPPL.prepare(fwd, problem, zeros(1))
+
+        val_fwd, grad_fwd = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
+            prepared_fwd, x1
+        )
+        @test val_fwd ≈ 9.0
+        @test grad_fwd ≈ [6.0]
+    end
 end

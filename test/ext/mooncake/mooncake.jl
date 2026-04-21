@@ -85,9 +85,7 @@ end
                 @test grad ≈ [6.0, 2.0, 4.0]
                 test_autograd(prepared, x)
 
-                @test_throws r"Expected a vector of length 3, but got length 4" prepared([
-                    3.0, 1.0, 2.0, 99.0
-                ])
+                @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
                 @test_throws MethodError prepared([3, 1, 2])
                 @test_throws Mooncake.PreparedCacheSpecError AbstractPPL.value_and_gradient(
                     prepared, [3.0, 1.0, 2.0, 3.0]

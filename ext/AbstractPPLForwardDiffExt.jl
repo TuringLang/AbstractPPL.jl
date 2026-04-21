@@ -16,10 +16,6 @@ end
 AbstractPPL.capabilities(::Type{<:ForwardDiffPrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::ForwardDiffPrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::ForwardDiffPrepared)(x::AbstractVector{<:Integer})
-    throw(MethodError(p, (x,)))
-end
-
 function (p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(
     values::NamedTuple
 )

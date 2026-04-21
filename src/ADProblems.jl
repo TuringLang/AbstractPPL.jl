@@ -212,7 +212,7 @@ function test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5)
     fd_prepared = prepare(ADTypes.AutoFiniteDifferences(; fdm), problem, prototype)
     val_fd, grad_fd = value_and_gradient(fd_prepared, x)
 
-    isapprox(val_ad, val_fd) || throw(
+    isapprox(val_ad, val_fd; atol=atol, rtol=rtol) || throw(
         ArgumentError(
             "Value mismatch against finite differences: got $val_ad, expected $val_fd."
         ),
