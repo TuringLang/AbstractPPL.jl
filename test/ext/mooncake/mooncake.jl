@@ -9,7 +9,8 @@ using FiniteDifferences
 using Mooncake
 using Test
 
-include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
+const config = ADTypes.AutoMooncake(; config=Mooncake.Config())
+const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
 
 struct QuadraticProblem end
 struct QuadraticNTPrepared end
@@ -40,9 +41,6 @@ function AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x::AbstractV
         )
     return (QuadraticProblem(), x, fdm)
 end
-
-const config = ADTypes.AutoMooncake(; config=Mooncake.Config())
-const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
 
 @testset "AbstractPPLMooncakeExt" begin
     for adtype in (config, config_forward)

@@ -8,8 +8,6 @@ using ADTypes: ADTypes
 using FiniteDifferences
 using Test
 
-include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
-
 struct QuadraticProblem end
 struct QuadraticNTPrepared end
 struct QuadraticVecPrepared end

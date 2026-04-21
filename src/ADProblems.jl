@@ -33,6 +33,7 @@ capabilities(x) = capabilities(typeof(x))
 """
     prepare(problem, values::NamedTuple)
     prepare(problem, x::AbstractVector{<:AbstractFloat})
+    prepare(adtype, problem, values_or_vector; check_dims::Bool=true)
 
 Prepare a callable evaluator for `problem`.
 
@@ -40,6 +41,10 @@ Use the two-argument form with a `NamedTuple` when the evaluator works with
 named inputs, or with a vector of floating-point numbers when it works with
 vector inputs. Automatic-differentiation backends extend this interface with
 backend-specific three-argument methods.
+
+The keyword argument `check_dims` (default `true`) controls whether the prepared
+evaluator validates that inputs match the prototype used during preparation.
+Pass `check_dims=false` when the caller guarantees input structure.
 """
 function prepare end
 
@@ -51,14 +56,14 @@ prepare(problem, x::AbstractVector{<:AbstractFloat}) = problem
 
 # Generic fallback: give a helpful error when the required AD package isn't loaded.
 # AD backend extensions add more specific methods without overwriting this fallback.
-function prepare(adtype, problem, x::AbstractVector{<:AbstractFloat})
+function prepare(adtype, problem, x::AbstractVector{<:AbstractFloat}; check_dims::Bool=true)
     throw(
         ArgumentError(
             "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading the corresponding AD backend.",
         ),
     )
 end
-function prepare(adtype, problem, values::NamedTuple)
+function prepare(adtype, problem, values::NamedTuple; check_dims::Bool=true)
     throw(
         ArgumentError(
             "`prepare($(nameof(typeof(adtype)))(), ...)` requires loading the corresponding AD backend.",
@@ -85,15 +90,13 @@ function value_and_gradient(prepared, x::AbstractVector{<:AbstractFloat})
 end
 
 """
-    test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5, finite_difference_kwargs...)
+    test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5)
 
-Compare `value_and_gradient(prepared, x)` against a finite-difference reference
-computed via `value_and_gradient(prepare(AutoFiniteDifferences(...), problem, x), x)`.
+Compare `value_and_gradient(prepared, x)` against a finite-difference reference.
 Throws an informative error on mismatch. Returns `nothing`.
 
-Backends that want this helper should define `prepare_for_test_autograd(prepared, x)`
-to return `(problem, prototype, fdm)` suitable for `prepare(AutoFiniteDifferences(...), ...)`.
-Additional keyword arguments are forwarded to `ADTypes.AutoFiniteDifferences`.
+Backends should define `AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x)`
+returning `(problem, prototype, fdm)` to enable this helper.
 """
 function test_autograd end
 
@@ -105,27 +108,53 @@ Return the number of scalar entries in the vector input expected by a prepared e
 function dimension end
 
 """
-    VectorEvaluator(f, dim)
+    VectorEvaluator{Checked}(f, dim)
+    VectorEvaluator(f, dim)  # equivalent to `VectorEvaluator{true}(f, dim)`
 
 Internal evaluator shape for scalar functions of a floating-point vector input.
 Used by AbstractPPL's AD extensions; this is not part of the public API.
+
+`Checked` controls whether the call method validates the input length. The default
+(`true`) is the safe shape exposed to users via `prepared(x)`. AD extensions may
+construct `VectorEvaluator{false}` for the inner callable handed to AD libraries,
+where the input length is already guaranteed and the runtime check would otherwise
+remain in the dual/shadow hot path.
 """
-struct VectorEvaluator{F}
+struct VectorEvaluator{Checked,F}
     f::F
     dim::Int
+    function VectorEvaluator{Checked}(f::F, dim::Int) where {Checked,F}
+        Checked isa Bool || throw(ArgumentError("`Checked` must be a Bool."))
+        return new{Checked,F}(f, dim)
+    end
 end
 
+VectorEvaluator(f, dim::Int) = VectorEvaluator{true}(f, dim)
+
 """
-    NamedTupleEvaluator(f, prototype)
+    NamedTupleEvaluator{Checked}(f, prototype)
+    NamedTupleEvaluator(f, prototype)  # equivalent to `NamedTupleEvaluator{true}(f, prototype)`
 
 Internal evaluator shape for scalar functions of a `NamedTuple` input with a
 stable prototype. Used by AbstractPPL's AD extensions; this is not part of the
 public API.
+
+`Checked` controls whether wrapper code (via [`_assert_namedtuple_shape`](@ref))
+validates that an input `NamedTuple` has the same type as the prototype captured
+during preparation.
 """
-struct NamedTupleEvaluator{F,P<:NamedTuple}
+struct NamedTupleEvaluator{Checked,F,P<:NamedTuple}
     f::F
     inputspec::P
+    function NamedTupleEvaluator{Checked}(
+        f::F, inputspec::P
+    ) where {Checked,F,P<:NamedTuple}
+        Checked isa Bool || throw(ArgumentError("`Checked` must be a Bool."))
+        return new{Checked,F,P}(f, inputspec)
+    end
 end
+
+NamedTupleEvaluator(f, inputspec::NamedTuple) = NamedTupleEvaluator{true}(f, inputspec)
 
 dimension(e::VectorEvaluator) = e.dim
 function dimension(::NamedTupleEvaluator)
@@ -136,8 +165,6 @@ function dimension(::NamedTupleEvaluator)
     )
 end
 
-function prepare_for_test_autograd end
-
 function prepare_for_test_autograd(prepared, x)
     throw(
         ArgumentError(
@@ -146,7 +173,7 @@ function prepare_for_test_autograd(prepared, x)
     )
 end
 
-function (e::VectorEvaluator)(x::AbstractVector)
+function (e::VectorEvaluator{true})(x::AbstractVector)
     length(x) == e.dim || throw(
         DimensionMismatch(
             "Expected a vector of length $(e.dim), but got length $(length(x))."
@@ -155,34 +182,34 @@ function (e::VectorEvaluator)(x::AbstractVector)
     return e.f(x)
 end
 
+(e::VectorEvaluator{false})(x::AbstractVector) = e.f(x)
+
 (e::NamedTupleEvaluator)(values::NamedTuple) = e.f(values)
 
-function (e::NamedTupleEvaluator)(x::AbstractVector)
-    throw(MethodError(e, (x,)))
-end
+(e::VectorEvaluator{true})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
+(e::VectorEvaluator{false})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
 
-function (e::VectorEvaluator)(x::AbstractVector{<:Integer})
-    throw(MethodError(e, (x,)))
-end
+"""
+    _assert_namedtuple_shape(e::NamedTupleEvaluator, values)
 
-function (e::VectorEvaluator)(x)
-    throw(MethodError(e, (x,)))
+Throw `ArgumentError` unless `values` has the same type as the prototype captured
+during preparation. No-op when `e` was constructed with `Checked=false`.
+Internal helper shared by AD extensions.
+"""
+function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
+    typeof(values) === typeof(e.inputspec) || throw(
+        ArgumentError(
+            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
+        ),
+    )
+    return nothing
 end
+_assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
-function (e::NamedTupleEvaluator)(x)
-    throw(MethodError(e, (x,)))
-end
-
-function test_autograd(
-    prepared, x::AbstractVector; atol=1e-5, rtol=1e-5, finite_difference_kwargs...
-)
+function test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5)
     val_ad, grad_ad = value_and_gradient(prepared, x)
     problem, prototype, fdm = prepare_for_test_autograd(prepared, x)
-    fd_prepared = prepare(
-        ADTypes.AutoFiniteDifferences(; fdm, finite_difference_kwargs...),
-        problem,
-        prototype,
-    )
+    fd_prepared = prepare(ADTypes.AutoFiniteDifferences(; fdm), problem, prototype)
     val_fd, grad_fd = value_and_gradient(fd_prepared, x)
 
     isapprox(val_ad, val_fd) || throw(

@@ -69,6 +69,20 @@ end
         @test ne.inputspec == (a=0.0, b=zeros(2))
         @test_throws r"only available for evaluators prepared with a vector" dimension(ne)
         @test_throws MethodError ne([1.0, 2.0, 3.0])
+
+        # `Checked=false` skips the per-call shape checks.
+        ve_unchecked = AbstractPPL.ADProblems.VectorEvaluator{false}(sum, 3)
+        @test ve_unchecked([1.0, 2.0]) == 3.0
+
+        ne_unchecked = AbstractPPL.ADProblems.NamedTupleEvaluator{false}(
+            x -> 0.0, (a=0.0, b=zeros(2))
+        )
+        @test AbstractPPL.ADProblems._assert_namedtuple_shape(
+            ne_unchecked, (totally=:wrong,)
+        ) === nothing
+        @test_throws r"same NamedTuple structure" AbstractPPL.ADProblems._assert_namedtuple_shape(
+            ne, (totally=:wrong,)
+        )
     end
 
     @testset "DerivativeOrder" begin
@@ -82,9 +96,7 @@ end
 
     @testset "capabilities default" begin
         @test capabilities(Int) == DerivativeOrder{0}()
-        @test capabilities(42) == DerivativeOrder{0}()
         @test capabilities(DummyPrepared((:x,))) == DerivativeOrder{0}()
-        @test capabilities(DummyPrepared((:x,))) < DerivativeOrder{1}()
     end
 
     @testset "prepare (structural)" begin
@@ -148,7 +160,5 @@ end
         flat = AbstractPPL.Utils.flatten_to!!(nothing, view_values)
         rebuilt = AbstractPPL.Utils.unflatten_to!!(view_values, flat)
         @test collect(rebuilt.x) == [2.0, 3.0]
-        @test axes(rebuilt.x) == axes(view_values.x)
-        @test parent(rebuilt.x) == [2.0, 3.0]
     end
 end

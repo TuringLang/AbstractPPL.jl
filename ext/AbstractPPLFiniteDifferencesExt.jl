@@ -1,6 +1,7 @@
 module AbstractPPLFiniteDifferencesExt
 
 using AbstractPPL: AbstractPPL, DerivativeOrder
+using AbstractPPL.ADProblems: _assert_namedtuple_shape
 using AbstractPPL.Utils: flatten_to!!, unflatten_to!!
 using ADTypes: AutoFiniteDifferences
 using FiniteDifferences: FiniteDifferences
@@ -15,18 +16,16 @@ AbstractPPL.capabilities(::Type{<:FDPrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::FDPrepared) = AbstractPPL.dimension(p.evaluator)
 
 function (p::FDPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(values::NamedTuple)
-    typeof(values) === typeof(p.evaluator.inputspec) || throw(
-        ArgumentError(
-            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
-        ),
-    )
+    _assert_namedtuple_shape(p.evaluator, values)
     return p.evaluator(values)
 end
 
 (p::FDPrepared)(x) = p.evaluator(x)
 
-function AbstractPPL.prepare(adtype::AutoFiniteDifferences, problem, values::NamedTuple)
-    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(
+function AbstractPPL.prepare(
+    adtype::AutoFiniteDifferences, problem, values::NamedTuple; check_dims::Bool=true
+)
+    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(
         AbstractPPL.prepare(problem, values), values
     )
     f = x -> evaluator(unflatten_to!!(values, x))
@@ -34,9 +33,12 @@ function AbstractPPL.prepare(adtype::AutoFiniteDifferences, problem, values::Nam
 end
 
 function AbstractPPL.prepare(
-    adtype::AutoFiniteDifferences, problem, x::AbstractVector{<:AbstractFloat}
+    adtype::AutoFiniteDifferences,
+    problem,
+    x::AbstractVector{<:AbstractFloat};
+    check_dims::Bool=true,
 )
-    evaluator = AbstractPPL.ADProblems.VectorEvaluator(
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(
         AbstractPPL.prepare(problem, x), length(x)
     )
     return FDPrepared(evaluator, evaluator, adtype.fdm)
@@ -45,11 +47,7 @@ end
 function AbstractPPL.value_and_gradient(
     p::FDPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator}, values::NamedTuple
 )
-    typeof(values) === typeof(p.evaluator.inputspec) || throw(
-        ArgumentError(
-            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
-        ),
-    )
+    _assert_namedtuple_shape(p.evaluator, values)
     x = flatten_to!!(nothing, values)
     val = p.evaluator(values)
     grad = FiniteDifferences.grad(p.fdm, p.f, x)[1]

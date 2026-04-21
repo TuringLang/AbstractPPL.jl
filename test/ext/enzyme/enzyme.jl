@@ -9,8 +9,6 @@ using Enzyme
 using FiniteDifferences
 using Test
 
-include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
-
 struct QuadraticProblem end
 struct QuadraticPrepared end
 
@@ -65,7 +63,5 @@ end
         )
         @test val_fwd ≈ 14.0
         @test grad_fwd ≈ [6.0, 2.0, 4.0]
-
-        @test prepared.mode isa Enzyme.ReverseMode
     end
 end

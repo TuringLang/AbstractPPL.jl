@@ -1,8 +1,11 @@
 module AbstractPPLMooncakeExt
 
 using AbstractPPL: AbstractPPL, DerivativeOrder
+using AbstractPPL.ADProblems: _assert_namedtuple_shape
 using ADTypes: AutoMooncake, AutoMooncakeForward
 using Mooncake: Mooncake
+
+const MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 
 struct MooncakePrepared{E,C}
     evaluator::E
@@ -15,11 +18,7 @@ AbstractPPL.dimension(p::MooncakePrepared) = AbstractPPL.dimension(p.evaluator)
 function (p::MooncakePrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(
     values::NamedTuple
 )
-    typeof(values) === typeof(p.evaluator.inputspec) || throw(
-        ArgumentError(
-            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
-        ),
-    )
+    _assert_namedtuple_shape(p.evaluator, values)
     return p.evaluator(values)
 end
 
@@ -30,8 +29,10 @@ function _mooncake_config(adtype)
     return config === nothing ? Mooncake.Config() : config
 end
 
-function _prepare(adtype, problem, values::NamedTuple)
-    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(
+function AbstractPPL.prepare(
+    adtype::MooncakeAD, problem, values::NamedTuple; check_dims::Bool=true
+)
+    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(
         AbstractPPL.prepare(problem, values), values
     )
     cache = Mooncake.prepare_gradient_cache(
@@ -40,42 +41,20 @@ function _prepare(adtype, problem, values::NamedTuple)
     return MooncakePrepared(evaluator, cache)
 end
 
-function _prepare(adtype, problem, x::AbstractVector{<:AbstractFloat})
-    evaluator = AbstractPPL.ADProblems.VectorEvaluator(
+function AbstractPPL.prepare(
+    adtype::MooncakeAD, problem, x::AbstractVector{<:AbstractFloat}; check_dims::Bool=true
+)
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(
         AbstractPPL.prepare(problem, x), length(x)
     )
     cache = Mooncake.prepare_gradient_cache(evaluator, x; config=_mooncake_config(adtype))
     return MooncakePrepared(evaluator, cache)
 end
 
-function AbstractPPL.prepare(adtype::AutoMooncake, problem, values::NamedTuple)
-    return _prepare(adtype, problem, values)
-end
-
-function AbstractPPL.prepare(adtype::AutoMooncakeForward, problem, values::NamedTuple)
-    return _prepare(adtype, problem, values)
-end
-
-function AbstractPPL.prepare(
-    adtype::AutoMooncake, problem, x::AbstractVector{<:AbstractFloat}
-)
-    return _prepare(adtype, problem, x)
-end
-
-function AbstractPPL.prepare(
-    adtype::AutoMooncakeForward, problem, x::AbstractVector{<:AbstractFloat}
-)
-    return _prepare(adtype, problem, x)
-end
-
 @inline function AbstractPPL.value_and_gradient(
     p::MooncakePrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator}, values::NamedTuple
 )
-    typeof(values) === typeof(p.evaluator.inputspec) || throw(
-        ArgumentError(
-            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
-        ),
-    )
+    _assert_namedtuple_shape(p.evaluator, values)
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
     return (val, grad)
 end

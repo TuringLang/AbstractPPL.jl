@@ -18,6 +18,9 @@ AbstractPPL.dimension(p::EnzymePrepared) = AbstractPPL.dimension(p.evaluator)
 
 # Resolve the mode requested via `AutoEnzyme(; mode=...)` into one that also
 # returns the primal value, so that `value_and_gradient` can return both.
+# When `mode === nothing` we default to `set_runtime_activity(ReverseWithPrimal)`;
+# when the caller supplies a mode we honor it as-is (only adding `WithPrimal`),
+# leaving runtime-activity / strict-activity choices entirely to the caller.
 _enzyme_mode(::Nothing) = Enzyme.set_runtime_activity(Enzyme.ReverseWithPrimal)
 _enzyme_mode(mode) = Enzyme.WithPrimal(mode)
 
@@ -32,9 +35,9 @@ _enzyme_gradient(::Enzyme.ReverseMode, x) = similar(x)
 _enzyme_gradient(_, _) = nothing
 
 function AbstractPPL.prepare(
-    adtype::AutoEnzyme, problem, x::AbstractVector{<:AbstractFloat}
+    adtype::AutoEnzyme, problem, x::AbstractVector{<:AbstractFloat}; check_dims::Bool=true
 )
-    evaluator = AbstractPPL.ADProblems.VectorEvaluator(
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(
         AbstractPPL.prepare(problem, x), length(x)
     )
     mode = _enzyme_mode(adtype.mode)

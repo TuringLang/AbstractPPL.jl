@@ -9,11 +9,14 @@ using DifferentiationInterface
 using FiniteDifferences
 using Test
 
-include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
+# Use a backend without a native AbstractPPL extension so this test exercises
+# AbstractPPLDifferentiationInterfaceExt dispatch directly.
+const fdm = FiniteDifferences.central_fdm(5, 1)
+struct DummyADType <: ADTypes.AbstractADType end
+const adtype = DummyADType()
 
 struct QuadraticProblem end
 struct QuadraticPrepared end
-struct DummyADType <: ADTypes.AbstractADType end
 
 function AbstractPPL.prepare(::QuadraticProblem, x::AbstractVector{<:AbstractFloat})
     return QuadraticPrepared()
@@ -30,11 +33,6 @@ function AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x::AbstractV
         )
     return (QuadraticProblem(), x, fdm)
 end
-
-# Use a backend without a native AbstractPPL extension so this test exercises
-# AbstractPPLDifferentiationInterfaceExt dispatch directly.
-const fdm = FiniteDifferences.central_fdm(5, 1)
-const adtype = DummyADType()
 
 function DifferentiationInterface.prepare_gradient(f, ::DummyADType, x)
     return DifferentiationInterface.prepare_gradient(

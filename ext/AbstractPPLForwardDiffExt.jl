@@ -1,6 +1,7 @@
 module AbstractPPLForwardDiffExt
 
 using AbstractPPL: AbstractPPL, DerivativeOrder
+using AbstractPPL.ADProblems: _assert_namedtuple_shape
 using AbstractPPL.Utils: flatten_to!!, unflatten_to!!
 using ADTypes: AutoForwardDiff
 using ForwardDiff: ForwardDiff
@@ -22,11 +23,7 @@ end
 function (p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(
     values::NamedTuple
 )
-    typeof(values) === typeof(p.evaluator.inputspec) || throw(
-        ArgumentError(
-            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
-        ),
-    )
+    _assert_namedtuple_shape(p.evaluator, values)
     return p.evaluator(values)
 end
 
@@ -49,8 +46,10 @@ function _forwarddiff_config(adtype::AutoForwardDiff, f, x)
     )
 end
 
-function AbstractPPL.prepare(adtype::AutoForwardDiff, problem, values::NamedTuple)
-    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator(
+function AbstractPPL.prepare(
+    adtype::AutoForwardDiff, problem, values::NamedTuple; check_dims::Bool=true
+)
+    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(
         AbstractPPL.prepare(problem, values), values
     )
     x = flatten_to!!(nothing, values)
@@ -63,28 +62,29 @@ function AbstractPPL.prepare(adtype::AutoForwardDiff, problem, values::NamedTupl
 end
 
 function AbstractPPL.prepare(
-    adtype::AutoForwardDiff, problem, x::AbstractVector{<:AbstractFloat}
+    adtype::AutoForwardDiff,
+    problem,
+    x::AbstractVector{<:AbstractFloat};
+    check_dims::Bool=true,
 )
-    evaluator = AbstractPPL.ADProblems.VectorEvaluator(
-        AbstractPPL.prepare(problem, x), length(x)
-    )
-    cfg = _forwarddiff_config(adtype, evaluator, x)
+    raw = AbstractPPL.prepare(problem, x)
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, length(x))
+    # Hand ForwardDiff an unchecked wrapper so the per-call dim check does not
+    # land in the dual-number hot path; user-visible `prepared(x)` still goes
+    # through `evaluator` (whose `check_dims` honors the caller's request).
+    f = AbstractPPL.ADProblems.VectorEvaluator{false}(raw, length(x))
+    cfg = _forwarddiff_config(adtype, f, x)
     grad_buf = similar(x)
     result = ForwardDiff.DiffResults.MutableDiffResult(zero(eltype(x)), (grad_buf,))
-    return ForwardDiffPrepared(evaluator, evaluator, cfg, result)
+    return ForwardDiffPrepared(evaluator, f, cfg, result)
 end
 
 @inline function AbstractPPL.value_and_gradient(
     p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator}, values::NamedTuple
 )
-    typeof(values) === typeof(p.evaluator.inputspec) || throw(
-        ArgumentError(
-            "Expected the same NamedTuple structure that was used to prepare this evaluator.",
-        ),
-    )
+    _assert_namedtuple_shape(p.evaluator, values)
     x = flatten_to!!(nothing, values)
-    # `Val(false)` skips ForwardDiff's tag check; we built `p.config` from `p.f`
-    # in `_forwarddiff_config`, so caller-supplied custom tags must be honored.
+    # `Val(false)`: skip ForwardDiff's tag check; `p.config` is already bound to `p.f`.
     ForwardDiff.gradient!(p.result, p.f, x, p.config, Val(false))
     val = ForwardDiff.DiffResults.value(p.result)
     grad = copy(ForwardDiff.DiffResults.gradient(p.result))

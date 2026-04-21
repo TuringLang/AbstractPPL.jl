@@ -9,8 +9,6 @@ using FiniteDifferences
 using ForwardDiff
 using Test
 
-include(joinpath(@__DIR__, "..", "..", "test_utils.jl"))
-
 struct QuadraticProblem end
 struct QuadraticNTPrepared end
 struct QuadraticVecPrepared end
@@ -85,6 +83,21 @@ end
 
         @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
         @test_throws MethodError prepared([3, 1, 2])
+
+        @testset "check_dims=false skips dim/shape checks" begin
+            prepared_unchecked = AbstractPPL.prepare(
+                ADTypes.AutoForwardDiff(), problem, x0; check_dims=false
+            )
+            val, grad = AbstractPPL.value_and_gradient(prepared_unchecked, x)
+            @test val ≈ 14.0
+            @test grad ≈ [6.0, 2.0, 4.0]
+
+            values = (x=3.0, y=[1.0, 2.0])
+            prepared_nt_unchecked = AbstractPPL.prepare(
+                ADTypes.AutoForwardDiff(), problem, (x=0.0, y=[0.0, 0.0]); check_dims=false
+            )
+            @test prepared_nt_unchecked(values) ≈ 14.0
+        end
 
         @testset "honors caller-provided custom tag" begin
             ad = ADTypes.AutoForwardDiff(;
