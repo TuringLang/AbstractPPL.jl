@@ -16,13 +16,6 @@ end
 AbstractPPL.capabilities(::Type{<:ForwardDiffPrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::ForwardDiffPrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(
-    values::NamedTuple
-)
-    _assert_namedtuple_shape(p.evaluator, values)
-    return p.evaluator(values)
-end
-
 (p::ForwardDiffPrepared)(x) = p.evaluator(x)
 
 function _forwarddiff_chunk(::AutoForwardDiff{nothing}, x)
@@ -45,12 +38,14 @@ end
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff, problem, values::NamedTuple; check_dims::Bool=true
 )
-    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(
-        AbstractPPL.prepare(problem, values), values
-    )
+    raw = AbstractPPL.prepare(problem, values)
+    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(raw, values)
+    # Hand ForwardDiff an unchecked wrapper: the flattened input is reconstructed
+    # with Dual-typed fields during tracing, which would fail the exact-type check.
+    inner = AbstractPPL.ADProblems.NamedTupleEvaluator{false}(raw, values)
     x = flatten_to!!(nothing, values)
-    f = let evaluator = evaluator, values = values
-        x -> evaluator(unflatten_to!!(values, x))
+    f = let inner = inner, values = values
+        x -> inner(unflatten_to!!(values, x))
     end
     result = ForwardDiff.DiffResults.MutableDiffResult(zero(eltype(x)), (similar(x),))
     cfg = _forwarddiff_config(adtype, f, x)

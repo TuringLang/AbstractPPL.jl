@@ -15,13 +15,6 @@ end
 AbstractPPL.capabilities(::Type{<:MooncakePrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::MooncakePrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::MooncakePrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(
-    values::NamedTuple
-)
-    _assert_namedtuple_shape(p.evaluator, values)
-    return p.evaluator(values)
-end
-
 (p::MooncakePrepared)(x) = p.evaluator(x)
 
 function _mooncake_config(adtype)

@@ -151,6 +151,15 @@ end
         @test_throws ErrorException prepared(ones(5))
     end
 
+    @testset "test_autograd hook protocol" begin
+        struct UnknownPrepared end
+        # The hook must return a 3-tuple (problem, prototype, fdm).
+        # Guard that the default error message explicitly names this contract.
+        @test_throws r"\(problem, prototype, fdm\)" AbstractPPL.ADProblems.prepare_for_test_autograd(
+            UnknownPrepared(), Float64[]
+        )
+    end
+
     @testset "flatten / unflatten edge cases" begin
         empty = NamedTuple()
         @test AbstractPPL.Utils.flatten_to!!(nothing, empty) == Float64[]

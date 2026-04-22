@@ -15,11 +15,6 @@ end
 AbstractPPL.capabilities(::Type{<:FDPrepared}) = DerivativeOrder{1}()
 AbstractPPL.dimension(p::FDPrepared) = AbstractPPL.dimension(p.evaluator)
 
-function (p::FDPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator})(values::NamedTuple)
-    _assert_namedtuple_shape(p.evaluator, values)
-    return p.evaluator(values)
-end
-
 (p::FDPrepared)(x) = p.evaluator(x)
 
 function AbstractPPL.prepare(

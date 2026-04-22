@@ -145,9 +145,8 @@ Internal evaluator shape for scalar functions of a `NamedTuple` input with a
 stable prototype. Used by AbstractPPL's AD extensions; this is not part of the
 public API.
 
-`Checked` controls whether wrapper code (via [`_assert_namedtuple_shape`](@ref))
-validates that an input `NamedTuple` has the same type as the prototype captured
-during preparation.
+`Checked` controls whether the call method validates that an input `NamedTuple`
+has the same type as the prototype captured during preparation.
 """
 struct NamedTupleEvaluator{Checked,F,P<:NamedTuple}
     f::F
@@ -190,7 +189,11 @@ end
 
 (e::VectorEvaluator{false})(x::AbstractVector) = e.f(x)
 
-(e::NamedTupleEvaluator)(values::NamedTuple) = e.f(values)
+function (e::NamedTupleEvaluator{true})(values::NamedTuple)
+    _assert_namedtuple_shape(e, values)
+    return e.f(values)
+end
+(e::NamedTupleEvaluator{false})(values::NamedTuple) = e.f(values)
 
 (e::VectorEvaluator{true})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
 (e::VectorEvaluator{false})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
@@ -200,7 +203,7 @@ end
 
 Throw `ArgumentError` unless `values` has the same type as the prototype captured
 during preparation. No-op when `e` was constructed with `Checked=false`.
-Internal helper shared by AD extensions.
+Internal helper; called at `value_and_gradient` entry points in AD extensions.
 """
 function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
     typeof(values) === typeof(e.inputspec) || throw(
