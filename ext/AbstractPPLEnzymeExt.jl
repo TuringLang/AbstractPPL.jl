@@ -73,7 +73,9 @@ end
     derivs, val = Enzyme.autodiff(
         p.mode, Enzyme.Const(p.evaluator), Enzyme.BatchDuplicated(x, p.shadow)
     )
-    return (val, collect(values(derivs)))
+    # length-1 input yields a scalar; wrap it so the gradient is always a Vector.
+    grad = derivs isa Number ? [derivs] : collect(values(derivs))
+    return (val, grad)
 end
 
 end # module
