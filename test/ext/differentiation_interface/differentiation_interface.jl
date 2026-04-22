@@ -26,14 +26,6 @@ function (::QuadraticPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(xi -> xi^2, x)
 end
 
-function AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x::AbstractVector)
-    prepared isa typeof(AbstractPPL.prepare(adtype, QuadraticProblem(), x)) ||
-        return invoke(
-            AbstractPPL.ADProblems.prepare_for_test_autograd, Tuple{Any,Any}, prepared, x
-        )
-    return (QuadraticProblem(), x, fdm)
-end
-
 function DifferentiationInterface.prepare_gradient(f, ::DummyADType, x)
     return DifferentiationInterface.prepare_gradient(
         f, ADTypes.AutoFiniteDifferences(; fdm), x
@@ -60,7 +52,7 @@ end
     val, grad = AbstractPPL.value_and_gradient(prepared, x)
     @test val ≈ 14.0 atol = 1e-6
     @test grad ≈ [6.0, 2.0, 4.0] atol = 1e-6
-    test_autograd(prepared, x; atol=1e-4, rtol=1e-4)
+    test_autograd(prepared, x; atol=1e-4, rtol=1e-4, fdm)
 
     @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
     @test_throws MethodError prepared([3, 1, 2])

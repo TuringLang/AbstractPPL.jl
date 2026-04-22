@@ -96,15 +96,20 @@ function value_and_gradient(prepared, x::AbstractVector{<:AbstractFloat})
 end
 
 """
-    test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5)
+    test_autograd(prepared, x; atol=1e-5, rtol=1e-5)
 
 Compare `value_and_gradient(prepared, x)` against a finite-difference reference.
 Throws an informative error on mismatch. Returns `nothing`.
 
-Backends should define `AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x)`
-returning `(problem, prototype, fdm)` to enable this helper.
+Requires loading FiniteDifferences so the extension-backed implementation is available.
 """
-function test_autograd end
+function test_autograd(prepared, x; atol=1e-5, rtol=1e-5)
+    throw(
+        ArgumentError(
+            "`test_autograd` requires loading FiniteDifferences to activate the AbstractPPLFiniteDifferencesExt implementation.",
+        ),
+    )
+end
 
 """
     dimension(prepared)::Int
@@ -170,14 +175,6 @@ function dimension(::NamedTupleEvaluator)
     )
 end
 
-function prepare_for_test_autograd(prepared, x)
-    throw(
-        ArgumentError(
-            "`test_autograd` needs a finite-difference preparation path for $(typeof(prepared)). Define `prepare_for_test_autograd(prepared, x)` to return `(problem, prototype, fdm)`.",
-        ),
-    )
-end
-
 function (e::VectorEvaluator{true})(x::AbstractVector)
     length(x) == e.dim || throw(
         DimensionMismatch(
@@ -214,24 +211,5 @@ function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
     return nothing
 end
 _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
-
-function test_autograd(prepared, x::AbstractVector; atol=1e-5, rtol=1e-5)
-    val_ad, grad_ad = value_and_gradient(prepared, x)
-    problem, prototype, fdm = prepare_for_test_autograd(prepared, x)
-    fd_prepared = prepare(ADTypes.AutoFiniteDifferences(; fdm), problem, prototype)
-    val_fd, grad_fd = value_and_gradient(fd_prepared, x)
-
-    isapprox(val_ad, val_fd; atol=atol, rtol=rtol) || throw(
-        ArgumentError(
-            "Value mismatch against finite differences: got $val_ad, expected $val_fd."
-        ),
-    )
-    isapprox(grad_ad, grad_fd; atol=atol, rtol=rtol) || throw(
-        ArgumentError(
-            "Gradient mismatch against finite differences with atol=$atol and rtol=$rtol.",
-        ),
-    )
-    return nothing
-end
 
 end # module

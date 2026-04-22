@@ -32,16 +32,6 @@ function (::QuadraticVecPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(xi -> xi^2, x)
 end
 
-function AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x::AbstractVector)
-    fdm = FiniteDifferences.central_fdm(5, 1)
-    prepared isa typeof(AbstractPPL.prepare(config, QuadraticProblem(), x)) ||
-        prepared isa typeof(AbstractPPL.prepare(config_forward, QuadraticProblem(), x)) ||
-        return invoke(
-            AbstractPPL.ADProblems.prepare_for_test_autograd, Tuple{Any,Any}, prepared, x
-        )
-    return (QuadraticProblem(), x, fdm)
-end
-
 @testset "AbstractPPLMooncakeExt" begin
     for adtype in (config, config_forward)
         @testset "$(nameof(typeof(adtype)))" begin

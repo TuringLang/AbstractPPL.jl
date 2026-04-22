@@ -20,15 +20,6 @@ function (::QuadraticPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(xi -> xi^2, x)
 end
 
-function AbstractPPL.ADProblems.prepare_for_test_autograd(prepared, x::AbstractVector)
-    fdm = FiniteDifferences.central_fdm(5, 1)
-    prepared isa typeof(AbstractPPL.prepare(ADTypes.AutoEnzyme(), QuadraticProblem(), x)) ||
-        return invoke(
-            AbstractPPL.ADProblems.prepare_for_test_autograd, Tuple{Any,Any}, prepared, x
-        )
-    return (QuadraticProblem(), x, fdm)
-end
-
 @testset "AbstractPPLEnzymeExt" begin
     problem = QuadraticProblem()
     x0 = zeros(3)
