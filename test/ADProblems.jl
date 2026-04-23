@@ -35,7 +35,7 @@ function (p::DummyADPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(x)
 end
 
-AbstractPPL.capabilities(::Type{DummyADPrepared}) = DerivativeOrder{1}()
+AbstractPPL.capabilities(::Type{DummyADPrepared}) = DerivativeCapability{1}()
 
 function AbstractPPL.value_and_gradient(
     p::DummyADPrepared, x::AbstractVector{<:AbstractFloat}
@@ -85,18 +85,31 @@ end
         )
     end
 
-    @testset "DerivativeOrder" begin
-        @test_throws r"must be 0, 1, or 2" DerivativeOrder{3}()
-        @test_throws ArgumentError DerivativeOrder{-1}()
-        @test DerivativeOrder{0}() < DerivativeOrder{1}()
-        @test DerivativeOrder{1}() >= DerivativeOrder{1}()
-        @test DerivativeOrder{1}() < DerivativeOrder{2}()
-        @test !(DerivativeOrder{2}() < DerivativeOrder{1}())
+    @testset "DerivativeCapability" begin
+        @test_throws r"Derivative order must be 0, 1, or 2" DerivativeCapability{3}()
+        @test_throws ArgumentError DerivativeCapability{-1}()
+        @test_throws r"must be `:scalar` or `:vector`" DerivativeCapability{1}(:other)
+
+        gradcap = DerivativeCapability{1}(:scalar)
+        jaccap = DerivativeCapability{1}(:vector)
+
+        @test gradcap.output === :scalar
+        @test jaccap.output === :vector
+
+        # Ordering compares by derivative order only.
+        @test DerivativeCapability{0}() < DerivativeCapability{1}()
+        @test !(DerivativeCapability{1}() < DerivativeCapability{1}())
+        @test DerivativeCapability{1}() >= DerivativeCapability{1}()
+        @test DerivativeCapability{1}() < DerivativeCapability{2}()
+        @test !(DerivativeCapability{2}() < DerivativeCapability{1}())
+        @test DerivativeCapability{0}(:scalar) < DerivativeCapability{1}(:vector)
+        # output kind does not affect ordering
+        @test !(gradcap < jaccap) && !(jaccap < gradcap)
     end
 
     @testset "capabilities default" begin
-        @test capabilities(Int) == DerivativeOrder{0}()
-        @test capabilities(DummyPrepared((:x,))) == DerivativeOrder{0}()
+        @test capabilities(Int) == DerivativeCapability{0}()
+        @test capabilities(DummyPrepared((:x,))) == DerivativeCapability{0}()
     end
 
     @testset "prepare (structural)" begin
@@ -118,7 +131,7 @@ end
         adtype = DummyADType()
         prepared = prepare(adtype, problem, x0)
         @test prepared isa DummyADPrepared
-        @test capabilities(prepared) == DerivativeOrder{1}()
+        @test capabilities(prepared) == DerivativeCapability{1}()
 
         x = [0.5, 1.5, 2.5]
         @test prepared(x) ≈ 0.5 + 1.5 + 2.5

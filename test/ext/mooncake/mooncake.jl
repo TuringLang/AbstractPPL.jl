@@ -9,74 +9,26 @@ using FiniteDifferences
 using Mooncake
 using Test
 
-const config = ADTypes.AutoMooncake(; config=Mooncake.Config())
-const config_forward = ADTypes.AutoMooncakeForward(; config=Mooncake.Config())
-
-struct QuadraticProblem end
-struct QuadraticNTPrepared end
-struct QuadraticVecPrepared end
-
-function AbstractPPL.prepare(::QuadraticProblem, values::NamedTuple)
-    return QuadraticNTPrepared()
-end
-
-function (::QuadraticNTPrepared)(values::NamedTuple{(:x, :y)})
-    return values.x^2 + sum(vi -> vi^2, values.y)
-end
-
-function AbstractPPL.prepare(::QuadraticProblem, x::AbstractVector{<:AbstractFloat})
-    return QuadraticVecPrepared()
-end
-
-function (::QuadraticVecPrepared)(x::AbstractVector{<:AbstractFloat})
-    return sum(xi -> xi^2, x)
-end
+include(joinpath(@__DIR__, "..", "ad_tests.jl"))
 
 @testset "AbstractPPLMooncakeExt" begin
-    for adtype in (config, config_forward)
+    for adtype in (
+        ADTypes.AutoMooncake(; config=Mooncake.Config()),
+        ADTypes.AutoMooncakeForward(; config=Mooncake.Config()),
+    )
         @testset "$(nameof(typeof(adtype)))" begin
-            @testset "NamedTuple path" begin
-                problem = QuadraticProblem()
-                values = (x=0.0, y=[0.0, 0.0])
-                prepared = AbstractPPL.prepare(adtype, problem, values)
+            x0 = zeros(3)
+            x = [3.0, 1.0, 2.0]
+            values0 = (x=0.0, y=[0.0, 0.0])
+            values = (x=3.0, y=[1.0, 2.0])
 
-                @test AbstractPPL.capabilities(prepared) >= AbstractPPL.DerivativeOrder{1}()
-                @test_throws r"only available for evaluators prepared with a vector" AbstractPPL.dimension(
-                    prepared
-                )
+            run_shared_gradient_tests(adtype, x0, x)
+            run_shared_jacobian_tests(adtype, x0, [2.0, 3.0, 4.0])
+            run_shared_namedtuple_tests(adtype, values0, values)
+            run_shared_invalid_mode_tests(adtype, x0)
 
-                values = (x=3.0, y=[1.0, 2.0])
-                @test prepared(values) ≈ 14.0
-
-                val, grad = AbstractPPL.value_and_gradient(prepared, values)
-                @test val ≈ 14.0
-                @test grad.x ≈ 6.0
-                @test grad.y ≈ [2.0, 4.0]
-
-                @test_throws r"same NamedTuple structure" prepared((x=3.0, z=[1.0, 2.0]))
-                @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(
-                    prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
-                )
-            end
-
-            @testset "vector path" begin
-                problem = QuadraticProblem()
-                x0 = zeros(3)
-                prepared = AbstractPPL.prepare(adtype, problem, x0)
-
-                @test AbstractPPL.capabilities(prepared) >= AbstractPPL.DerivativeOrder{1}()
-                @test AbstractPPL.dimension(prepared) == 3
-
-                x = [3.0, 1.0, 2.0]
-                @test prepared(x) ≈ 14.0
-
-                val, grad = AbstractPPL.value_and_gradient(prepared, x)
-                @test val ≈ 14.0
-                @test grad ≈ [6.0, 2.0, 4.0]
-                test_autograd(prepared, x)
-
-                @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
-                @test_throws MethodError prepared([3, 1, 2])
+            @testset "Mooncake cache spec enforcement" begin
+                prepared = AbstractPPL.prepare(adtype, QuadraticProblem(), x0)
                 @test_throws Mooncake.PreparedCacheSpecError AbstractPPL.value_and_gradient(
                     prepared, [3.0, 1.0, 2.0, 3.0]
                 )

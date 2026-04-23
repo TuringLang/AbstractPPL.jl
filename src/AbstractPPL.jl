@@ -12,8 +12,15 @@ include("abstractprobprog.jl")
 include("evaluate.jl")
 include("ADProblems.jl")
 using .ADProblems:
-    DerivativeOrder, capabilities, prepare, value_and_gradient, test_autograd, dimension
-export DerivativeOrder, capabilities, prepare, value_and_gradient, test_autograd, dimension
+    DerivativeCapability,
+    capabilities,
+    prepare,
+    value_and_gradient,
+    value_and_jacobian,
+    test_autograd,
+    dimension
+export DerivativeCapability,
+    capabilities, prepare, value_and_gradient, value_and_jacobian, test_autograd, dimension
 include("utils.jl")
 
 include("varname/optic.jl")

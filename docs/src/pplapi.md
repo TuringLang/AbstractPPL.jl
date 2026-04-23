@@ -22,10 +22,11 @@ AbstractModelTrace
 ## ADProblem interface
 
 ```@docs
-DerivativeOrder
+DerivativeCapability
 capabilities
 prepare
 value_and_gradient
+value_and_jacobian
 test_autograd
 dimension
 ```

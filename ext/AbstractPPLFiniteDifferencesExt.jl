@@ -1,7 +1,11 @@
 module AbstractPPLFiniteDifferencesExt
 
-using AbstractPPL: AbstractPPL, DerivativeOrder
-using AbstractPPL.ADProblems: _assert_namedtuple_shape
+using AbstractPPL: AbstractPPL
+using AbstractPPL.ADProblems:
+    _assert_namedtuple_shape,
+    _assert_gradient_capability,
+    _check_mode,
+    _check_namedtuple_mode
 using AbstractPPL.Utils: flatten_to!!, unflatten_to!!
 using ADTypes: AutoFiniteDifferences
 using FiniteDifferences: FiniteDifferences
@@ -21,6 +25,9 @@ function _test_autograd_ref(p, values::NamedTuple, fdm=DEFAULT_TEST_FDM)
     return (val, unflatten_to!!(p.evaluator.inputspec, grad))
 end
 
+_flat_grad(g) = g
+_flat_grad(g::NamedTuple) = flatten_to!!(nothing, g)
+
 function _assert_test_autograd_matches(
     val_ad, grad_ad, val_fd, grad_fd; atol=1e-5, rtol=1e-5
 )
@@ -29,7 +36,7 @@ function _assert_test_autograd_matches(
             "Value mismatch against finite differences: got $val_ad, expected $val_fd."
         ),
     )
-    isapprox(grad_ad, grad_fd; atol=atol, rtol=rtol) || throw(
+    isapprox(_flat_grad(grad_ad), _flat_grad(grad_fd); atol=atol, rtol=rtol) || throw(
         ArgumentError(
             "Gradient mismatch against finite differences with atol=$atol and rtol=$rtol.",
         ),
@@ -40,6 +47,7 @@ end
 function AbstractPPL.test_autograd(
     prepared, x::AbstractVector; atol=1e-5, rtol=1e-5, fdm=DEFAULT_TEST_FDM
 )
+    _assert_gradient_capability(prepared)
     val_ad, grad_ad = AbstractPPL.value_and_gradient(prepared, x)
     val_fd, grad_fd = _test_autograd_ref(prepared, x, fdm)
     return _assert_test_autograd_matches(val_ad, grad_ad, val_fd, grad_fd; atol, rtol)
@@ -48,30 +56,34 @@ end
 function AbstractPPL.test_autograd(
     prepared, values::NamedTuple; atol=1e-5, rtol=1e-5, fdm=DEFAULT_TEST_FDM
 )
+    _assert_gradient_capability(prepared)
     val_ad, grad_ad = AbstractPPL.value_and_gradient(prepared, values)
     val_fd, grad_fd = _test_autograd_ref(prepared, values, fdm)
     return _assert_test_autograd_matches(val_ad, grad_ad, val_fd, grad_fd; atol, rtol)
 end
 
-struct FDPrepared{E,F,M}
+struct FDPrepared{Mode,E,F,M} <: AbstractPPL.ADProblems.AbstractPrepared{Mode}
     evaluator::E
     f::F
     fdm::M
+    function FDPrepared{Mode}(evaluator::E, f::F, fdm::M) where {Mode,E,F,M}
+        return new{Mode,E,F,M}(evaluator, f, fdm)
+    end
 end
 
-AbstractPPL.capabilities(::Type{<:FDPrepared}) = DerivativeOrder{1}()
-AbstractPPL.dimension(p::FDPrepared) = AbstractPPL.dimension(p.evaluator)
-
-(p::FDPrepared)(x) = p.evaluator(x)
-
 function AbstractPPL.prepare(
-    adtype::AutoFiniteDifferences, problem, values::NamedTuple; check_dims::Bool=true
+    adtype::AutoFiniteDifferences,
+    problem,
+    values::NamedTuple;
+    check_dims::Bool=true,
+    mode::Symbol=:gradient,
 )
+    _check_namedtuple_mode(mode)
     evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(
         AbstractPPL.prepare(problem, values), values
     )
     f = x -> evaluator(unflatten_to!!(values, x))
-    return FDPrepared(evaluator, f, adtype.fdm)
+    return FDPrepared{:gradient}(evaluator, f, adtype.fdm)
 end
 
 function AbstractPPL.prepare(
@@ -79,15 +91,18 @@ function AbstractPPL.prepare(
     problem,
     x::AbstractVector{<:AbstractFloat};
     check_dims::Bool=true,
+    mode::Symbol=:gradient,
 )
+    _check_mode(mode)
     evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(
         AbstractPPL.prepare(problem, x), length(x)
     )
-    return FDPrepared(evaluator, evaluator, adtype.fdm)
+    return FDPrepared{mode}(evaluator, evaluator, adtype.fdm)
 end
 
 function AbstractPPL.value_and_gradient(
-    p::FDPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator}, values::NamedTuple
+    p::FDPrepared{:gradient,<:AbstractPPL.ADProblems.NamedTupleEvaluator},
+    values::NamedTuple,
 )
     _assert_namedtuple_shape(p.evaluator, values)
     x = flatten_to!!(nothing, values)
@@ -97,12 +112,21 @@ function AbstractPPL.value_and_gradient(
 end
 
 function AbstractPPL.value_and_gradient(
-    p::FDPrepared{<:AbstractPPL.ADProblems.VectorEvaluator},
+    p::FDPrepared{:gradient,<:AbstractPPL.ADProblems.VectorEvaluator},
     x::AbstractVector{<:AbstractFloat},
 )
     val = p.evaluator(x)
     grad = FiniteDifferences.grad(p.fdm, p.f, x)[1]
     return (val, grad)
+end
+
+function AbstractPPL.value_and_jacobian(
+    p::FDPrepared{:jacobian,<:AbstractPPL.ADProblems.VectorEvaluator},
+    x::AbstractVector{<:AbstractFloat},
+)
+    val = p.evaluator(x)
+    jac = FiniteDifferences.jacobian(p.fdm, p.f, x)[1]
+    return (val, jac)
 end
 
 end # module

@@ -1,20 +1,21 @@
 module AbstractPPLEnzymeExt
 
-using AbstractPPL: AbstractPPL, DerivativeOrder
+using AbstractPPL: AbstractPPL
+using AbstractPPL.ADProblems: _check_mode
 using ADTypes: AutoEnzyme
 using Enzyme: Enzyme
 
-struct EnzymePrepared{E,G,M,S}
+struct EnzymePrepared{Mode,E,G,M,S} <: AbstractPPL.ADProblems.AbstractPrepared{Mode}
     evaluator::E
     gradient::G
     mode::M
     shadow::S
+    function EnzymePrepared{Mode}(
+        evaluator::E, gradient::G, mode::M, shadow::S
+    ) where {Mode,E,G,M,S}
+        return new{Mode,E,G,M,S}(evaluator, gradient, mode, shadow)
+    end
 end
-
-AbstractPPL.capabilities(::Type{<:EnzymePrepared}) = DerivativeOrder{1}()
-AbstractPPL.dimension(p::EnzymePrepared) = AbstractPPL.dimension(p.evaluator)
-
-(p::EnzymePrepared)(x) = p.evaluator(x)
 
 # Resolve the mode requested via `AutoEnzyme(; mode=...)` into one that also
 # returns the primal value, so that `value_and_gradient` can return both.
@@ -30,24 +31,38 @@ _enzyme_mode(mode) = Enzyme.WithPrimal(mode)
 _enzyme_shadow(::Enzyme.ForwardMode, x) = Enzyme.onehot(x)
 _enzyme_shadow(_, _) = nothing
 
-# Reverse mode reuses a persistent buffer passed as the `Duplicated` shadow.
+# Reverse mode pre-allocates the gradient buffer to avoid per-call allocation on the hot path.
 _enzyme_gradient(::Enzyme.ReverseMode, x) = similar(x)
 _enzyme_gradient(_, _) = nothing
 
 function AbstractPPL.prepare(
-    adtype::AutoEnzyme, problem, x::AbstractVector{<:AbstractFloat}; check_dims::Bool=true
+    adtype::AutoEnzyme,
+    problem,
+    x::AbstractVector{<:AbstractFloat};
+    check_dims::Bool=true,
+    mode::Symbol=:gradient,
 )
+    _check_mode(mode)
     evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(
         AbstractPPL.prepare(problem, x), length(x)
     )
-    mode = _enzyme_mode(adtype.mode)
-    return EnzymePrepared(
-        evaluator, _enzyme_gradient(mode, x), mode, _enzyme_shadow(mode, x)
-    )
+    enzyme_mode = _enzyme_mode(adtype.mode)
+    if mode === :gradient
+        return EnzymePrepared{:gradient}(
+            evaluator,
+            _enzyme_gradient(enzyme_mode, x),
+            enzyme_mode,
+            _enzyme_shadow(enzyme_mode, x),
+        )
+    else
+        # Jacobian uses `Enzyme.jacobian` sugar; no buffer or shadow to keep.
+        return EnzymePrepared{:jacobian}(evaluator, nothing, enzyme_mode, nothing)
+    end
 end
 
 @inline function AbstractPPL.value_and_gradient(
-    p::EnzymePrepared{<:Any,<:Any,<:Enzyme.ReverseMode}, x::AbstractVector{<:AbstractFloat}
+    p::EnzymePrepared{:gradient,<:Any,<:Any,<:Enzyme.ReverseMode},
+    x::AbstractVector{<:AbstractFloat},
 )
     dx = p.gradient
     length(dx) == length(x) || throw(
@@ -63,7 +78,8 @@ end
 end
 
 @inline function AbstractPPL.value_and_gradient(
-    p::EnzymePrepared{<:Any,<:Any,<:Enzyme.ForwardMode}, x::AbstractVector{<:AbstractFloat}
+    p::EnzymePrepared{:gradient,<:Any,<:Any,<:Enzyme.ForwardMode},
+    x::AbstractVector{<:AbstractFloat},
 )
     length(p.shadow) == length(x) || throw(
         DimensionMismatch(
@@ -76,6 +92,15 @@ end
     # length-1 input yields a scalar; wrap it so the gradient is always a Vector.
     grad = derivs isa Number ? [derivs] : collect(values(derivs))
     return (val, grad)
+end
+
+@inline function AbstractPPL.value_and_jacobian(
+    p::EnzymePrepared{:jacobian}, x::AbstractVector{<:AbstractFloat}
+)
+    # `Enzyme.jacobian(WithPrimal(mode), f, x)` returns `(derivs=(J,), val=y)`
+    # in both forward and reverse modes.
+    nt = Enzyme.jacobian(p.mode, Enzyme.Const(p.evaluator), x)
+    return (nt.val, nt.derivs[1])
 end
 
 end # module

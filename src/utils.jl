@@ -133,12 +133,8 @@ Supported `x` values are:
 - `Tuple` recursively containing supported values
 - `NamedTuple` recursively containing supported values
 """
-# Currently always allocates: `_unflatten` calls `similar` for each array field.
-# Buffer reuse is possible but requires a pre-allocated gradient NamedTuple in
-# each prepared evaluator (so the template is not mutated) and a mutating
-# `_unflatten!!` that uses `copyto!` instead of `similar` + `copyto!`.
-# NamedTuples with scalar fields still need a new wrapper, so gains are limited
-# to avoiding inner-array allocations — negligible vs. gradient computation cost.
+# Always allocates: `_unflatten` calls `similar` for each array field. Gains from
+# buffer reuse are negligible relative to gradient computation cost.
 unflatten_to!!(x, buf::AbstractVector) = unflatten(x, buf)
 
 end # module
