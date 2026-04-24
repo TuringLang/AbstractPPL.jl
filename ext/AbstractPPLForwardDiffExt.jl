@@ -64,6 +64,7 @@ function AbstractPPL.prepare(
 )
     _check_mode(mode)
     raw = AbstractPPL.prepare(problem, x)
+    length(x) == 0 && return AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, 0)
     evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, length(x))
     # Hand ForwardDiff an unchecked wrapper so the per-call dim check does not
     # land in the dual-number hot path; user-visible `prepared(x)` still goes

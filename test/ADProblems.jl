@@ -181,4 +181,30 @@ end
         rebuilt = AbstractPPL.Utils.unflatten_to!!(view_values, flat)
         @test collect(rebuilt.x) == [2.0, 3.0]
     end
+
+    @testset "zero-dimensional prepared evaluator" begin
+        struct ZeroDimProblem end
+        AbstractPPL.prepare(::ZeroDimProblem, ::AbstractVector{<:AbstractFloat}) =
+            (_::AbstractVector) -> 7.5
+
+        struct ZeroDimVecProblem end
+        AbstractPPL.prepare(::ZeroDimVecProblem, ::AbstractVector{<:AbstractFloat}) =
+            (_::AbstractVector) -> [2.0, 3.0]
+
+        x = Float64[]
+
+        prepared = AbstractPPL.ADProblems.VectorEvaluator{true}(
+            AbstractPPL.prepare(ZeroDimProblem(), x), 0
+        )
+        val, grad = value_and_gradient(prepared, x)
+        @test val == 7.5
+        @test grad == Float64[]
+
+        prepared_jac = AbstractPPL.ADProblems.VectorEvaluator{true}(
+            AbstractPPL.prepare(ZeroDimVecProblem(), x), 0
+        )
+        valj, jac = value_and_jacobian(prepared_jac, x)
+        @test valj == [2.0, 3.0]
+        @test size(jac) == (2, 0)
+    end
 end

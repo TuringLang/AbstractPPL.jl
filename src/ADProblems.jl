@@ -228,17 +228,47 @@ Used by AbstractPPL's AD extensions; this is not part of the public API.
 construct `VectorEvaluator{false}` for the inner callable handed to AD libraries,
 where the input length is already guaranteed and the runtime check would otherwise
 remain in the dual/shadow hot path.
+
+The `Trivial` type parameter is `true` iff `dim == 0`.
 """
-struct VectorEvaluator{Checked,F}
+struct VectorEvaluator{Checked,Trivial,F}
     f::F
     dim::Int
     function VectorEvaluator{Checked}(f::F, dim::Int) where {Checked,F}
         Checked isa Bool || throw(ArgumentError("`Checked` must be a Bool."))
-        return new{Checked,F}(f, dim)
+        dim >= 0 || throw(ArgumentError("`dim` must be non-negative, got $dim."))
+        return new{Checked,dim == 0,F}(f, dim)
     end
 end
 
 VectorEvaluator(f, dim::Int) = VectorEvaluator{true}(f, dim)
+
+# Trivial (dim == 0) evaluators are a complete prepared evaluator on their own:
+# both gradient and jacobian are well-defined, and all backends can route
+# zero-dimensional inputs through this shape.
+capabilities(::Type{<:VectorEvaluator{C,true}}) where {C} = DerivativeCapability{1}(:scalar)
+
+function value_and_gradient(
+    e::VectorEvaluator{C,true}, x::AbstractVector{<:AbstractFloat}
+) where {C}
+    length(x) == 0 ||
+        throw(DimensionMismatch("Expected an empty vector, but got length $(length(x))."))
+    return (e.f(x), similar(x))
+end
+
+function value_and_jacobian(
+    e::VectorEvaluator{C,true}, x::AbstractVector{<:AbstractFloat}
+) where {C}
+    length(x) == 0 ||
+        throw(DimensionMismatch("Expected an empty vector, but got length $(length(x))."))
+    val = e.f(x)
+    val isa AbstractVector || throw(
+        ArgumentError(
+            "`mode=:jacobian` requires `f(x)` to return an AbstractVector; got $(typeof(val)).",
+        ),
+    )
+    return (val, similar(x, length(val), 0))
+end
 
 """
     NamedTupleEvaluator{Checked}(f, prototype)
