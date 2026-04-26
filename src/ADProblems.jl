@@ -2,48 +2,7 @@ module ADProblems
 
 using ADTypes: ADTypes
 
-export ADCapability,
-    capabilities, prepare, value_and_gradient, value_and_jacobian, test_autograd, dimension
-
-"""
-    ADCapability{K}(output::Symbol = :scalar)
-
-Describes what a prepared evaluator can compute: the highest supported
-derivative order `K` (0, 1, or 2), plus the shape of `f`'s output
-(`:scalar` for [`value_and_gradient`](@ref); `:vector` for
-[`value_and_jacobian`](@ref)).
-
-Ordering compares by `K` alone, so `capabilities(prepared) >= ADCapability{1}()`
-is true for any evaluator that supports at least first-order derivatives,
-regardless of output shape.
-"""
-struct ADCapability{K}
-    output::Symbol
-    function ADCapability{K}(output::Symbol=:scalar) where {K}
-        K isa Int && 0 <= K <= 2 ||
-            throw(ArgumentError("Derivative order must be 0, 1, or 2, but got $K."))
-        output === :scalar ||
-            output === :vector ||
-            throw(ArgumentError("`output` must be `:scalar` or `:vector`, got `:$output`."))
-        return new{K}(output)
-    end
-end
-
-Base.isless(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K < L
-Base.:>(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K > L
-Base.:>=(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K >= L
-Base.:<=(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K <= L
-
-"""
-    capabilities(T::Type)
-    capabilities(x)
-
-Return the [`ADCapability`](@ref) supported by a prepared evaluator type or
-instance. Prepared evaluators default to `ADCapability{0}()` unless they
-declare higher-order or jacobian support explicitly.
-"""
-capabilities(::Type) = ADCapability{0}()
-capabilities(x) = capabilities(typeof(x))
+export prepare, value_and_gradient, value_and_jacobian, test_autograd, dimension
 
 """
     AbstractPrepared{Mode}
@@ -52,13 +11,10 @@ Internal abstract supertype for all AD-prepared evaluators produced by AbstractP
 extension backends. `Mode` is `:gradient` or `:jacobian`.
 
 Concrete subtypes must have an `evaluator` field (`VectorEvaluator` or
-`NamedTupleEvaluator`). In exchange they inherit `capabilities`, `dimension`, and
+`NamedTupleEvaluator`). In exchange they inherit `dimension` and
 the callable forwarder automatically.
 """
 abstract type AbstractPrepared{Mode} end
-
-capabilities(::Type{<:AbstractPrepared{:gradient}}) = ADCapability{1}(:scalar)
-capabilities(::Type{<:AbstractPrepared{:jacobian}}) = ADCapability{1}(:vector)
 
 """
     prepare(problem, values::NamedTuple)
@@ -140,8 +96,7 @@ end
 Return `(value, gradient::AbstractVector)` for an evaluator prepared with a
 vector of floating-point numbers.
 
-Requires `capabilities(prepared) >= ADCapability{1}()` and an evaluator
-prepared with `mode=:gradient`. Extensions also add a NamedTuple overload.
+Requires an evaluator prepared with `mode=:gradient`. Extensions also add a NamedTuple overload.
 """
 function value_and_gradient end
 
@@ -160,8 +115,7 @@ Return `(value::AbstractVector, jacobian::AbstractMatrix)` for an evaluator
 prepared with a vector of floating-point numbers and `mode=:jacobian`.
 The returned `jacobian` has shape `(length(value), length(x))`.
 
-Requires `capabilities(prepared) >= ADCapability{1}()` and an evaluator
-prepared with `mode=:jacobian`.
+Requires an evaluator prepared with `mode=:jacobian`.
 """
 function value_and_jacobian end
 
@@ -193,15 +147,8 @@ function test_autograd(prepared, x; atol=1e-5, rtol=1e-5)
     )
 end
 
-"""
-    _assert_gradient_capability(prepared)
-
-Throw `ArgumentError` if `prepared` reports `:vector` output (i.e. it was
-prepared with `mode=:jacobian`). Used by `test_autograd` to keep the
-finite-difference reference path scalar-only.
-"""
 function _assert_gradient_capability(prepared)
-    capabilities(prepared).output === :vector && throw(
+    prepared isa AbstractPrepared{:jacobian} && throw(
         ArgumentError(
             "`test_autograd` only supports gradient-mode evaluators; got an evaluator prepared with `mode=:jacobian`.",
         ),
@@ -246,8 +193,6 @@ VectorEvaluator(f, dim::Int) = VectorEvaluator{true}(f, dim)
 # Trivial (dim == 0) evaluators are a complete prepared evaluator on their own:
 # both gradient and jacobian are well-defined, and all backends can route
 # zero-dimensional inputs through this shape.
-capabilities(::Type{<:VectorEvaluator{C,true}}) where {C} = ADCapability{1}(:scalar)
-
 function value_and_gradient(
     e::VectorEvaluator{C,true}, x::AbstractVector{<:AbstractFloat}
 ) where {C}

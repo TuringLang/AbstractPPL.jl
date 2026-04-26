@@ -46,7 +46,6 @@ function run_shared_gradient_tests(
         problem = QuadraticProblem()
         prepared = AbstractPPL.prepare(adtype, problem, x0)
 
-        @test AbstractPPL.capabilities(prepared) >= AbstractPPL.ADCapability{1}()
         @test AbstractPPL.dimension(prepared) == length(x0)
 
         @test prepared(x) ≈ 14.0
@@ -74,9 +73,6 @@ function run_shared_jacobian_tests(
         problem = VectorValuedProblem()
         prepared = AbstractPPL.prepare(adtype, problem, x0; mode=:jacobian)
 
-        cap = AbstractPPL.capabilities(prepared)
-        @test cap == AbstractPPL.ADCapability{1}(:vector)
-        @test cap >= AbstractPPL.ADCapability{1}()
         @test AbstractPPL.dimension(prepared) == length(x0)
 
         @test prepared(xj) ≈ [6.0, 7.0]
@@ -105,7 +101,6 @@ function run_shared_namedtuple_tests(
         problem = QuadraticProblem()
         prepared = AbstractPPL.prepare(adtype, problem, values0)
 
-        @test AbstractPPL.capabilities(prepared) >= AbstractPPL.ADCapability{1}()
         @test_throws r"only available for evaluators prepared with a vector" AbstractPPL.dimension(
             prepared
         )
