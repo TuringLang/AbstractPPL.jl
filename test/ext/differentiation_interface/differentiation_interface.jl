@@ -7,7 +7,6 @@ using AbstractPPL
 using ADTypes: ADTypes
 using DifferentiationInterface
 using FiniteDifferences
-using LogDensityProblems: LogDensityProblems
 using Test
 
 include(joinpath(@__DIR__, "..", "ad_tests.jl"))
@@ -58,5 +57,4 @@ end
     )
     run_shared_jacobian_tests(adtype, x0, [2.0, 3.0, 4.0]; atol=1e-6, rtol=1e-6)
     run_shared_invalid_mode_tests(adtype, x0)
-    run_shared_ldp_tests(adtype, x0, x)
 end

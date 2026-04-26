@@ -75,6 +75,7 @@ end
     values::NamedTuple,
 )
     _assert_namedtuple_shape(p.evaluator, values)
+    # `value_and_gradient!!` returns (val, (∂f, ∂x)); discard the function tangent ∂f.
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
     return (val, grad)
 end
@@ -83,6 +84,7 @@ end
     p::MooncakePrepared{:gradient,<:AbstractPPL.ADProblems.VectorEvaluator},
     x::AbstractVector{<:AbstractFloat},
 )
+    # `value_and_gradient!!` returns (val, (∂f, ∂x)); discard the function tangent ∂f.
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, x)
     return (val, grad)
 end

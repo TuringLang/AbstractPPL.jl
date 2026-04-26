@@ -1,5 +1,5 @@
 # Shared problem definitions and test helpers for AD backend integration tests.
-# Include this file after `using AbstractPPL, LogDensityProblems, Test` and any backend-specific setup.
+# Include this file after `using AbstractPPL, Test` and any backend-specific setup.
 
 struct QuadraticProblem end
 struct QuadraticNTPrepared end
@@ -126,29 +126,5 @@ function run_shared_invalid_mode_tests(adtype, x0)
         @test_throws r"`mode` must be" AbstractPPL.prepare(
             adtype, QuadraticProblem(), x0; mode=:hessian
         )
-    end
-end
-
-"""
-    run_shared_ldp_tests(adtype, x0, x)
-
-Test that a gradient-mode prepared evaluator satisfies the LogDensityProblems interface.
-`x0` is the prototype (zeros(3)), `x = [3.0, 1.0, 2.0]` is the test point.
-"""
-function run_shared_ldp_tests(adtype, x0, x)
-    @testset "LogDensityProblems interface" begin
-        prepared = AbstractPPL.prepare(adtype, QuadraticProblem(), x0)
-
-        @test LogDensityProblems.dimension(prepared) == length(x0)
-        @test LogDensityProblems.logdensity(prepared, x) ≈ 14.0
-        @test LogDensityProblems.capabilities(prepared) == LogDensityProblems.LogDensityOrder{1}()
-
-        val, grad = LogDensityProblems.logdensity_and_gradient(prepared, x)
-        @test val ≈ 14.0
-        @test grad ≈ [6.0, 2.0, 4.0]
-
-        prepared_jac = AbstractPPL.prepare(adtype, VectorValuedProblem(), x0; mode=:jacobian)
-        @test LogDensityProblems.capabilities(prepared_jac) == LogDensityProblems.LogDensityOrder{0}()
-        @test LogDensityProblems.dimension(prepared_jac) == length(x0)
     end
 end

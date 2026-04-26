@@ -5,9 +5,15 @@
 #   LABEL=mooncake                  julia test/run_ext_tests.jl
 #   LABEL=enzyme                    julia test/run_ext_tests.jl
 #   LABEL=differentiation_interface julia test/run_ext_tests.jl
+#   LABEL=logdensityproblems        julia test/run_ext_tests.jl
 
 const VALID_LABELS = [
-    "forward_diff", "mooncake", "enzyme", "differentiation_interface", "finite_differences"
+    "forward_diff",
+    "mooncake",
+    "enzyme",
+    "differentiation_interface",
+    "finite_differences",
+    "logdensityproblems",
 ]
 
 label = get(ENV, "LABEL", nothing)

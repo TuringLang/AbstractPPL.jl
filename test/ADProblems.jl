@@ -1,6 +1,5 @@
 using AbstractPPL
 using ADTypes: ADTypes
-using LogDensityProblems: LogDensityProblems
 using Test
 
 struct DummyProblem end
@@ -42,16 +41,15 @@ function AbstractPPL.value_and_gradient(
     return (sum(x), ones(length(x)))
 end
 
-# Example of an external type that extends the LDP dimension interface directly.
-struct DummyVectorPrepared
-    dim::Int
+struct UnknownPrepared end
+struct ZeroDimProblem end
+struct ZeroDimVecProblem end
+
+function AbstractPPL.prepare(::ZeroDimProblem, ::AbstractVector{<:AbstractFloat})
+    return (_::AbstractVector) -> 7.5
 end
-
-LogDensityProblems.dimension(p::DummyVectorPrepared) = p.dim
-
-function (p::DummyVectorPrepared)(x::AbstractVector)
-    length(x) == p.dim || error("expected vector of length $(p.dim)")
-    return sum(x)
+function AbstractPPL.prepare(::ZeroDimVecProblem, ::AbstractVector{<:AbstractFloat})
+    return (_::AbstractVector) -> [2.0, 3.0]
 end
 
 @testset "ADProblem interface" begin
@@ -131,29 +129,7 @@ end
         end
     end
 
-    @testset "LogDensityProblems interface (VectorEvaluator)" begin
-        ve = AbstractPPL.ADProblems.VectorEvaluator(sum, 3)
-        @test LogDensityProblems.dimension(ve) == 3
-        @test LogDensityProblems.logdensity(ve, [1.0, 2.0, 3.0]) == 6.0
-
-        # trivial (dim=0) VectorEvaluator is gradient-capable
-        ve0 = AbstractPPL.ADProblems.VectorEvaluator((_) -> 5.0, 0)
-        @test LogDensityProblems.dimension(ve0) == 0
-        @test LogDensityProblems.capabilities(ve0) == LogDensityProblems.LogDensityOrder{1}()
-        val0, grad0 = LogDensityProblems.logdensity_and_gradient(ve0, Float64[])
-        @test val0 == 5.0
-        @test grad0 == Float64[]
-    end
-
-    @testset "external dimension implementor" begin
-        prepared = DummyVectorPrepared(3)
-        @test LogDensityProblems.dimension(prepared) == 3
-        @test prepared(ones(3)) ≈ 3.0
-        @test_throws ErrorException prepared(ones(5))
-    end
-
     @testset "test_autograd reports missing FiniteDifferences extension" begin
-        struct UnknownPrepared end
         @test_throws r"requires loading FiniteDifferences" AbstractPPL.ADProblems.test_autograd(
             UnknownPrepared(), Float64[]
         )
@@ -171,14 +147,6 @@ end
     end
 
     @testset "zero-dimensional prepared evaluator" begin
-        struct ZeroDimProblem end
-        AbstractPPL.prepare(::ZeroDimProblem, ::AbstractVector{<:AbstractFloat}) =
-            (_::AbstractVector) -> 7.5
-
-        struct ZeroDimVecProblem end
-        AbstractPPL.prepare(::ZeroDimVecProblem, ::AbstractVector{<:AbstractFloat}) =
-            (_::AbstractVector) -> [2.0, 3.0]
-
         x = Float64[]
 
         prepared = AbstractPPL.ADProblems.VectorEvaluator{true}(

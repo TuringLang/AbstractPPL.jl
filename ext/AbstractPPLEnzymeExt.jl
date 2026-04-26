@@ -74,6 +74,7 @@ end
     result = Enzyme.autodiff(
         p.mode, Enzyme.Const(p.evaluator), Enzyme.Active, Enzyme.Duplicated(x, dx)
     )
+    # ReverseWithPrimal returns (pullback_result, primal); index 2 is the primal.
     return (result[2], copy(dx))
 end
 

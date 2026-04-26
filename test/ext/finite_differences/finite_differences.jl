@@ -6,7 +6,6 @@ Pkg.instantiate()
 using AbstractPPL
 using ADTypes: ADTypes
 using FiniteDifferences
-using LogDensityProblems: LogDensityProblems
 using Test
 
 include(joinpath(@__DIR__, "..", "ad_tests.jl"))
@@ -29,5 +28,4 @@ include(joinpath(@__DIR__, "..", "ad_tests.jl"))
         adtype, values0, values; atol=1e-5, rtol=1e-5, test_autograd_kwargs=(; fdm)
     )
     run_shared_invalid_mode_tests(adtype, x0)
-    run_shared_ldp_tests(adtype, x0, x)
 end

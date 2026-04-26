@@ -266,6 +266,8 @@ function (e::NamedTupleEvaluator{true})(values::NamedTuple)
 end
 (e::NamedTupleEvaluator{false})(values::NamedTuple) = e.f(values)
 
+# Two separate overloads rather than one `(::VectorEvaluator)(::AbstractVector{<:Integer})`
+# to avoid ambiguity with `(::VectorEvaluator{true})(::AbstractVector)`.
 (e::VectorEvaluator{true})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
 (e::VectorEvaluator{false})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
 
@@ -274,7 +276,6 @@ end
 
 Throw `ArgumentError` unless `values` has the same type as the prototype captured
 during preparation. No-op when `e` was constructed with `Checked=false`.
-Internal helper; called at `value_and_gradient` entry points in AD extensions.
 """
 function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
     typeof(values) === typeof(e.inputspec) || throw(
