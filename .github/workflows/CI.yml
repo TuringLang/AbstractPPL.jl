@@ -58,6 +58,7 @@ jobs:
           - enzyme
           - differentiation_interface
           - finite_differences
+          - logdensityproblems
         version:
           - '1'
           - 'lts'
