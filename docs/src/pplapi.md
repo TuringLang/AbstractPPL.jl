@@ -22,8 +22,6 @@ AbstractModelTrace
 ## ADProblem interface
 
 ```@docs
-ADCapability
-capabilities
 prepare
 value_and_gradient
 value_and_jacobian
