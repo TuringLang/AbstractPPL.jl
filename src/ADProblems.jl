@@ -2,24 +2,24 @@ module ADProblems
 
 using ADTypes: ADTypes
 
-export DerivativeCapability,
+export ADCapability,
     capabilities, prepare, value_and_gradient, value_and_jacobian, test_autograd, dimension
 
 """
-    DerivativeCapability{K}(output::Symbol = :scalar)
+    ADCapability{K}(output::Symbol = :scalar)
 
 Describes what a prepared evaluator can compute: the highest supported
 derivative order `K` (0, 1, or 2), plus the shape of `f`'s output
 (`:scalar` for [`value_and_gradient`](@ref); `:vector` for
 [`value_and_jacobian`](@ref)).
 
-Ordering compares by `K` alone, so `capabilities(prepared) >= DerivativeCapability{1}()`
+Ordering compares by `K` alone, so `capabilities(prepared) >= ADCapability{1}()`
 is true for any evaluator that supports at least first-order derivatives,
 regardless of output shape.
 """
-struct DerivativeCapability{K}
+struct ADCapability{K}
     output::Symbol
-    function DerivativeCapability{K}(output::Symbol=:scalar) where {K}
+    function ADCapability{K}(output::Symbol=:scalar) where {K}
         K isa Int && 0 <= K <= 2 ||
             throw(ArgumentError("Derivative order must be 0, 1, or 2, but got $K."))
         output === :scalar ||
@@ -29,20 +29,20 @@ struct DerivativeCapability{K}
     end
 end
 
-Base.isless(::DerivativeCapability{K}, ::DerivativeCapability{L}) where {K,L} = K < L
-Base.:>(::DerivativeCapability{K}, ::DerivativeCapability{L}) where {K,L} = K > L
-Base.:>=(::DerivativeCapability{K}, ::DerivativeCapability{L}) where {K,L} = K >= L
-Base.:<=(::DerivativeCapability{K}, ::DerivativeCapability{L}) where {K,L} = K <= L
+Base.isless(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K < L
+Base.:>(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K > L
+Base.:>=(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K >= L
+Base.:<=(::ADCapability{K}, ::ADCapability{L}) where {K,L} = K <= L
 
 """
     capabilities(T::Type)
     capabilities(x)
 
-Return the [`DerivativeCapability`](@ref) supported by a prepared evaluator type or
-instance. Prepared evaluators default to `DerivativeCapability{0}()` unless they
+Return the [`ADCapability`](@ref) supported by a prepared evaluator type or
+instance. Prepared evaluators default to `ADCapability{0}()` unless they
 declare higher-order or jacobian support explicitly.
 """
-capabilities(::Type) = DerivativeCapability{0}()
+capabilities(::Type) = ADCapability{0}()
 capabilities(x) = capabilities(typeof(x))
 
 """
@@ -57,8 +57,8 @@ the callable forwarder automatically.
 """
 abstract type AbstractPrepared{Mode} end
 
-capabilities(::Type{<:AbstractPrepared{:gradient}}) = DerivativeCapability{1}(:scalar)
-capabilities(::Type{<:AbstractPrepared{:jacobian}}) = DerivativeCapability{1}(:vector)
+capabilities(::Type{<:AbstractPrepared{:gradient}}) = ADCapability{1}(:scalar)
+capabilities(::Type{<:AbstractPrepared{:jacobian}}) = ADCapability{1}(:vector)
 
 """
     prepare(problem, values::NamedTuple)
@@ -88,7 +88,7 @@ function _check_mode(mode::Symbol)
     mode === :gradient ||
         mode === :jacobian ||
         throw(ArgumentError("`mode` must be `:gradient` or `:jacobian`, got `:$(mode)`."))
-    return mode
+    return nothing
 end
 
 function _check_namedtuple_mode(mode::Symbol)
@@ -97,7 +97,7 @@ function _check_namedtuple_mode(mode::Symbol)
             "`mode=:$(mode)` is only supported on the vector-input path; NamedTuple inputs are gradient-only.",
         ),
     )
-    return mode
+    return nothing
 end
 
 # Identity defaults: AD backend extensions call the 2-arg form to obtain a
@@ -140,7 +140,7 @@ end
 Return `(value, gradient::AbstractVector)` for an evaluator prepared with a
 vector of floating-point numbers.
 
-Requires `capabilities(prepared) >= DerivativeCapability{1}()` and an evaluator
+Requires `capabilities(prepared) >= ADCapability{1}()` and an evaluator
 prepared with `mode=:gradient`. Extensions also add a NamedTuple overload.
 """
 function value_and_gradient end
@@ -160,7 +160,7 @@ Return `(value::AbstractVector, jacobian::AbstractMatrix)` for an evaluator
 prepared with a vector of floating-point numbers and `mode=:jacobian`.
 The returned `jacobian` has shape `(length(value), length(x))`.
 
-Requires `capabilities(prepared) >= DerivativeCapability{1}()` and an evaluator
+Requires `capabilities(prepared) >= ADCapability{1}()` and an evaluator
 prepared with `mode=:jacobian`.
 """
 function value_and_jacobian end
@@ -246,7 +246,7 @@ VectorEvaluator(f, dim::Int) = VectorEvaluator{true}(f, dim)
 # Trivial (dim == 0) evaluators are a complete prepared evaluator on their own:
 # both gradient and jacobian are well-defined, and all backends can route
 # zero-dimensional inputs through this shape.
-capabilities(::Type{<:VectorEvaluator{C,true}}) where {C} = DerivativeCapability{1}(:scalar)
+capabilities(::Type{<:VectorEvaluator{C,true}}) where {C} = ADCapability{1}(:scalar)
 
 function value_and_gradient(
     e::VectorEvaluator{C,true}, x::AbstractVector{<:AbstractFloat}

@@ -13,7 +13,7 @@ using FiniteDifferences: FiniteDifferences
 const DEFAULT_TEST_FDM = FiniteDifferences.central_fdm(5, 1)
 
 function _test_autograd_ref(p, x::AbstractVector{<:AbstractFloat}, fdm=DEFAULT_TEST_FDM)
-    return (p.evaluator(x), FiniteDifferences.grad(fdm, p.evaluator, x)[1])
+    return (p(x), FiniteDifferences.grad(fdm, p, x)[1])
 end
 
 function _test_autograd_ref(p, values::NamedTuple, fdm=DEFAULT_TEST_FDM)

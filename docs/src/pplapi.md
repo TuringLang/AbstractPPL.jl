@@ -22,7 +22,7 @@ AbstractModelTrace
 ## ADProblem interface
 
 ```@docs
-DerivativeCapability
+ADCapability
 capabilities
 prepare
 value_and_gradient

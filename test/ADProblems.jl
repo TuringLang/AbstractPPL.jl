@@ -35,7 +35,7 @@ function (p::DummyADPrepared)(x::AbstractVector{<:AbstractFloat})
     return sum(x)
 end
 
-AbstractPPL.capabilities(::Type{DummyADPrepared}) = DerivativeCapability{1}()
+AbstractPPL.capabilities(::Type{DummyADPrepared}) = ADCapability{1}()
 
 function AbstractPPL.value_and_gradient(
     p::DummyADPrepared, x::AbstractVector{<:AbstractFloat}
@@ -85,31 +85,31 @@ end
         )
     end
 
-    @testset "DerivativeCapability" begin
-        @test_throws r"Derivative order must be 0, 1, or 2" DerivativeCapability{3}()
-        @test_throws ArgumentError DerivativeCapability{-1}()
-        @test_throws r"must be `:scalar` or `:vector`" DerivativeCapability{1}(:other)
+    @testset "ADCapability" begin
+        @test_throws r"Derivative order must be 0, 1, or 2" ADCapability{3}()
+        @test_throws ArgumentError ADCapability{-1}()
+        @test_throws r"must be `:scalar` or `:vector`" ADCapability{1}(:other)
 
-        gradcap = DerivativeCapability{1}(:scalar)
-        jaccap = DerivativeCapability{1}(:vector)
+        gradcap = ADCapability{1}(:scalar)
+        jaccap = ADCapability{1}(:vector)
 
         @test gradcap.output === :scalar
         @test jaccap.output === :vector
 
         # Ordering compares by derivative order only.
-        @test DerivativeCapability{0}() < DerivativeCapability{1}()
-        @test !(DerivativeCapability{1}() < DerivativeCapability{1}())
-        @test DerivativeCapability{1}() >= DerivativeCapability{1}()
-        @test DerivativeCapability{1}() < DerivativeCapability{2}()
-        @test !(DerivativeCapability{2}() < DerivativeCapability{1}())
-        @test DerivativeCapability{0}(:scalar) < DerivativeCapability{1}(:vector)
+        @test ADCapability{0}() < ADCapability{1}()
+        @test !(ADCapability{1}() < ADCapability{1}())
+        @test ADCapability{1}() >= ADCapability{1}()
+        @test ADCapability{1}() < ADCapability{2}()
+        @test !(ADCapability{2}() < ADCapability{1}())
+        @test ADCapability{0}(:scalar) < ADCapability{1}(:vector)
         # output kind does not affect ordering
         @test !(gradcap < jaccap) && !(jaccap < gradcap)
     end
 
     @testset "capabilities default" begin
-        @test capabilities(Int) == DerivativeCapability{0}()
-        @test capabilities(DummyPrepared((:x,))) == DerivativeCapability{0}()
+        @test capabilities(Int) == ADCapability{0}()
+        @test capabilities(DummyPrepared((:x,))) == ADCapability{0}()
     end
 
     @testset "prepare (structural)" begin
@@ -131,7 +131,7 @@ end
         adtype = DummyADType()
         prepared = prepare(adtype, problem, x0)
         @test prepared isa DummyADPrepared
-        @test capabilities(prepared) == DerivativeCapability{1}()
+        @test capabilities(prepared) == ADCapability{1}()
 
         x = [0.5, 1.5, 2.5]
         @test prepared(x) ≈ 0.5 + 1.5 + 2.5
