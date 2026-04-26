@@ -2,7 +2,7 @@ module ADProblems
 
 using ADTypes: ADTypes
 
-export prepare, value_and_gradient, value_and_jacobian, test_autograd, dimension
+export prepare, value_and_gradient, value_and_jacobian, test_autograd
 
 """
     AbstractPrepared{Mode}
@@ -96,14 +96,15 @@ end
 Return `(value, gradient::AbstractVector)` for an evaluator prepared with a
 vector of floating-point numbers.
 
-Requires an evaluator prepared with `mode=:gradient`. Extensions also add a NamedTuple overload.
+Requires an evaluator prepared with `mode=:gradient`. A NamedTuple overload is
+also available when the evaluator was prepared with a `NamedTuple` prototype.
 """
 function value_and_gradient end
 
 function value_and_gradient(prepared, x::AbstractVector{<:AbstractFloat})
     throw(
         ArgumentError(
-            "This evaluator does not support gradients for a vector of floating-point numbers.",
+            "This evaluator does not support gradients for a vector of floating-point numbers. Re-prepare it with `mode=:gradient`.",
         ),
     )
 end

@@ -11,8 +11,8 @@ include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
 include("ADProblems.jl")
-using .ADProblems: prepare, value_and_gradient, value_and_jacobian, test_autograd, dimension
-export prepare, value_and_gradient, value_and_jacobian, test_autograd, dimension
+using .ADProblems: prepare, value_and_gradient, value_and_jacobian, test_autograd
+export prepare, value_and_gradient, value_and_jacobian, test_autograd
 include("utils.jl")
 
 include("varname/optic.jl")

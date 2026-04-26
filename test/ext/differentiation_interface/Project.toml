@@ -1,4 +1,5 @@
 [deps]
+LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
 AbstractPPL = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
@@ -7,6 +8,7 @@ Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+LogDensityProblems = "2"
 ADTypes = "1"
 DifferentiationInterface = "0.6, 0.7"
 FiniteDifferences = "0.12"

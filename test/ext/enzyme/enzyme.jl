@@ -7,6 +7,7 @@ using AbstractPPL
 using ADTypes: ADTypes
 using Enzyme
 using FiniteDifferences
+using LogDensityProblems: LogDensityProblems
 using Test
 
 include(joinpath(@__DIR__, "..", "ad_tests.jl"))
@@ -16,6 +17,7 @@ include(joinpath(@__DIR__, "..", "ad_tests.jl"))
     x = [3.0, 1.0, 2.0]
 
     run_shared_gradient_tests(ADTypes.AutoEnzyme(), x0, x)
+    run_shared_ldp_tests(ADTypes.AutoEnzyme(), x0, x)
     run_shared_jacobian_tests(
         ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward)),
         x0,

@@ -1,5 +1,6 @@
 using AbstractPPL
 using ADTypes: ADTypes
+using LogDensityProblems: LogDensityProblems
 using Test
 
 struct DummyProblem end
@@ -41,11 +42,12 @@ function AbstractPPL.value_and_gradient(
     return (sum(x), ones(length(x)))
 end
 
+# Example of an external type that extends the LDP dimension interface directly.
 struct DummyVectorPrepared
     dim::Int
 end
 
-AbstractPPL.dimension(p::DummyVectorPrepared) = p.dim
+LogDensityProblems.dimension(p::DummyVectorPrepared) = p.dim
 
 function (p::DummyVectorPrepared)(x::AbstractVector)
     length(x) == p.dim || error("expected vector of length $(p.dim)")
@@ -56,7 +58,7 @@ end
     @testset "explicit evaluator shapes" begin
         ve = AbstractPPL.ADProblems.VectorEvaluator(sum, 3)
         @test ve([1.0, 2.0, 3.0]) == 6.0
-        @test dimension(ve) == 3
+        @test AbstractPPL.ADProblems.dimension(ve) == 3
         @test_throws DimensionMismatch ve([1.0, 2.0])
         @test_throws MethodError ve([1, 2, 3])
 
@@ -65,7 +67,9 @@ end
         )
         @test ne((a=1.0, b=[2.0, 3.0])) == 6.0
         @test ne.inputspec == (a=0.0, b=zeros(2))
-        @test_throws r"only available for evaluators prepared with a vector" dimension(ne)
+        @test_throws r"only available for evaluators prepared with a vector" AbstractPPL.ADProblems.dimension(
+            ne
+        )
         @test_throws MethodError ne([1.0, 2.0, 3.0])
 
         # `Checked=false` skips the per-call shape checks.
@@ -127,9 +131,23 @@ end
         end
     end
 
-    @testset "dimension and vector adapter" begin
+    @testset "LogDensityProblems interface (VectorEvaluator)" begin
+        ve = AbstractPPL.ADProblems.VectorEvaluator(sum, 3)
+        @test LogDensityProblems.dimension(ve) == 3
+        @test LogDensityProblems.logdensity(ve, [1.0, 2.0, 3.0]) == 6.0
+
+        # trivial (dim=0) VectorEvaluator is gradient-capable
+        ve0 = AbstractPPL.ADProblems.VectorEvaluator((_) -> 5.0, 0)
+        @test LogDensityProblems.dimension(ve0) == 0
+        @test LogDensityProblems.capabilities(ve0) == LogDensityProblems.LogDensityOrder{1}()
+        val0, grad0 = LogDensityProblems.logdensity_and_gradient(ve0, Float64[])
+        @test val0 == 5.0
+        @test grad0 == Float64[]
+    end
+
+    @testset "external dimension implementor" begin
         prepared = DummyVectorPrepared(3)
-        @test dimension(prepared) == 3
+        @test LogDensityProblems.dimension(prepared) == 3
         @test prepared(ones(3)) ≈ 3.0
         @test_throws ErrorException prepared(ones(5))
     end

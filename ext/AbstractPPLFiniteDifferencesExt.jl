@@ -94,12 +94,9 @@ function AbstractPPL.prepare(
     mode::Symbol=:gradient,
 )
     _check_mode(mode)
-    length(x) == 0 && return AbstractPPL.ADProblems.VectorEvaluator{check_dims}(
-        AbstractPPL.prepare(problem, x), 0
-    )
-    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(
-        AbstractPPL.prepare(problem, x), length(x)
-    )
+    raw = AbstractPPL.prepare(problem, x)
+    length(x) == 0 && return AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, 0)
+    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, length(x))
     return FDPrepared{mode}(evaluator, evaluator, adtype.fdm)
 end
 
