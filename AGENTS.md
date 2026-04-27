@@ -26,6 +26,11 @@ AbstractPPL.jl is a Julia interface package for probabilistic programming. It is
   - The Distributions extension exists to reconstruct structured values from elementwise `VarName` entries. Keep that logic in `ext/`, and prefer the simpler two-argument `getvalue` / `hasvalue` methods unless distribution-shaped reconstruction is actually needed.
   - There is explicit code to keep optic equality JET-friendly and to work around Julia tuple-equality issues; changes around optic equality need extra care.
 
+## Julia Patterns
+
+  - Prefer `Base.Experimental.register_error_hint` in `__init__` over catch-all throwing methods for helpful `MethodError` messages. Catch-all methods create method ambiguities; error hints do not. Note that hint text is shown at display time only — it is not stored in the exception, so `@test_throws r"..."` will not match it.
+  - Prefer two-method dispatch over a single method with an `isa` check: `_assert_foo(_) = nothing` / `_assert_foo(::T) = throw(...)` is cleaner, more composable, and avoids value-level branching.
+
 ## Testing
 
   - Start with a minimal reproducer and run the smallest relevant test scope.
