@@ -26,6 +26,8 @@ end
         @test LogDensityProblems.dimension(ve0) == 0
         @test LogDensityProblems.capabilities(ve0) ==
             LogDensityProblems.LogDensityOrder{1}()
+        @test LogDensityProblems.capabilities(typeof(ve0)) ==
+            LogDensityProblems.LogDensityOrder{1}()
         val0, grad0 = LogDensityProblems.logdensity_and_gradient(ve0, Float64[])
         @test val0 == 5.0
         @test grad0 == Float64[]

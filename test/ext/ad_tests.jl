@@ -2,16 +2,7 @@
 # Include this file after `using AbstractPPL, Test` and any backend-specific setup.
 
 struct QuadraticProblem end
-struct QuadraticNTPrepared end
 struct QuadraticVecPrepared end
-
-function AbstractPPL.prepare(::QuadraticProblem, values::NamedTuple)
-    return QuadraticNTPrepared()
-end
-
-function (::QuadraticNTPrepared)(values::NamedTuple{(:x, :y)})
-    return values.x^2 + sum(vi -> vi^2, values.y)
-end
 
 function AbstractPPL.prepare(::QuadraticProblem, x::AbstractVector{<:Real})
     return QuadraticVecPrepared()
@@ -73,30 +64,5 @@ function run_shared_jacobian_tests(adtype, x0, xj; atol=0, rtol=1e-10)
         @test jac ≈ [3.0 2.0 0.0; 0.0 1.0 1.0] atol = atol rtol = rtol
 
         @test_throws r"scalar-valued" AbstractPPL.value_and_gradient(prepared, xj)
-    end
-end
-
-"""
-    run_shared_namedtuple_tests(adtype, values0, values; atol=0, rtol=1e-10)
-
-Test the NamedTuple-input gradient path for `adtype` on `QuadraticProblem`.
-`values0` is the prototype, `values = (x=3.0, y=[1.0, 2.0])` is the test point.
-"""
-function run_shared_namedtuple_tests(adtype, values0, values; atol=0, rtol=1e-10)
-    @testset "NamedTuple path" begin
-        problem = QuadraticProblem()
-        prepared = AbstractPPL.prepare(adtype, problem, values0)
-
-        @test prepared(values) ≈ 14.0
-
-        val, grad = AbstractPPL.value_and_gradient(prepared, values)
-        @test val ≈ 14.0
-        @test grad.x ≈ 6.0 atol = atol rtol = rtol
-        @test grad.y ≈ [2.0, 4.0] atol = atol rtol = rtol
-
-        @test_throws r"same NamedTuple structure" prepared((x=3.0, z=[1.0, 2.0]))
-        @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(
-            prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
-        )
     end
 end

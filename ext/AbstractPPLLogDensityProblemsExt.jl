@@ -27,6 +27,10 @@ function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
     return LogDensityProblems.LogDensityOrder{0}()
 end
 
+function LogDensityProblems.capabilities(::Type{T}) where {T<:VectorEvaluator{<:Any,true}}
+    return LogDensityProblems.LogDensityOrder{1}()
+end
+
 function LogDensityProblems.capabilities(::VectorEvaluator{V,true}) where {V}
     return LogDensityProblems.LogDensityOrder{1}()
 end

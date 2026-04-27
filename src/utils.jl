@@ -35,7 +35,8 @@ Pass `nothing` as `buf` to allocate a new vector.
 """
 function flatten_to!!(::Nothing, x)
     buf = Vector{flat_eltype(x)}(undef, flat_length(x))
-    return flatten_to!!(buf, x)
+    _flatten_to!(buf, x, 1)
+    return buf
 end
 
 function flatten_to!!(buf::AbstractVector, x)

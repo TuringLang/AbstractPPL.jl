@@ -40,7 +40,6 @@ function AbstractPPL.value_and_gradient(p::DummyADPrepared, x::AbstractVector{<:
     return (sum(x), ones(length(x)))
 end
 
-struct UnknownPrepared end
 struct ZeroDimProblem end
 struct ZeroDimVecProblem end
 
@@ -112,9 +111,9 @@ end
         problem = DummyProblem()
         x0 = zeros(3)
 
-        for adtype in (ADTypes.AutoEnzyme(),)
-            @test_throws MethodError AbstractPPL.ADProblems.prepare(adtype, problem, x0)
-        end
+        @test_throws MethodError AbstractPPL.ADProblems.prepare(
+            ADTypes.AutoEnzyme(), problem, x0
+        )
     end
 
     @testset "flatten / unflatten edge cases" begin

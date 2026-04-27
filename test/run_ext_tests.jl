@@ -4,9 +4,13 @@
 #   LABEL=enzyme                    julia test/run_ext_tests.jl
 #   LABEL=differentiation_interface julia test/run_ext_tests.jl
 #   LABEL=logdensityproblems        julia test/run_ext_tests.jl
+#   LABEL=reversediff               julia test/run_ext_tests.jl
 
 const TEST_SUBDIRS = (
-    enzyme="integration", differentiation_interface="ext", logdensityproblems="ext"
+    enzyme="integration",
+    differentiation_interface="ext",
+    logdensityproblems="ext",
+    reversediff="integration",
 )
 const VALID_LABELS = string.(keys(TEST_SUBDIRS))
 
