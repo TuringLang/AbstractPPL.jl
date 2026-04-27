@@ -9,6 +9,7 @@ from *AD preparation* (selecting a backend and computing derivatives).
 
 ```@example ad
 using AbstractPPL
+using AbstractPPL: prepare, value_and_gradient, value_and_jacobian, test_autograd
 using ForwardDiff  # loads AbstractPPLForwardDiffExt
 using ADTypes: AutoForwardDiff
 
@@ -92,11 +93,12 @@ calls `prepare` unconditionally works even when no AD backend is loaded.
 
 ## Testing AD correctness
 
-[`test_autograd`](@ref) compares a prepared evaluator against a finite-difference
-reference. It requires loading `FiniteDifferences`:
+[`test_autograd`](@ref AbstractPPL.test_autograd) compares a prepared evaluator
+against a finite-difference reference. It requires loading `FiniteDifferences`:
 
 ```julia
 using FiniteDifferences  # loads AbstractPPLFiniteDifferencesExt
+using AbstractPPL: test_autograd
 
 test_autograd(prepared, x)           # vector path
 test_autograd(prepared, values)      # NamedTuple path
@@ -114,15 +116,15 @@ Each backend is loaded as a package extension; load the package to activate it:
 | `ForwardDiff` | `AutoForwardDiff()` | Vector and NamedTuple inputs |
 | `Mooncake` | `AutoMooncake()` / `AutoMooncakeForward()` | Vector and NamedTuple inputs |
 | `Enzyme` | `AutoEnzyme()` | Vector inputs; forward and reverse mode |
-| `FiniteDifferences` | `AutoFiniteDifferences(; fdm)` | Vector and NamedTuple; also enables [`test_autograd`](@ref) |
+| `FiniteDifferences` | `AutoFiniteDifferences(; fdm)` | Vector and NamedTuple; also enables [`test_autograd`](@ref AbstractPPL.test_autograd) |
 | Any `DifferentiationInterface`-compatible backend | the corresponding `ADTypes` type | Vector inputs |
 
 ## API reference
 
 ```@docs
-prepare
-value_and_gradient
-value_and_jacobian
-test_autograd
+AbstractPPL.prepare
+AbstractPPL.value_and_gradient
+AbstractPPL.value_and_jacobian
+AbstractPPL.test_autograd
 AbstractPPL.ADProblems.dimension
 ```

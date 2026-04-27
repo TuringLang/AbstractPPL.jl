@@ -1,4 +1,5 @@
 using AbstractPPL
+using AbstractPPL: prepare, value_and_gradient, value_and_jacobian, test_autograd
 using ADTypes: ADTypes
 using Test
 

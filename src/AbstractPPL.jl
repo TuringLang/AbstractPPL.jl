@@ -12,7 +12,9 @@ include("abstractprobprog.jl")
 include("evaluate.jl")
 include("ADProblems.jl")
 using .ADProblems: prepare, value_and_gradient, value_and_jacobian, test_autograd
-export prepare, value_and_gradient, value_and_jacobian, test_autograd
+@static if VERSION >= v"1.11.0"
+    eval(Meta.parse("public prepare, value_and_gradient, value_and_jacobian, test_autograd"))
+end
 include("utils.jl")
 
 include("varname/optic.jl")

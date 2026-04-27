@@ -51,7 +51,7 @@ function run_shared_gradient_tests(
         val, grad = AbstractPPL.value_and_gradient(prepared, x)
         @test val ≈ 14.0 atol = atol rtol = rtol
         @test grad ≈ [6.0, 2.0, 4.0] atol = atol rtol = rtol
-        test_autograd(prepared, x; test_autograd_kwargs...)
+        AbstractPPL.test_autograd(prepared, x; test_autograd_kwargs...)
 
         @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
         @test_throws MethodError prepared([3, 1, 2])
@@ -78,7 +78,7 @@ function run_shared_jacobian_tests(
         @test jac ≈ [3.0 2.0 0.0; 0.0 1.0 1.0] atol = atol rtol = rtol
 
         @test_throws MethodError AbstractPPL.value_and_gradient(prepared, xj)
-        @test_throws r"only supports gradient-mode" test_autograd(
+        @test_throws r"only supports gradient-mode" AbstractPPL.test_autograd(
             prepared, xj; test_autograd_kwargs...
         )
     end
@@ -103,7 +103,7 @@ function run_shared_namedtuple_tests(
         @test val ≈ 14.0
         @test grad.x ≈ 6.0 atol = atol rtol = rtol
         @test grad.y ≈ [2.0, 4.0] atol = atol rtol = rtol
-        test_autograd(prepared, values; test_autograd_kwargs...)
+        AbstractPPL.test_autograd(prepared, values; test_autograd_kwargs...)
 
         @test_throws r"same NamedTuple structure" prepared((x=3.0, z=[1.0, 2.0]))
         @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(

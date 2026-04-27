@@ -1,6 +1,8 @@
 module ADProblems
 
-export prepare, value_and_gradient, value_and_jacobian, test_autograd
+@static if VERSION >= v"1.11.0"
+    eval(Meta.parse("public prepare, value_and_gradient, value_and_jacobian, test_autograd"))
+end
 
 """
     AbstractPrepared{Mode}
