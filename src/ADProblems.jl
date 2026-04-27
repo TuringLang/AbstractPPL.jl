@@ -65,8 +65,6 @@ function _assert_supported_output(y)
     return nothing
 end
 
-_supports_gradient(_) = false
-
 # Downstream packages (e.g. DynamicPPL) pass already-callable objects,
 # so the safe default is to return them unchanged.
 prepare(problem, values::NamedTuple) = problem

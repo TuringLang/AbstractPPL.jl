@@ -12,18 +12,16 @@ function LogDensityProblems.dimension(p::AbstractPrepared)
 end
 LogDensityProblems.dimension(e::VectorEvaluator) = e.dim
 
-# Type-level capabilities (required by the LDP convention: capabilities(ℓ) = capabilities(typeof(ℓ)))
 function LogDensityProblems.capabilities(::Type{<:AbstractPrepared})
     return LogDensityProblems.LogDensityOrder{0}()
 end
 
 function LogDensityProblems.capabilities(p::AbstractPrepared)
-    return if AbstractPPL.ADProblems._supports_gradient(p)
-        LogDensityProblems.LogDensityOrder{1}()
-    else
-        LogDensityProblems.LogDensityOrder{0}()
-    end
+    return _prepared_capabilities(p.evaluator)
 end
+
+_prepared_capabilities(_) = LogDensityProblems.LogDensityOrder{0}()
+_prepared_capabilities(::VectorEvaluator) = LogDensityProblems.LogDensityOrder{1}()
 
 function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
     return LogDensityProblems.LogDensityOrder{0}()

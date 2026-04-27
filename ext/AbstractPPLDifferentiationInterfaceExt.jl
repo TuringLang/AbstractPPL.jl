@@ -13,8 +13,8 @@ struct DIPrepared{E,B,GP,JP} <: AbstractPPL.ADProblems.AbstractPrepared
     jacobian_prep::JP
 end
 
-# Catch-all for backends without a native AbstractPPL extension; native
-# extensions take precedence via more-specific positional types.
+# Catch-all for backends without a native AbstractPPL extension;
+# native extensions take precedence via more-specific positional types.
 # NamedTuple inputs are not handled here; native extensions cover that path.
 function AbstractPPL.prepare(
     adtype::ADTypes.AbstractADType,
@@ -37,10 +37,13 @@ function AbstractPPL.prepare(
     end
 end
 
-@inline function AbstractPPL.value_and_gradient(p::DIPrepared, x::AbstractVector{<:Real})
+@inline function AbstractPPL.value_and_gradient(
+    p::DIPrepared, x::AbstractVector{T}
+) where {T<:Real}
     p.gradient_prep === nothing &&
         throw(ArgumentError("`value_and_gradient` requires a scalar-valued function."))
-    return DI.value_and_gradient(p.evaluator, p.gradient_prep, p.backend, x)
+    val, grad = DI.value_and_gradient(p.evaluator, p.gradient_prep, p.backend, x)
+    return (val, grad isa Vector{T} ? grad : Vector{T}(grad))
 end
 
 @inline function AbstractPPL.value_and_jacobian(p::DIPrepared, x::AbstractVector{<:Real})
@@ -48,7 +51,5 @@ end
         throw(ArgumentError("`value_and_jacobian` requires a vector-valued function."))
     return DI.value_and_jacobian(p.evaluator, p.jacobian_prep, p.backend, x)
 end
-
-AbstractPPL.ADProblems._supports_gradient(::DIPrepared{<:Any,<:Any,<:Any,Nothing}) = true
 
 end # module

@@ -7,6 +7,10 @@ using AbstractPPL
 using LogDensityProblems: LogDensityProblems
 using Test
 
+struct _VectorPrepared <: AbstractPPL.ADProblems.AbstractPrepared
+    evaluator::AbstractPPL.ADProblems.VectorEvaluator
+end
+
 struct _NTPrepared <: AbstractPPL.ADProblems.AbstractPrepared
     evaluator::AbstractPPL.ADProblems.NamedTupleEvaluator
 end
@@ -28,14 +32,16 @@ end
     end
 
     @testset "type-level capabilities" begin
-        # Type-level dispatch follows the LDP convention (capabilities(ℓ) = capabilities(typeof(ℓ)))
         @test LogDensityProblems.capabilities(AbstractPPL.ADProblems.AbstractPrepared) ==
             LogDensityProblems.LogDensityOrder{0}()
     end
 
+    @testset "Vector-backed AbstractPrepared" begin
+        p = _VectorPrepared(AbstractPPL.ADProblems.VectorEvaluator(sum, 3))
+        @test LogDensityProblems.capabilities(p) == LogDensityProblems.LogDensityOrder{1}()
+    end
+
     @testset "NT-backed AbstractPrepared" begin
-        # capabilities must be LogDensityOrder{0} for NT-backed prepared objects because
-        # logdensity_and_gradient expects a NamedTuple, not the flat vector LDP callers pass.
         p = _NTPrepared(
             AbstractPPL.ADProblems.NamedTupleEvaluator(
                 x -> x.a + sum(x.b), (a=0.0, b=zeros(2))

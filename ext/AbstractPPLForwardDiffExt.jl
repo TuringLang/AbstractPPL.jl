@@ -127,12 +127,4 @@ end
     )
 end
 
-function AbstractPPL.ADProblems._supports_gradient(
-    ::ForwardDiffPrepared{
-        <:AbstractPPL.ADProblems.VectorEvaluator,<:Any,<:Any,<:Any,Nothing,Nothing
-    },
-)
-    return true
-end
-
 end # module

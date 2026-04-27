@@ -5,13 +5,14 @@ Pkg.instantiate()
 
 using AbstractPPL
 using ADTypes: ADTypes
+using DifferentiationInterface
 using Enzyme
 using FiniteDifferences
 using Test
 
-include(joinpath(@__DIR__, "..", "ad_tests.jl"))
+include(joinpath(@__DIR__, "..", "..", "ext", "ad_tests.jl"))
 
-@testset "AbstractPPLEnzymeExt" begin
+@testset "Enzyme via DifferentiationInterface" begin
     x0 = zeros(3)
     x = [3.0, 1.0, 2.0]
 
@@ -34,15 +35,17 @@ include(joinpath(@__DIR__, "..", "ad_tests.jl"))
         prepared_fwd = AbstractPPL.prepare(fwd, problem, x0)
         prepared_rev = AbstractPPL.prepare(rev, problem, x0)
 
-        @test prepared_fwd.mode isa Enzyme.ForwardMode
-        @test prepared_rev.mode isa Enzyme.ReverseMode
-        @test typeof(prepared_fwd) !== typeof(prepared_rev)
-
         val_fwd, grad_fwd = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
             prepared_fwd, x
         )
         @test val_fwd ≈ 14.0
         @test grad_fwd ≈ [6.0, 2.0, 4.0]
+
+        val_rev, grad_rev = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
+            prepared_rev, x
+        )
+        @test val_rev ≈ 14.0
+        @test grad_rev ≈ [6.0, 2.0, 4.0]
     end
 
     @testset "normalizes single-parameter forward gradients" begin

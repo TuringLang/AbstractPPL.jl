@@ -110,13 +110,12 @@ finite-difference estimate.
 Each backend is loaded as a package extension when you load the corresponding
 package:
 
-| Package | `adtype` | Notes |
-|:--- |:--- |:--- |
-| `ForwardDiff` | `AutoForwardDiff()` | Vector and NamedTuple inputs |
-| `Mooncake` | `AutoMooncake()`, `AutoMooncakeForward()` | Vector and NamedTuple inputs |
-| `Enzyme` | `AutoEnzyme()` | Vector inputs; forward and reverse mode |
-| `FiniteDifferences` | `AutoFiniteDifferences(; fdm)` | Vector and NamedTuple inputs; also enables [`test_autograd`](@ref AbstractPPL.test_autograd) |
-| `DifferentiationInterface` | any `ADTypes.AbstractADType` | Vector inputs; catch-all for backends without a native extension |
+| Package                    | `adtype`                                  | Notes                                                                                        |
+|:-------------------------- |:----------------------------------------- |:-------------------------------------------------------------------------------------------- |
+| `ForwardDiff`              | `AutoForwardDiff()`                       | Vector and NamedTuple inputs                                                                 |
+| `Mooncake`                 | `AutoMooncake()`, `AutoMooncakeForward()` | Vector and NamedTuple inputs                                                                 |
+| `FiniteDifferences`        | `AutoFiniteDifferences(; fdm)`            | Vector and NamedTuple inputs; also enables [`test_autograd`](@ref AbstractPPL.test_autograd) |
+| `DifferentiationInterface` | any `ADTypes.AbstractADType`              | Vector inputs; catch-all for backends without a native extension                             |
 
 ## API reference
 

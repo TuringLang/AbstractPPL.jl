@@ -90,10 +90,4 @@ end
     return Mooncake.value_and_jacobian!!(p.jacobian_cache, p.evaluator, x)
 end
 
-function AbstractPPL.ADProblems._supports_gradient(
-    ::MooncakePrepared{<:AbstractPPL.ADProblems.VectorEvaluator,<:Any,Nothing}
-)
-    return true
-end
-
 end # module
