@@ -21,9 +21,4 @@ AbstractModelTrace
 
 ## ADProblem interface
 
-```@docs
-prepare
-value_and_gradient
-value_and_jacobian
-test_autograd
-```
+See [Evaluator preparation and AD](@ref) for a full guide and API reference.
