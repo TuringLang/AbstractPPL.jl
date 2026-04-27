@@ -1,9 +1,9 @@
 # Evaluator preparation and AD
 
-AbstractPPL provides a small interface for wrapping a log-density (or other
-callable) into an object that AD backends can differentiate through. The design
-separates *structural preparation* (binding a callable to an input prototype)
-from *AD preparation* (selecting a backend and computing derivatives).
+AbstractPPL provides a small interface for preparing any callable to be
+differentiated by an AD backend. `prepare` binds a callable to a sample input
+that establishes the expected input shape and type; `value_and_gradient` and
+`value_and_jacobian` then return the value and derivative together.
 
 ## Quick start
 
@@ -19,7 +19,7 @@ struct MyModel end
 
 model = MyModel()
 
-# 2. Prepare with a prototype vector and an AD backend.
+# 2. Prepare: bind the model to a sample input and select an AD backend.
 x0 = zeros(3)
 prepared = prepare(AutoForwardDiff(), model, x0)
 
@@ -29,12 +29,12 @@ val, grad = value_and_gradient(prepared, x)
 val, grad
 ```
 
-## Two preparation paths
+## Two input styles
 
 ### Vector inputs
 
-When the model accepts a flat vector, pass a prototype vector of the same
-length to fix the input dimension:
+When the callable accepts a flat vector, pass a sample vector whose length
+matches the expected input:
 
 ```@example ad
 prepared_vec = prepare(AutoForwardDiff(), model, zeros(3))
@@ -43,8 +43,9 @@ value_and_gradient(prepared_vec, [1.0, 2.0, 3.0])
 
 ### NamedTuple inputs
 
-When the model uses named fields, pass a `NamedTuple` prototype to fix the
-field structure:
+When the callable accepts a `NamedTuple`, pass a sample `NamedTuple` whose
+field names and value types match the expected input. The returned gradient
+has the same field names and array shapes as the input:
 
 ```@example ad
 struct NTModel end
@@ -53,18 +54,17 @@ function AbstractPPL.prepare(::NTModel, values::NamedTuple)
 end
 
 nt_model = NTModel()
-prototype = (a=0.0, b=zeros(2))
-prepared_nt = prepare(AutoForwardDiff(), nt_model, prototype)
+nt0 = (a=0.0, b=zeros(2))
+prepared_nt = prepare(AutoForwardDiff(), nt_model, nt0)
 
 val_nt, grad_nt = value_and_gradient(prepared_nt, (a=1.0, b=[2.0, 3.0]))
 val_nt, grad_nt
 ```
 
-The gradient has the same field names as the input.
-
 ## Jacobians
 
-For vector-valued functions, call `value_and_jacobian`:
+For vector-valued callables, use `value_and_jacobian`. The returned Jacobian
+has shape `(length(value), length(x))`:
 
 ```@example ad
 struct VecModel end
@@ -77,8 +77,9 @@ val, jac
 
 ## Without an AD backend
 
-The two-argument form `prepare(problem, prototype)` is available without any AD
-package. It binds the problem to a prototype but does not add differentiation:
+The two-argument form `prepare(problem, x)` is available without any AD
+package. It returns the callable unchanged, so code that calls `prepare`
+unconditionally works regardless of which backends are loaded:
 
 ```@example ad
 struct SimpleProblem end
@@ -88,20 +89,17 @@ p = prepare(SimpleProblem(), zeros(3))
 p([1.0, 2.0, 3.0])
 ```
 
-Any already-callable object is returned unchanged, so downstream code that
-calls `prepare` unconditionally works even when no AD backend is loaded.
-
 ## Testing AD correctness
 
-[`test_autograd`](@ref AbstractPPL.test_autograd) compares a prepared evaluator
+[`test_autograd`](@ref AbstractPPL.test_autograd) compares `value_and_gradient`
 against a finite-difference reference. It requires loading `FiniteDifferences`:
 
 ```julia
 using FiniteDifferences  # loads AbstractPPLFiniteDifferencesExt
 using AbstractPPL: test_autograd
 
-test_autograd(prepared, x)           # vector path
-test_autograd(prepared, values)      # NamedTuple path
+test_autograd(prepared, x)       # vector input
+test_autograd(prepared, values)  # NamedTuple input
 ```
 
 An informative error is thrown if the AD gradient disagrees with the
@@ -109,15 +107,16 @@ finite-difference estimate.
 
 ## Supported backends
 
-Each backend is loaded as a package extension; load the package to activate it:
+Each backend is loaded as a package extension when you load the corresponding
+package:
 
-| Package                                           | `adtype`                                   | Notes                                                                                 |
-|:------------------------------------------------- |:------------------------------------------ |:------------------------------------------------------------------------------------- |
-| `ForwardDiff`                                     | `AutoForwardDiff()`                        | Vector and NamedTuple inputs                                                          |
-| `Mooncake`                                        | `AutoMooncake()` / `AutoMooncakeForward()` | Vector and NamedTuple inputs                                                          |
-| `Enzyme`                                          | `AutoEnzyme()`                             | Vector inputs; forward and reverse mode                                               |
-| `FiniteDifferences`                               | `AutoFiniteDifferences(; fdm)`             | Vector and NamedTuple; also enables [`test_autograd`](@ref AbstractPPL.test_autograd) |
-| Any `DifferentiationInterface`-compatible backend | the corresponding `ADTypes` type           | Vector inputs                                                                         |
+| Package | `adtype` | Notes |
+|:--- |:--- |:--- |
+| `ForwardDiff` | `AutoForwardDiff()` | Vector and NamedTuple inputs |
+| `Mooncake` | `AutoMooncake()`, `AutoMooncakeForward()` | Vector and NamedTuple inputs |
+| `Enzyme` | `AutoEnzyme()` | Vector inputs; forward and reverse mode |
+| `FiniteDifferences` | `AutoFiniteDifferences(; fdm)` | Vector and NamedTuple inputs; also enables [`test_autograd`](@ref AbstractPPL.test_autograd) |
+| `DifferentiationInterface` | any `ADTypes.AbstractADType` | Vector inputs; catch-all for backends without a native extension |
 
 ## API reference
 

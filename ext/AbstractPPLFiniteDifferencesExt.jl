@@ -16,9 +16,8 @@ end
 function _test_autograd_ref(p, values::NamedTuple, fdm=DEFAULT_TEST_FDM)
     _assert_namedtuple_shape(p.evaluator, values)
     x = flatten_to!!(nothing, values)
-    f = x -> p.evaluator(unflatten_to!!(p.evaluator.inputspec, x))
     val = p.evaluator(values)
-    grad = FiniteDifferences.grad(fdm, f, x)[1]
+    grad = FiniteDifferences.grad(fdm, p.f, x)[1]
     return (val, unflatten_to!!(p.evaluator.inputspec, grad))
 end
 

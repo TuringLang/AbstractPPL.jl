@@ -78,15 +78,6 @@ function _flatten_to!(buf::AbstractVector, x, offset::Int)
     throw(ArgumentError("This value cannot be flattened into a vector."))
 end
 
-function unflatten(x, buf::AbstractVector)
-    n = flat_length(x)
-    length(buf) == n || throw(
-        DimensionMismatch("Expected a vector of length $n, but got length $(length(buf))."),
-    )
-    value, _ = _unflatten(x, buf, 1)
-    return value
-end
-
 function _unflatten(x::Union{Real,Complex}, buf::AbstractVector, offset::Int)
     return buf[offset], offset + 1
 end
@@ -135,6 +126,13 @@ Supported `x` values are:
 """
 # Always allocates: `_unflatten` calls `similar` for each array field. Gains from
 # buffer reuse are negligible relative to gradient computation cost.
-unflatten_to!!(x, buf::AbstractVector) = unflatten(x, buf)
+function unflatten_to!!(x, buf::AbstractVector)
+    n = flat_length(x)
+    length(buf) == n || throw(
+        DimensionMismatch("Expected a vector of length $n, but got length $(length(buf))."),
+    )
+    value, _ = _unflatten(x, buf, 1)
+    return value
+end
 
 end # module
