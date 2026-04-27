@@ -49,7 +49,7 @@ end
 function AbstractPPL.prepare(
     adtype::MooncakeAD,
     problem,
-    x::AbstractVector{<:AbstractFloat};
+    x::AbstractVector{<:Real};
     check_dims::Bool=true,
     mode::Symbol=:gradient,
 )
@@ -82,7 +82,7 @@ end
 
 @inline function AbstractPPL.value_and_gradient(
     p::MooncakePrepared{:gradient,<:AbstractPPL.ADProblems.VectorEvaluator},
-    x::AbstractVector{<:AbstractFloat},
+    x::AbstractVector{<:Real},
 )
     # `value_and_gradient!!` returns (val, (∂f, ∂x)); discard the function tangent ∂f.
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, x)
@@ -91,7 +91,7 @@ end
 
 @inline function AbstractPPL.value_and_jacobian(
     p::MooncakePrepared{:jacobian,<:AbstractPPL.ADProblems.VectorEvaluator},
-    x::AbstractVector{<:AbstractFloat},
+    x::AbstractVector{<:Real},
 )
     return Mooncake.value_and_jacobian!!(p.cache, p.evaluator, x)
 end

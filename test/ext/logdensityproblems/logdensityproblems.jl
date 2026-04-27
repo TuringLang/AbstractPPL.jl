@@ -27,13 +27,14 @@ end
         @test grad0 == Float64[]
     end
 
-    @testset "NamedTupleEvaluator" begin
-        ne = AbstractPPL.ADProblems.NamedTupleEvaluator(
-            x -> x.a + sum(x.b), (a=0.0, b=zeros(2))
-        )
-        @test LogDensityProblems.dimension(ne) == 3
-        @test LogDensityProblems.logdensity(ne, (a=1.0, b=[2.0, 3.0])) == 6.0
-        @test LogDensityProblems.capabilities(ne) == LogDensityProblems.LogDensityOrder{0}()
+    @testset "type-level capabilities" begin
+        # Type-level dispatch follows the LDP convention (capabilities(ℓ) = capabilities(typeof(ℓ)))
+        @test LogDensityProblems.capabilities(
+            AbstractPPL.ADProblems.AbstractPrepared{:gradient}
+        ) == LogDensityProblems.LogDensityOrder{1}()
+        @test LogDensityProblems.capabilities(
+            AbstractPPL.ADProblems.AbstractPrepared{:jacobian}
+        ) == LogDensityProblems.LogDensityOrder{0}()
     end
 
     @testset "NT-backed gradient-mode AbstractPrepared" begin

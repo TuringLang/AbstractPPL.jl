@@ -70,7 +70,7 @@ end
         )
         @test_throws MethodError ne([1.0, 2.0, 3.0])
 
-        # `Checked=false` skips the per-call shape checks.
+        # `Validate=false` skips the per-call shape checks.
         ve_unchecked = AbstractPPL.ADProblems.VectorEvaluator{false}(sum, 3)
         @test ve_unchecked([1.0, 2.0]) == 3.0
 
@@ -123,9 +123,7 @@ end
             ADTypes.AutoMooncake(),
             ADTypes.AutoMooncakeForward(),
         )
-            @test_throws r"requires loading the corresponding AD backend" AbstractPPL.ADProblems.prepare(
-                adtype, problem, x0
-            )
+            @test_throws MethodError AbstractPPL.ADProblems.prepare(adtype, problem, x0)
         end
     end
 

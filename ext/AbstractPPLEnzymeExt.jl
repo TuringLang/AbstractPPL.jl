@@ -38,7 +38,7 @@ _enzyme_gradient(_, _) = nothing
 function AbstractPPL.prepare(
     adtype::AutoEnzyme,
     problem,
-    x::AbstractVector{<:AbstractFloat};
+    x::AbstractVector{<:Real};
     check_dims::Bool=true,
     mode::Symbol=:gradient,
 )
@@ -61,8 +61,7 @@ function AbstractPPL.prepare(
 end
 
 @inline function AbstractPPL.value_and_gradient(
-    p::EnzymePrepared{:gradient,<:Any,<:Any,<:Enzyme.ReverseMode},
-    x::AbstractVector{<:AbstractFloat},
+    p::EnzymePrepared{:gradient,<:Any,<:Any,<:Enzyme.ReverseMode}, x::AbstractVector{<:Real}
 )
     dx = p.gradient
     length(dx) == length(x) || throw(
@@ -79,8 +78,7 @@ end
 end
 
 @inline function AbstractPPL.value_and_gradient(
-    p::EnzymePrepared{:gradient,<:Any,<:Any,<:Enzyme.ForwardMode},
-    x::AbstractVector{<:AbstractFloat},
+    p::EnzymePrepared{:gradient,<:Any,<:Any,<:Enzyme.ForwardMode}, x::AbstractVector{<:Real}
 )
     length(p.shadow) == length(x) || throw(
         DimensionMismatch(
@@ -96,7 +94,7 @@ end
 end
 
 @inline function AbstractPPL.value_and_jacobian(
-    p::EnzymePrepared{:jacobian}, x::AbstractVector{<:AbstractFloat}
+    p::EnzymePrepared{:jacobian}, x::AbstractVector{<:Real}
 )
     # `Enzyme.jacobian(WithPrimal(mode), f, x)` returns `(derivs=(J,), val=y)`
     # in both forward and reverse modes.

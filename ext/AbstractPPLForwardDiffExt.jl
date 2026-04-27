@@ -58,7 +58,7 @@ end
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff,
     problem,
-    x::AbstractVector{<:AbstractFloat};
+    x::AbstractVector{<:Real};
     check_dims::Bool=true,
     mode::Symbol=:gradient,
 )
@@ -105,7 +105,7 @@ end
 
 @inline function AbstractPPL.value_and_gradient(
     p::ForwardDiffPrepared{:gradient,<:AbstractPPL.ADProblems.VectorEvaluator},
-    x::AbstractVector{<:AbstractFloat},
+    x::AbstractVector{<:Real},
 )
     ForwardDiff.gradient!(p.result, p.f, x, p.config, Val(false))
     val = ForwardDiff.DiffResults.value(p.result)
@@ -115,7 +115,7 @@ end
 
 @inline function AbstractPPL.value_and_jacobian(
     p::ForwardDiffPrepared{:jacobian,<:AbstractPPL.ADProblems.VectorEvaluator},
-    x::AbstractVector{<:AbstractFloat},
+    x::AbstractVector{<:Real},
 )
     ForwardDiff.jacobian!(p.result, p.f, x, p.config, Val(false))
     val = ForwardDiff.DiffResults.value(p.result)

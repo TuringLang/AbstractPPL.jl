@@ -12,7 +12,7 @@ using FiniteDifferences: FiniteDifferences
 
 const DEFAULT_TEST_FDM = FiniteDifferences.central_fdm(5, 1)
 
-function _test_autograd_ref(p, x::AbstractVector{<:AbstractFloat}, fdm=DEFAULT_TEST_FDM)
+function _test_autograd_ref(p, x::AbstractVector{<:Real}, fdm=DEFAULT_TEST_FDM)
     return (p(x), FiniteDifferences.grad(fdm, p, x)[1])
 end
 
@@ -89,7 +89,7 @@ end
 function AbstractPPL.prepare(
     adtype::AutoFiniteDifferences,
     problem,
-    x::AbstractVector{<:AbstractFloat};
+    x::AbstractVector{<:Real};
     check_dims::Bool=true,
     mode::Symbol=:gradient,
 )
@@ -113,7 +113,7 @@ end
 
 function AbstractPPL.value_and_gradient(
     p::FDPrepared{:gradient,<:AbstractPPL.ADProblems.VectorEvaluator},
-    x::AbstractVector{<:AbstractFloat},
+    x::AbstractVector{<:Real},
 )
     val = p.evaluator(x)
     grad = FiniteDifferences.grad(p.fdm, p.f, x)[1]
@@ -122,7 +122,7 @@ end
 
 function AbstractPPL.value_and_jacobian(
     p::FDPrepared{:jacobian,<:AbstractPPL.ADProblems.VectorEvaluator},
-    x::AbstractVector{<:AbstractFloat},
+    x::AbstractVector{<:Real},
 )
     val = p.evaluator(x)
     jac = FiniteDifferences.jacobian(p.fdm, p.f, x)[1]

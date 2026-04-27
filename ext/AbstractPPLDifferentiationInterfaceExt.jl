@@ -20,7 +20,7 @@ end
 function AbstractPPL.prepare(
     adtype::ADTypes.AbstractADType,
     problem,
-    x::AbstractVector{<:AbstractFloat};
+    x::AbstractVector{<:Real};
     check_dims::Bool=true,
     mode::Symbol=:gradient,
 )
@@ -38,13 +38,13 @@ function AbstractPPL.prepare(
 end
 
 @inline function AbstractPPL.value_and_gradient(
-    p::DIPrepared{:gradient}, x::AbstractVector{<:AbstractFloat}
+    p::DIPrepared{:gradient}, x::AbstractVector{<:Real}
 )
     return DI.value_and_gradient(p.evaluator, p.prep, p.backend, x)
 end
 
 @inline function AbstractPPL.value_and_jacobian(
-    p::DIPrepared{:jacobian}, x::AbstractVector{<:AbstractFloat}
+    p::DIPrepared{:jacobian}, x::AbstractVector{<:Real}
 )
     return DI.value_and_jacobian(p.evaluator, p.prep, p.backend, x)
 end
