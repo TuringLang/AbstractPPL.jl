@@ -13,7 +13,7 @@ function (::QuadraticNTPrepared)(values::NamedTuple{(:x, :y)})
     return values.x^2 + sum(vi -> vi^2, values.y)
 end
 
-function AbstractPPL.prepare(::QuadraticProblem, x::AbstractVector{<:AbstractFloat})
+function AbstractPPL.prepare(::QuadraticProblem, x::AbstractVector{<:Real})
     return QuadraticVecPrepared()
 end
 
@@ -24,7 +24,7 @@ end
 struct VectorValuedProblem end
 struct VectorValuedPrepared end
 
-function AbstractPPL.prepare(::VectorValuedProblem, x::AbstractVector{<:AbstractFloat})
+function AbstractPPL.prepare(::VectorValuedProblem, x::AbstractVector{<:Real})
     return VectorValuedPrepared()
 end
 
@@ -77,7 +77,7 @@ function run_shared_jacobian_tests(
         @test val ≈ [6.0, 7.0] atol = atol rtol = rtol
         @test jac ≈ [3.0 2.0 0.0; 0.0 1.0 1.0] atol = atol rtol = rtol
 
-        @test_throws ArgumentError AbstractPPL.value_and_gradient(prepared, xj)
+        @test_throws MethodError AbstractPPL.value_and_gradient(prepared, xj)
         @test_throws r"only supports gradient-mode" test_autograd(
             prepared, xj; test_autograd_kwargs...
         )

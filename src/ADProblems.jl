@@ -22,8 +22,8 @@ abstract type AbstractPrepared{Mode} end
 Prepare a callable evaluator for `problem`.
 
 Use the two-argument form with a `NamedTuple` when the evaluator works with
-named inputs, or with a vector when it works with
-vector inputs. Automatic differentiation backends extend this interface with
+named inputs, or with a vector when it works with vector inputs. Automatic
+differentiation backends extend this interface with
 backend-specific three-argument methods.
 
 The keyword argument `check_dims` (default `true`) controls whether the prepared

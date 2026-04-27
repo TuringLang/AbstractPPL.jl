@@ -25,18 +25,18 @@ end
 struct DummyADType <: ADTypes.AbstractADType end
 
 function AbstractPPL.prepare(
-    ::DummyADType, problem::DummyProblem, x::AbstractVector{<:AbstractFloat}
+    ::DummyADType, problem::DummyProblem, x::AbstractVector{<:Real}
 )
     return DummyADPrepared(length(x))
 end
 
-function (p::DummyADPrepared)(x::AbstractVector{<:AbstractFloat})
+function (p::DummyADPrepared)(x::AbstractVector{<:Real})
     length(x) == p.dim || error("expected vector of length $(p.dim)")
     return sum(x)
 end
 
 function AbstractPPL.value_and_gradient(
-    p::DummyADPrepared, x::AbstractVector{<:AbstractFloat}
+    p::DummyADPrepared, x::AbstractVector{<:Real}
 )
     return (sum(x), ones(length(x)))
 end
@@ -45,10 +45,10 @@ struct UnknownPrepared end
 struct ZeroDimProblem end
 struct ZeroDimVecProblem end
 
-function AbstractPPL.prepare(::ZeroDimProblem, ::AbstractVector{<:AbstractFloat})
+function AbstractPPL.prepare(::ZeroDimProblem, ::AbstractVector{<:Real})
     return (_::AbstractVector) -> 7.5
 end
-function AbstractPPL.prepare(::ZeroDimVecProblem, ::AbstractVector{<:AbstractFloat})
+function AbstractPPL.prepare(::ZeroDimVecProblem, ::AbstractVector{<:Real})
     return (_::AbstractVector) -> [2.0, 3.0]
 end
 
