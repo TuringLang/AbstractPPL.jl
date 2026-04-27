@@ -6,9 +6,7 @@
 #   LABEL=logdensityproblems        julia test/run_ext_tests.jl
 
 const TEST_SUBDIRS = (
-    enzyme="integration",
-    differentiation_interface="ext",
-    logdensityproblems="ext",
+    enzyme="integration", differentiation_interface="ext", logdensityproblems="ext"
 )
 const VALID_LABELS = string.(keys(TEST_SUBDIRS))
 

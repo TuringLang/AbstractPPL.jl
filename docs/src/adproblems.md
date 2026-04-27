@@ -27,9 +27,7 @@ end
 
 (prepared::MyPrepared)(x::AbstractVector) = prepared.f(x)
 
-function AbstractPPL.value_and_gradient(
-    prepared::MyPrepared, x::AbstractVector{<:Real}
-)
+function AbstractPPL.value_and_gradient(prepared::MyPrepared, x::AbstractVector{<:Real})
     return (prepared(x), 2 .* x)
 end
 
@@ -67,9 +65,7 @@ end
 
 (prepared::VecPrepared)(x::AbstractVector) = prepared.f(x)
 
-function AbstractPPL.value_and_jacobian(
-    prepared::VecPrepared, x::AbstractVector{<:Real}
-)
+function AbstractPPL.value_and_jacobian(prepared::VecPrepared, x::AbstractVector{<:Real})
     return (prepared(x), [x[2] x[1] 0; 0 1 1])
 end
 

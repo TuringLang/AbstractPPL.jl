@@ -112,9 +112,7 @@ end
         problem = DummyProblem()
         x0 = zeros(3)
 
-        for adtype in (
-            ADTypes.AutoEnzyme(),
-        )
+        for adtype in (ADTypes.AutoEnzyme(),)
             @test_throws MethodError AbstractPPL.ADProblems.prepare(adtype, problem, x0)
         end
     end
