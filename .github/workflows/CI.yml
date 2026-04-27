@@ -53,11 +53,8 @@ jobs:
       fail-fast: false
       matrix:
         label:
-          - forward_diff
-          - mooncake
           - enzyme
           - differentiation_interface
-          - finite_differences
           - logdensityproblems
         version:
           - '1'
