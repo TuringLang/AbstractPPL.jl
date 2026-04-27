@@ -6,6 +6,9 @@ using AbstractPPL.ADProblems:
 using ADTypes
 using DifferentiationInterface: DifferentiationInterface as DI
 
+# The DI fallback calls this wrapper so only `x` is differentiated; in DynamicPPL the model and other evaluator state stay constant.
+@inline _call_evaluator(x, evaluator) = evaluator(x)
+
 struct DIPrepared{E,B,GP,JP} <: AbstractPPL.ADProblems.AbstractPrepared
     evaluator::E
     backend::B
@@ -28,11 +31,15 @@ function AbstractPPL.prepare(
     y = evaluator(x)
     _assert_supported_output(y)
     if _is_scalar_output(y)
-        gradient_prep = DI.prepare_gradient(evaluator, adtype, x)
+        gradient_prep = DI.prepare_gradient(
+            _call_evaluator, adtype, x, DI.Constant(evaluator)
+        )
         return DIPrepared(evaluator, adtype, gradient_prep, nothing)
     else
         _assert_jacobian_output(y)
-        jacobian_prep = DI.prepare_jacobian(evaluator, adtype, x)
+        jacobian_prep = DI.prepare_jacobian(
+            _call_evaluator, adtype, x, DI.Constant(evaluator)
+        )
         return DIPrepared(evaluator, adtype, nothing, jacobian_prep)
     end
 end
@@ -42,14 +49,18 @@ end
 ) where {T<:Real}
     p.gradient_prep === nothing &&
         throw(ArgumentError("`value_and_gradient` requires a scalar-valued function."))
-    val, grad = DI.value_and_gradient(p.evaluator, p.gradient_prep, p.backend, x)
+    val, grad = DI.value_and_gradient(
+        _call_evaluator, p.gradient_prep, p.backend, x, DI.Constant(p.evaluator)
+    )
     return (val, grad isa Vector{T} ? grad : Vector{T}(grad))
 end
 
 @inline function AbstractPPL.value_and_jacobian(p::DIPrepared, x::AbstractVector{<:Real})
     p.jacobian_prep === nothing &&
         throw(ArgumentError("`value_and_jacobian` requires a vector-valued function."))
-    return DI.value_and_jacobian(p.evaluator, p.jacobian_prep, p.backend, x)
+    return DI.value_and_jacobian(
+        _call_evaluator, p.jacobian_prep, p.backend, x, DI.Constant(p.evaluator)
+    )
 end
 
 end # module

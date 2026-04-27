@@ -15,20 +15,32 @@ include(joinpath(@__DIR__, "..", "ad_tests.jl"))
 struct DummyADType <: ADTypes.AbstractADType end
 const adtype = DummyADType()
 
-DifferentiationInterface.prepare_gradient(f, ::DummyADType, x) = Val(:gradient)
-
-function DifferentiationInterface.value_and_gradient(f, prep, ::DummyADType, x)
-    return (f(x), 2 .* x)
+function DifferentiationInterface.prepare_gradient(
+    f, ::DummyADType, x, ctx::DifferentiationInterface.Constant
+)
+    return Val(:gradient)
 end
 
-DifferentiationInterface.prepare_jacobian(f, ::DummyADType, x) = Val(:jacobian)
+function DifferentiationInterface.value_and_gradient(
+    f, prep, ::DummyADType, x, ctx::DifferentiationInterface.Constant
+)
+    return (f(x, ctx.data), 2 .* x)
+end
 
-function DifferentiationInterface.value_and_jacobian(f, prep, ::DummyADType, x)
+function DifferentiationInterface.prepare_jacobian(
+    f, ::DummyADType, x, ctx::DifferentiationInterface.Constant
+)
+    return Val(:jacobian)
+end
+
+function DifferentiationInterface.value_and_jacobian(
+    f, prep, ::DummyADType, x, ctx::DifferentiationInterface.Constant
+)
     jac = [
         x[2] x[1] zero(eltype(x))
         zero(eltype(x)) one(eltype(x)) one(eltype(x))
     ]
-    return (f(x), jac)
+    return (f(x, ctx.data), jac)
 end
 
 @testset "AbstractPPLDifferentiationInterfaceExt" begin

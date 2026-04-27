@@ -11,6 +11,18 @@ using Test
 
 include(joinpath(@__DIR__, "..", "..", "ext", "ad_tests.jl"))
 
+struct StatefulQuadraticProblem
+    data::Vector{Float64}
+end
+
+function AbstractPPL.prepare(problem::StatefulQuadraticProblem, x::AbstractVector{<:Real})
+    return problem
+end
+
+function (p::StatefulQuadraticProblem)(x::AbstractVector{<:Real})
+    return sum(abs2(xi - di) for (xi, di) in zip(x, p.data))
+end
+
 @testset "Enzyme via DifferentiationInterface" begin
     x0 = zeros(3)
     x = [3.0, 1.0, 2.0]
@@ -58,4 +70,15 @@ include(joinpath(@__DIR__, "..", "..", "ext", "ad_tests.jl"))
         @test val_fwd ≈ 9.0
         @test grad_fwd ≈ [6.0]
     end
+
+    prepared = AbstractPPL.prepare(
+        ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward)),
+        StatefulQuadraticProblem([0.5, 1.5]),
+        zeros(2),
+    )
+    val, grad = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
+        prepared, [1.0, 2.0]
+    )
+    @test val ≈ 0.5
+    @test grad ≈ [1.0, 1.0]
 end
