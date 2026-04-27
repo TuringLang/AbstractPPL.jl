@@ -1,5 +1,5 @@
 using AbstractPPL
-using AbstractPPL: prepare, value_and_gradient, value_and_jacobian, test_autograd
+using AbstractPPL: prepare, value_and_gradient, value_and_jacobian
 using ADTypes: ADTypes
 using Test
 
@@ -113,19 +113,10 @@ end
         x0 = zeros(3)
 
         for adtype in (
-            ADTypes.AutoForwardDiff(),
             ADTypes.AutoEnzyme(),
-            ADTypes.AutoMooncake(),
-            ADTypes.AutoMooncakeForward(),
         )
             @test_throws MethodError AbstractPPL.ADProblems.prepare(adtype, problem, x0)
         end
-    end
-
-    @testset "test_autograd reports missing FiniteDifferences extension" begin
-        @test_throws r"requires loading FiniteDifferences" AbstractPPL.ADProblems.test_autograd(
-            UnknownPrepared(), Float64[]
-        )
     end
 
     @testset "flatten / unflatten edge cases" begin

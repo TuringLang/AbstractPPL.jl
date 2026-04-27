@@ -7,7 +7,6 @@ using AbstractPPL
 using ADTypes: ADTypes
 using DifferentiationInterface
 using Enzyme
-using FiniteDifferences
 using Test
 
 include(joinpath(@__DIR__, "..", "..", "ext", "ad_tests.jl"))

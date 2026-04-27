@@ -1,9 +1,7 @@
 module ADProblems
 
 @static if VERSION >= v"1.11.0"
-    eval(
-        Meta.parse("public prepare, value_and_gradient, value_and_jacobian, test_autograd")
-    )
+    eval(Meta.parse("public prepare, value_and_gradient, value_and_jacobian"))
 end
 
 """
@@ -88,20 +86,6 @@ evaluator prepared with a vector. The returned `jacobian` has shape
 `(length(value), length(x))`.
 """
 function value_and_jacobian end
-
-"""
-    test_autograd(prepared, x; atol=1e-5, rtol=1e-5)
-
-Compare `value_and_gradient(prepared, x)` against a finite-difference reference.
-Throws an informative error on mismatch. Returns `nothing`.
-
-Requires loading FiniteDifferences so the extension-backed implementation is available.
-"""
-function test_autograd(prepared, x; atol=1e-5, rtol=1e-5)
-    return error(
-        "`test_autograd` requires loading FiniteDifferences to activate the AbstractPPLFiniteDifferencesExt implementation.",
-    )
-end
 
 """
     VectorEvaluator{Validate}(f, dim)
@@ -223,7 +207,7 @@ function __init__()
         if exc.f === prepare && length(args) >= 3
             print(
                 io,
-                "\nCalling `prepare` with an AD backend requires loading the corresponding extension (e.g., `using ForwardDiff` or `using DifferentiationInterface`).",
+                "\nCalling `prepare` with an AD backend requires loading the corresponding extension (e.g., `using DifferentiationInterface`).",
             )
         end
     end
