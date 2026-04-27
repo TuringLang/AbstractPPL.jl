@@ -36,9 +36,7 @@ function (p::DummyADPrepared)(x::AbstractVector{<:Real})
     return sum(x)
 end
 
-function AbstractPPL.value_and_gradient(
-    p::DummyADPrepared, x::AbstractVector{<:Real}
-)
+function AbstractPPL.value_and_gradient(p::DummyADPrepared, x::AbstractVector{<:Real})
     return (sum(x), ones(length(x)))
 end
 
@@ -57,7 +55,6 @@ end
     @testset "explicit evaluator shapes" begin
         ve = AbstractPPL.ADProblems.VectorEvaluator(sum, 3)
         @test ve([1.0, 2.0, 3.0]) == 6.0
-        @test AbstractPPL.ADProblems.dimension(ve) == 3
         @test_throws DimensionMismatch ve([1.0, 2.0])
         @test_throws MethodError ve([1, 2, 3])
 
@@ -66,9 +63,6 @@ end
         )
         @test ne((a=1.0, b=[2.0, 3.0])) == 6.0
         @test ne.inputspec == (a=0.0, b=zeros(2))
-        @test_throws r"only available for evaluators prepared with a vector" AbstractPPL.ADProblems.dimension(
-            ne
-        )
         @test_throws MethodError ne([1.0, 2.0, 3.0])
 
         # `Validate=false` skips the per-call shape checks.

@@ -69,7 +69,7 @@ function run_shared_jacobian_tests(
 )
     @testset "jacobian path" begin
         problem = VectorValuedProblem()
-        prepared = AbstractPPL.prepare(adtype, problem, x0; mode=:jacobian)
+        prepared = AbstractPPL.prepare(adtype, problem, x0)
 
         @test prepared(xj) ≈ [6.0, 7.0]
 
@@ -77,8 +77,8 @@ function run_shared_jacobian_tests(
         @test val ≈ [6.0, 7.0] atol = atol rtol = rtol
         @test jac ≈ [3.0 2.0 0.0; 0.0 1.0 1.0] atol = atol rtol = rtol
 
-        @test_throws MethodError AbstractPPL.value_and_gradient(prepared, xj)
-        @test_throws r"only supports gradient-mode" AbstractPPL.test_autograd(
+        @test_throws r"scalar-valued" AbstractPPL.value_and_gradient(prepared, xj)
+        @test_throws r"scalar-valued" AbstractPPL.test_autograd(
             prepared, xj; test_autograd_kwargs...
         )
     end
@@ -108,23 +108,6 @@ function run_shared_namedtuple_tests(
         @test_throws r"same NamedTuple structure" prepared((x=3.0, z=[1.0, 2.0]))
         @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(
             prepared, (x=3.0, y=reshape([1.0, 2.0], 1, 2))
-        )
-
-        @test_throws r"only supported on the vector-input path" AbstractPPL.prepare(
-            adtype, problem, values0; mode=:jacobian
-        )
-    end
-end
-
-"""
-    run_shared_invalid_mode_tests(adtype, x0)
-
-Test that `mode=:hessian` is rejected at prepare-time.
-"""
-function run_shared_invalid_mode_tests(adtype, x0)
-    @testset "invalid mode rejected" begin
-        @test_throws r"`mode` must be" AbstractPPL.prepare(
-            adtype, QuadraticProblem(), x0; mode=:hessian
         )
     end
 end

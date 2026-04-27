@@ -27,5 +27,4 @@ include(joinpath(@__DIR__, "..", "ad_tests.jl"))
     run_shared_namedtuple_tests(
         adtype, values0, values; atol=1e-5, rtol=1e-5, test_autograd_kwargs=(; fdm)
     )
-    run_shared_invalid_mode_tests(adtype, x0)
 end

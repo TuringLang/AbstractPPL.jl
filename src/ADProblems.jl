@@ -1,25 +1,26 @@
 module ADProblems
 
 @static if VERSION >= v"1.11.0"
-    eval(Meta.parse("public prepare, value_and_gradient, value_and_jacobian, test_autograd"))
+    eval(
+        Meta.parse("public prepare, value_and_gradient, value_and_jacobian, test_autograd")
+    )
 end
 
 """
-    AbstractPrepared{Mode}
+    AbstractPrepared
 
 Internal abstract supertype for all AD-prepared evaluators produced by AbstractPPL's
-extension backends. `Mode` is `:gradient` or `:jacobian`.
+extension backends.
 
 Concrete subtypes must have an `evaluator` field (`VectorEvaluator` or
-`NamedTupleEvaluator`). In exchange they inherit `dimension` and
-the callable forwarder automatically.
+`NamedTupleEvaluator`). In exchange they inherit the callable forwarder automatically.
 """
-abstract type AbstractPrepared{Mode} end
+abstract type AbstractPrepared end
 
 """
     prepare(problem, values::NamedTuple)
     prepare(problem, x::AbstractVector{<:Real})
-    prepare(adtype, problem, values_or_vector; check_dims::Bool=true, mode::Symbol=:gradient)
+    prepare(adtype, problem, values_or_vector; check_dims::Bool=true)
 
 Prepare a callable evaluator for `problem`.
 
@@ -31,55 +32,62 @@ backend-specific three-argument methods.
 The keyword argument `check_dims` (default `true`) controls whether the prepared
 evaluator validates that inputs match the prototype used during preparation.
 Pass `check_dims=false` when the caller guarantees input structure.
-
-The keyword argument `mode` (default `:gradient`) selects what derivative the
-prepared evaluator can compute. Supported values are `:gradient` (scalar-valued
-`f`, used with [`value_and_gradient`](@ref)) and `:jacobian` (vector-valued `f`,
-used with [`value_and_jacobian`](@ref)). Jacobian preparation is only supported
-on the vector-input path.
 """
 function prepare end
 
-function _check_mode(mode::Symbol)
-    mode === :gradient ||
-        mode === :jacobian ||
-        throw(ArgumentError("`mode` must be `:gradient` or `:jacobian`, got `:$(mode)`."))
-    return nothing
-end
+_is_scalar_output(y) = y isa Number
+_is_vector_output(y) = y isa AbstractVector
 
-function _check_namedtuple_mode(mode::Symbol)
-    mode === :gradient || throw(
+function _assert_gradient_output(y)
+    _is_scalar_output(y) || throw(
         ArgumentError(
-            "`mode=:$(mode)` is only supported on the vector-input path; NamedTuple inputs are gradient-only.",
+            "`value_and_gradient` requires a scalar-valued function; got $(typeof(y))."
         ),
     )
     return nothing
 end
 
-# Identity defaults: AD backend extensions call the 2-arg form to obtain a
-# callable from the problem. Downstream packages (e.g. DynamicPPL) pass
-# already-callable objects, so the safe default is to return them unchanged.
+function _assert_jacobian_output(y)
+    _is_vector_output(y) || throw(
+        ArgumentError(
+            "`value_and_jacobian` requires the prepared function to return an AbstractVector; got $(typeof(y)).",
+        ),
+    )
+    return nothing
+end
+
+function _assert_supported_output(y)
+    (_is_scalar_output(y) || _is_vector_output(y)) || throw(
+        ArgumentError(
+            "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
+        ),
+    )
+    return nothing
+end
+
+_supports_gradient(_) = false
+
+# Downstream packages (e.g. DynamicPPL) pass already-callable objects,
+# so the safe default is to return them unchanged.
 prepare(problem, values::NamedTuple) = problem
 prepare(problem, x::AbstractVector{<:Real}) = problem
 
 """
     value_and_gradient(prepared, x::AbstractVector{<:Real})
 
-Return `(value, gradient::AbstractVector)` for an evaluator prepared with a vector.
+Return `(value, gradient::AbstractVector)` for a scalar-valued evaluator prepared with a vector.
 
-Requires an evaluator prepared with `mode=:gradient`. A NamedTuple overload is
-also available when the evaluator was prepared with a `NamedTuple` prototype.
+A NamedTuple overload is also available when the evaluator was prepared with a
+`NamedTuple` prototype.
 """
 function value_and_gradient end
 
 """
     value_and_jacobian(prepared, x::AbstractVector{<:Real})
 
-Return `(value::AbstractVector, jacobian::AbstractMatrix)` for an evaluator
-prepared with a vector and `mode=:jacobian`.
-The returned `jacobian` has shape `(length(value), length(x))`.
-
-Requires an evaluator prepared with `mode=:jacobian`.
+Return `(value::AbstractVector, jacobian::AbstractMatrix)` for a vector-valued
+evaluator prepared with a vector. The returned `jacobian` has shape
+`(length(value), length(x))`.
 """
 function value_and_jacobian end
 
@@ -89,33 +97,13 @@ function value_and_jacobian end
 Compare `value_and_gradient(prepared, x)` against a finite-difference reference.
 Throws an informative error on mismatch. Returns `nothing`.
 
-Errors if `prepared` was built with `mode=:jacobian`; only gradient-mode
-evaluators are supported.
-
 Requires loading FiniteDifferences so the extension-backed implementation is available.
 """
 function test_autograd(prepared, x; atol=1e-5, rtol=1e-5)
-    _assert_gradient_capability(prepared)
     return error(
         "`test_autograd` requires loading FiniteDifferences to activate the AbstractPPLFiniteDifferencesExt implementation.",
     )
 end
-
-_assert_gradient_capability(_) = nothing
-function _assert_gradient_capability(::AbstractPrepared{:jacobian})
-    throw(
-        ArgumentError(
-            "`test_autograd` only supports gradient-mode evaluators; got an evaluator prepared with `mode=:jacobian`.",
-        ),
-    )
-end
-
-"""
-    dimension(prepared)::Int
-
-Return the number of scalar entries in the vector input expected by a prepared evaluator.
-"""
-function dimension end
 
 """
     VectorEvaluator{Validate}(f, dim)
@@ -154,18 +142,16 @@ VectorEvaluator(f, dim::Int) = VectorEvaluator{true}(f, dim)
 function value_and_gradient(e::VectorEvaluator{V,true}, x::AbstractVector{<:Real}) where {V}
     length(x) == 0 ||
         throw(DimensionMismatch("Expected an empty vector, but got length $(length(x))."))
-    return (e.f(x), similar(x))
+    val = e.f(x)
+    _assert_gradient_output(val)
+    return (val, similar(x))
 end
 
 function value_and_jacobian(e::VectorEvaluator{V,true}, x::AbstractVector{<:Real}) where {V}
     length(x) == 0 ||
         throw(DimensionMismatch("Expected an empty vector, but got length $(length(x))."))
     val = e.f(x)
-    val isa AbstractVector || throw(
-        ArgumentError(
-            "`mode=:jacobian` requires `f(x)` to return an AbstractVector; got $(typeof(val)).",
-        ),
-    )
+    _assert_jacobian_output(val)
     return (val, similar(x, length(val), 0))
 end
 
@@ -192,15 +178,6 @@ struct NamedTupleEvaluator{Validate,F,P<:NamedTuple}
 end
 
 NamedTupleEvaluator(f, inputspec::NamedTuple) = NamedTupleEvaluator{true}(f, inputspec)
-
-dimension(e::VectorEvaluator) = e.dim
-function dimension(::NamedTupleEvaluator)
-    throw(
-        ArgumentError(
-            "`dimension` is only available for evaluators prepared with a vector of floating-point numbers.",
-        ),
-    )
-end
 
 function (e::VectorEvaluator{true})(x::AbstractVector)
     length(x) == e.dim || throw(
@@ -240,9 +217,7 @@ function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
 end
 _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
-# Shared behaviours for all AbstractPrepared subtypes. These rely on the
-# `evaluator` field contract, so they are defined after the evaluator types.
-dimension(p::AbstractPrepared) = dimension(p.evaluator)
+# These rely on the `evaluator` field contract, so they are defined after the evaluator types.
 (p::AbstractPrepared)(x) = p.evaluator(x)
 
 function __init__()
@@ -251,20 +226,6 @@ function __init__()
             print(
                 io,
                 "\nCalling `prepare` with an AD backend requires loading the corresponding extension (e.g., `using ForwardDiff` or `using DifferentiationInterface`).",
-            )
-        elseif exc.f === value_and_gradient &&
-            !isempty(args) &&
-            args[1] isa AbstractPrepared{:jacobian}
-            print(
-                io,
-                "\nThis evaluator was prepared with `mode=:jacobian`; use `value_and_jacobian` instead.",
-            )
-        elseif exc.f === value_and_jacobian &&
-            !isempty(args) &&
-            args[1] isa AbstractPrepared{:gradient}
-            print(
-                io,
-                "\nThis evaluator was prepared with `mode=:gradient`; use `value_and_gradient` instead.",
             )
         end
     end

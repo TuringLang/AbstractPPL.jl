@@ -26,7 +26,6 @@ include(joinpath(@__DIR__, "..", "ad_tests.jl"))
         x0,
         [2.0, 3.0, 4.0],
     )
-    run_shared_invalid_mode_tests(ADTypes.AutoEnzyme(), x0)
 
     @testset "honors AutoEnzyme mode" begin
         fwd = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward))

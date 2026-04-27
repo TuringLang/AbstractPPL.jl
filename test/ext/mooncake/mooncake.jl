@@ -25,7 +25,6 @@ include(joinpath(@__DIR__, "..", "ad_tests.jl"))
             run_shared_gradient_tests(adtype, x0, x)
             run_shared_jacobian_tests(adtype, x0, [2.0, 3.0, 4.0])
             run_shared_namedtuple_tests(adtype, values0, values)
-            run_shared_invalid_mode_tests(adtype, x0)
 
             @testset "Mooncake cache spec enforcement" begin
                 prepared = AbstractPPL.prepare(adtype, QuadraticProblem(), x0)

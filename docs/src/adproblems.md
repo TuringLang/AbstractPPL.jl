@@ -64,13 +64,13 @@ The gradient has the same field names as the input.
 
 ## Jacobians
 
-For vector-valued functions, use `mode=:jacobian`:
+For vector-valued functions, call `value_and_jacobian`:
 
 ```@example ad
 struct VecModel end
 (::VecModel)(x::AbstractVector) = [x[1] * x[2], x[2] + x[3]]
 
-prepared_jac = prepare(AutoForwardDiff(), VecModel(), zeros(3); mode=:jacobian)
+prepared_jac = prepare(AutoForwardDiff(), VecModel(), zeros(3))
 val, jac = value_and_jacobian(prepared_jac, [2.0, 3.0, 4.0])
 val, jac
 ```
@@ -111,13 +111,13 @@ finite-difference estimate.
 
 Each backend is loaded as a package extension; load the package to activate it:
 
-| Package | `adtype` | Notes |
-|---------|----------|-------|
-| `ForwardDiff` | `AutoForwardDiff()` | Vector and NamedTuple inputs |
-| `Mooncake` | `AutoMooncake()` / `AutoMooncakeForward()` | Vector and NamedTuple inputs |
-| `Enzyme` | `AutoEnzyme()` | Vector inputs; forward and reverse mode |
-| `FiniteDifferences` | `AutoFiniteDifferences(; fdm)` | Vector and NamedTuple; also enables [`test_autograd`](@ref AbstractPPL.test_autograd) |
-| Any `DifferentiationInterface`-compatible backend | the corresponding `ADTypes` type | Vector inputs |
+| Package                                           | `adtype`                                   | Notes                                                                                 |
+|:------------------------------------------------- |:------------------------------------------ |:------------------------------------------------------------------------------------- |
+| `ForwardDiff`                                     | `AutoForwardDiff()`                        | Vector and NamedTuple inputs                                                          |
+| `Mooncake`                                        | `AutoMooncake()` / `AutoMooncakeForward()` | Vector and NamedTuple inputs                                                          |
+| `Enzyme`                                          | `AutoEnzyme()`                             | Vector inputs; forward and reverse mode                                               |
+| `FiniteDifferences`                               | `AutoFiniteDifferences(; fdm)`             | Vector and NamedTuple; also enables [`test_autograd`](@ref AbstractPPL.test_autograd) |
+| Any `DifferentiationInterface`-compatible backend | the corresponding `ADTypes` type           | Vector inputs                                                                         |
 
 ## API reference
 
@@ -126,5 +126,4 @@ AbstractPPL.prepare
 AbstractPPL.value_and_gradient
 AbstractPPL.value_and_jacobian
 AbstractPPL.test_autograd
-AbstractPPL.ADProblems.dimension
 ```

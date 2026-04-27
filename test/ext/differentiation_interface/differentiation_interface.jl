@@ -56,5 +56,4 @@ end
         test_autograd_kwargs=(; atol=1e-4, rtol=1e-4, fdm),
     )
     run_shared_jacobian_tests(adtype, x0, [2.0, 3.0, 4.0]; atol=1e-6, rtol=1e-6)
-    run_shared_invalid_mode_tests(adtype, x0)
 end

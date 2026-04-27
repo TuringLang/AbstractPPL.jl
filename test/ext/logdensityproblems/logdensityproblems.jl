@@ -7,7 +7,7 @@ using AbstractPPL
 using LogDensityProblems: LogDensityProblems
 using Test
 
-struct _NTPrepared <: AbstractPPL.ADProblems.AbstractPrepared{:gradient}
+struct _NTPrepared <: AbstractPPL.ADProblems.AbstractPrepared
     evaluator::AbstractPPL.ADProblems.NamedTupleEvaluator
 end
 
@@ -29,15 +29,11 @@ end
 
     @testset "type-level capabilities" begin
         # Type-level dispatch follows the LDP convention (capabilities(ℓ) = capabilities(typeof(ℓ)))
-        @test LogDensityProblems.capabilities(
-            AbstractPPL.ADProblems.AbstractPrepared{:gradient}
-        ) == LogDensityProblems.LogDensityOrder{1}()
-        @test LogDensityProblems.capabilities(
-            AbstractPPL.ADProblems.AbstractPrepared{:jacobian}
-        ) == LogDensityProblems.LogDensityOrder{0}()
+        @test LogDensityProblems.capabilities(AbstractPPL.ADProblems.AbstractPrepared) ==
+            LogDensityProblems.LogDensityOrder{0}()
     end
 
-    @testset "NT-backed gradient-mode AbstractPrepared" begin
+    @testset "NT-backed AbstractPrepared" begin
         # capabilities must be LogDensityOrder{0} for NT-backed prepared objects because
         # logdensity_and_gradient expects a NamedTuple, not the flat vector LDP callers pass.
         p = _NTPrepared(
