@@ -4,12 +4,12 @@ Pkg.develop(; path=joinpath(@__DIR__, "..", "..", ".."))
 Pkg.instantiate()
 
 using AbstractPPL
-using ADTypes: AutoMooncake, AutoMooncakeForward
-using Mooncake
+using ADTypes: AutoForwardDiff
+using ForwardDiff
 using Test
 
 include(joinpath(@__DIR__, "..", "..", "autograd_tests.jl"))
 
-@testset "AbstractPPLMooncakeExt" begin
-    run_autograd_tests(AutoMooncake(); extra_jacobian_modes=(AutoMooncakeForward(),))
+@testset "AbstractPPLForwardDiffExt" begin
+    run_autograd_tests(AutoForwardDiff(); namedtuple=true)
 end

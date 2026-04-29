@@ -2,16 +2,16 @@
 #
 # Usage (from the repo root):
 #   LABEL=enzyme                    julia test/run_extra.jl
-#   LABEL=differentiation_interface julia test/run_extra.jl
-#   LABEL=forward_diff              julia test/run_extra.jl
+#   LABEL=differentiationinterface julia test/run_extra.jl
+#   LABEL=forwarddiff              julia test/run_extra.jl
 #   LABEL=logdensityproblems        julia test/run_extra.jl
 #   LABEL=mooncake                  julia test/run_extra.jl
 #   LABEL=reversediff               julia test/run_extra.jl
 
 const TEST_SUBDIRS = (
     enzyme="integration",
-    differentiation_interface="ext",
-    forward_diff="ext",
+    differentiationinterface="ext",
+    forwarddiff="ext",
     logdensityproblems="ext",
     mooncake="ext",
     reversediff="integration",

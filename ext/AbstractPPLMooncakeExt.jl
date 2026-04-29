@@ -47,8 +47,8 @@ function AbstractPPL.prepare(
 )
     raw = AbstractPPL.prepare(problem, x)
     evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, length(x))
-    # Empty inputs short-circuit at the `value_and_*` level; Mooncake has no
-    # tape to build for length-zero arrays.
+    # Mooncake has no tape to build for length-zero arrays; short-circuit
+    # in `value_and_gradient` / `value_and_jacobian` instead.
     length(x) == 0 && return MooncakePrepared(evaluator, nothing, nothing)
     y = evaluator(x)
     _assert_supported_output(y)

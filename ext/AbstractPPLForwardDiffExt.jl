@@ -64,10 +64,10 @@ function AbstractPPL.prepare(
 )
     raw = AbstractPPL.prepare(problem, x)
     evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, length(x))
-    # Empty inputs short-circuit at the `value_and_*` level; ForwardDiff has no
-    # configuration to build for length-zero arrays.
+    # ForwardDiff has no configuration to build for length-zero arrays; short-circuit
+    # in `value_and_gradient` / `value_and_jacobian` instead.
     length(x) == 0 &&
-        return ForwardDiffPrepared(evaluator, evaluator, nothing, nothing, nothing, nothing)
+        return ForwardDiffPrepared(evaluator, nothing, nothing, nothing, nothing, nothing)
     # Hand ForwardDiff an unchecked wrapper so the per-call dim check does not
     # land in the dual-number hot path; user-visible `prepared(x)` still goes
     # through `evaluator` (whose `check_dims` honors the caller's request).

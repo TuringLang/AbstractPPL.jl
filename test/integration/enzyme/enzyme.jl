@@ -9,7 +9,7 @@ using DifferentiationInterface
 using Enzyme
 using Test
 
-include(joinpath(@__DIR__, "..", "..", "ext", "ad_tests.jl"))
+include(joinpath(@__DIR__, "..", "..", "autograd_tests.jl"))
 
 struct StatefulQuadraticProblem
     data::Vector{Float64}
@@ -26,25 +26,15 @@ end
 @testset "Enzyme via DifferentiationInterface" begin
     x0 = zeros(3)
     x = [3.0, 1.0, 2.0]
+    enzyme_fwd = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward))
+    enzyme_rev = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
 
-    run_shared_gradient_tests(ADTypes.AutoEnzyme(), x0, x)
-    run_shared_jacobian_tests(
-        ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward)),
-        x0,
-        [2.0, 3.0, 4.0],
-    )
-    run_shared_jacobian_tests(
-        ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse)),
-        x0,
-        [2.0, 3.0, 4.0],
-    )
+    run_autograd_tests(ADTypes.AutoEnzyme(); extra_jacobian_modes=(enzyme_fwd, enzyme_rev))
 
     @testset "honors AutoEnzyme mode" begin
-        fwd = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward))
-        rev = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
         problem = QuadraticProblem()
-        prepared_fwd = AbstractPPL.prepare(fwd, problem, x0)
-        prepared_rev = AbstractPPL.prepare(rev, problem, x0)
+        prepared_fwd = AbstractPPL.prepare(enzyme_fwd, problem, x0)
+        prepared_rev = AbstractPPL.prepare(enzyme_rev, problem, x0)
 
         val_fwd, grad_fwd = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
             prepared_fwd, x
@@ -60,9 +50,8 @@ end
     end
 
     @testset "normalizes single-parameter forward gradients" begin
-        fwd = ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward))
         x1 = [3.0]
-        prepared_fwd = AbstractPPL.prepare(fwd, QuadraticProblem(), zeros(1))
+        prepared_fwd = AbstractPPL.prepare(enzyme_fwd, QuadraticProblem(), zeros(1))
 
         val_fwd, grad_fwd = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
             prepared_fwd, x1
@@ -72,9 +61,7 @@ end
     end
 
     prepared = AbstractPPL.prepare(
-        ADTypes.AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward)),
-        StatefulQuadraticProblem([0.5, 1.5]),
-        zeros(2),
+        enzyme_fwd, StatefulQuadraticProblem([0.5, 1.5]), zeros(2)
     )
     val, grad = @inferred Tuple{Float64,Vector{Float64}} AbstractPPL.value_and_gradient(
         prepared, [1.0, 2.0]

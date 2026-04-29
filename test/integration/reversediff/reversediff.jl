@@ -9,7 +9,7 @@ using DifferentiationInterface
 using ReverseDiff
 using Test
 
-include(joinpath(@__DIR__, "..", "..", "ext", "ad_tests.jl"))
+include(joinpath(@__DIR__, "..", "..", "autograd_tests.jl"))
 
 struct StatefulQuadraticProblem
     data::Vector{Float64}
@@ -36,10 +36,7 @@ function repeated_call_allocs(f)
 end
 
 @testset "ReverseDiff via DifferentiationInterface" begin
-    x0 = zeros(3)
-    x = [3.0, 1.0, 2.0]
-
-    run_shared_gradient_tests(ADTypes.AutoReverseDiff(), x0, x)
+    run_autograd_tests(ADTypes.AutoReverseDiff())
 
     @testset "compiled prep reduces repeated-call allocations" begin
         problem = StatefulQuadraticProblem(randn(10))

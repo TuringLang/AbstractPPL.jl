@@ -53,8 +53,8 @@ jobs:
       matrix:
         label:
           - enzyme
-          - differentiation_interface
-          - forward_diff
+          - differentiationinterface
+          - forwarddiff
           - logdensityproblems
           - mooncake
           - reversediff
