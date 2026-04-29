@@ -51,4 +51,13 @@ using Test
         x = (a=1.0, b=[2.0, 3.0])
         @test_throws r"Expected a vector of length 3" unflatten_to!!(x, [1.0, 2.0])
     end
+
+    @testset "unflatten_to!! type stability" begin
+        @inferred unflatten_to!!((a=1.0, b=2.0, c=3.0), zeros(3))
+        @inferred unflatten_to!!((a=1.0, b=[2.0, 3.0], c=3.0), zeros(4))
+        @inferred unflatten_to!!((a=(p=1.0, q=2.0), b=3.0), zeros(3))
+        @inferred unflatten_to!!((a=1.0, b=(2.0, 3.0)), zeros(3))
+        @inferred unflatten_to!!(NamedTuple(), Float64[])
+        @inferred unflatten_to!!((1.0, [2.0, 3.0], 3.0), zeros(4))
+    end
 end

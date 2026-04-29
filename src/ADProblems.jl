@@ -1,5 +1,7 @@
 module ADProblems
 
+using ADTypes: AbstractADType
+
 @static if VERSION >= v"1.11.0"
     eval(Meta.parse("public prepare, value_and_gradient, value_and_jacobian"))
 end
@@ -204,7 +206,8 @@ _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
 function __init__()
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
-        if exc.f === prepare && length(args) >= 3
+        # `args` are argument types, not values (see `Base.Experimental.show_error_hints`).
+        if exc.f === prepare && length(args) >= 1 && args[1] <: AbstractADType
             print(
                 io,
                 "\nCalling `prepare` with an AD backend requires loading the corresponding extension (e.g., `using DifferentiationInterface`).",

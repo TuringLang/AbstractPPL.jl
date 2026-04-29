@@ -48,7 +48,6 @@ jobs:
   ext:
     name: Ext (${{ matrix.label }}, ${{ matrix.version }})
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.label == 'enzyme' }}
     strategy:
       fail-fast: false
       matrix:
