@@ -38,17 +38,25 @@ end
             LogDensityProblems.LogDensityOrder{0}()
     end
 
-    @testset "Vector-backed AbstractPrepared" begin
-        p = _VectorPrepared(AbstractPPL.ADProblems.VectorEvaluator(sum, 3))
-        @test LogDensityProblems.capabilities(p) == LogDensityProblems.LogDensityOrder{1}()
-    end
+    @testset "AbstractPrepared without _supports_gradient override" begin
+        # Default trait is `false`; no gradient implementation exists.
+        p_vec = _VectorPrepared(AbstractPPL.ADProblems.VectorEvaluator(sum, 3))
+        @test LogDensityProblems.capabilities(p_vec) ==
+            LogDensityProblems.LogDensityOrder{0}()
 
-    @testset "NT-backed AbstractPrepared" begin
-        p = _NTPrepared(
+        p_nt = _NTPrepared(
             AbstractPPL.ADProblems.NamedTupleEvaluator(
                 x -> x.a + sum(x.b), (a=0.0, b=zeros(2))
             ),
         )
-        @test LogDensityProblems.capabilities(p) == LogDensityProblems.LogDensityOrder{0}()
+        @test LogDensityProblems.capabilities(p_nt) ==
+            LogDensityProblems.LogDensityOrder{0}()
+    end
+
+    @testset "AbstractPrepared with _supports_gradient override" begin
+        # An override on the concrete subtype lifts the capability.
+        AbstractPPL.ADProblems._supports_gradient(::Type{<:_VectorPrepared}) = true
+        p = _VectorPrepared(AbstractPPL.ADProblems.VectorEvaluator(sum, 3))
+        @test LogDensityProblems.capabilities(p) == LogDensityProblems.LogDensityOrder{1}()
     end
 end

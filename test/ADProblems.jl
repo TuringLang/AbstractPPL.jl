@@ -55,7 +55,7 @@ end
         ve = AbstractPPL.ADProblems.VectorEvaluator(sum, 3)
         @test ve([1.0, 2.0, 3.0]) == 6.0
         @test_throws DimensionMismatch ve([1.0, 2.0])
-        @test_throws MethodError ve([1, 2, 3])
+        @test_throws r"floating-point" ve([1, 2, 3])
 
         ne = AbstractPPL.ADProblems.NamedTupleEvaluator(
             x -> x.a + sum(x.b), (a=0.0, b=zeros(2))
@@ -114,17 +114,6 @@ end
         @test_throws MethodError AbstractPPL.ADProblems.prepare(
             ADTypes.AutoEnzyme(), problem, x0
         )
-    end
-
-    @testset "flatten / unflatten edge cases" begin
-        empty = NamedTuple()
-        @test AbstractPPL.Utils.flatten_to!!(nothing, empty) == Float64[]
-        @test AbstractPPL.Utils.unflatten_to!!(empty, Float64[]) == empty
-
-        view_values = (x=@view([1.0, 2.0, 3.0][2:3]),)
-        flat = AbstractPPL.Utils.flatten_to!!(nothing, view_values)
-        rebuilt = AbstractPPL.Utils.unflatten_to!!(view_values, flat)
-        @test collect(rebuilt.x) == [2.0, 3.0]
     end
 
     @testset "zero-dimensional prepared evaluator" begin

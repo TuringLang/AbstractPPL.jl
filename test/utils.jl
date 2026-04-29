@@ -52,6 +52,17 @@ using Test
         @test_throws r"Expected a vector of length 3" unflatten_to!!(x, [1.0, 2.0])
     end
 
+    @testset "edge cases" begin
+        empty = NamedTuple()
+        @test flatten_to!!(nothing, empty) == Float64[]
+        @test unflatten_to!!(empty, Float64[]) == empty
+
+        view_values = (x=@view([1.0, 2.0, 3.0][2:3]),)
+        flat = flatten_to!!(nothing, view_values)
+        rebuilt = unflatten_to!!(view_values, flat)
+        @test collect(rebuilt.x) == [2.0, 3.0]
+    end
+
     @testset "unflatten_to!! type stability" begin
         @inferred unflatten_to!!((a=1.0, b=2.0, c=3.0), zeros(3))
         @inferred unflatten_to!!((a=1.0, b=[2.0, 3.0], c=3.0), zeros(4))

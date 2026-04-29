@@ -1,7 +1,7 @@
 module AbstractPPLLogDensityProblemsExt
 
 using AbstractPPL: AbstractPPL
-using AbstractPPL.ADProblems: AbstractPrepared, VectorEvaluator
+using AbstractPPL.ADProblems: AbstractPrepared, VectorEvaluator, _supports_gradient
 using LogDensityProblems: LogDensityProblems
 
 LogDensityProblems.logdensity(p::AbstractPrepared, x) = p(x)
@@ -12,27 +12,28 @@ function LogDensityProblems.dimension(p::AbstractPrepared)
 end
 LogDensityProblems.dimension(e::VectorEvaluator) = e.dim
 
-function LogDensityProblems.capabilities(::Type{<:AbstractPrepared})
-    return LogDensityProblems.LogDensityOrder{0}()
+# Gradient capability is delegated to the `_supports_gradient` trait so that
+# only prepared shapes with an actual gradient implementation advertise order 1.
+function LogDensityProblems.capabilities(::Type{T}) where {T<:AbstractPrepared}
+    return if _supports_gradient(T)
+        LogDensityProblems.LogDensityOrder{1}()
+    else
+        LogDensityProblems.LogDensityOrder{0}()
+    end
 end
-
 function LogDensityProblems.capabilities(p::AbstractPrepared)
-    return _prepared_capabilities(p.evaluator)
+    return LogDensityProblems.capabilities(typeof(p))
 end
 
-_prepared_capabilities(_) = LogDensityProblems.LogDensityOrder{0}()
-_prepared_capabilities(::VectorEvaluator) = LogDensityProblems.LogDensityOrder{1}()
-
-function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
-    return LogDensityProblems.LogDensityOrder{0}()
+function LogDensityProblems.capabilities(::Type{T}) where {T<:VectorEvaluator}
+    return if _supports_gradient(T)
+        LogDensityProblems.LogDensityOrder{1}()
+    else
+        LogDensityProblems.LogDensityOrder{0}()
+    end
 end
-
-function LogDensityProblems.capabilities(::Type{T}) where {T<:VectorEvaluator{<:Any,true}}
-    return LogDensityProblems.LogDensityOrder{1}()
-end
-
-function LogDensityProblems.capabilities(::VectorEvaluator{V,true}) where {V}
-    return LogDensityProblems.LogDensityOrder{1}()
+function LogDensityProblems.capabilities(e::VectorEvaluator)
+    return LogDensityProblems.capabilities(typeof(e))
 end
 
 function LogDensityProblems.logdensity_and_gradient(p::AbstractPrepared, x)

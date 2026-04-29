@@ -3,6 +3,7 @@ module AbstractPPLDifferentiationInterfaceExt
 using AbstractPPL: AbstractPPL
 using AbstractPPL.ADProblems:
     _assert_jacobian_output, _assert_supported_output, _is_scalar_output
+import AbstractPPL.ADProblems: _supports_gradient
 using ADTypes
 using DifferentiationInterface: DifferentiationInterface as DI
 
@@ -16,6 +17,10 @@ struct DIPrepared{UseContext,E,B,F,GP,JP} <: AbstractPPL.ADProblems.AbstractPrep
     gradient_prep::GP
     jacobian_prep::JP
 end
+
+# Gradient is implemented iff `gradient_prep` is non-`nothing`.
+_supports_gradient(::Type{<:DIPrepared{<:Any,<:Any,<:Any,<:Any,Nothing}}) = false
+_supports_gradient(::Type{<:DIPrepared}) = true
 
 function DIPrepared(
     ::Val{UseContext}, evaluator, backend, target, gradient_prep, jacobian_prep
@@ -98,6 +103,8 @@ end
     return _value_and_jacobian(p, x)
 end
 
+# Only `{true}` is reachable: the jacobian path in `prepare` always sets
+# `use_context = Val(true)`, so a `{false}` overload would be dead code.
 @inline function _value_and_jacobian(p::DIPrepared{true}, x)
     return DI.value_and_jacobian(
         p.target, p.jacobian_prep, p.backend, x, DI.Constant(p.evaluator)

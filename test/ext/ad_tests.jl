@@ -42,7 +42,7 @@ function run_shared_gradient_tests(adtype, x0, x; atol=0, rtol=1e-10)
         @test grad ≈ [6.0, 2.0, 4.0] atol = atol rtol = rtol
 
         @test_throws DimensionMismatch prepared([3.0, 1.0, 2.0, 99.0])
-        @test_throws MethodError prepared([3, 1, 2])
+        @test_throws r"floating-point" prepared([3, 1, 2])
     end
 end
 

@@ -2,10 +2,6 @@ module ADProblems
 
 using ADTypes: AbstractADType
 
-@static if VERSION >= v"1.11.0"
-    eval(Meta.parse("public prepare, value_and_gradient, value_and_jacobian"))
-end
-
 """
     AbstractPrepared
 
@@ -180,10 +176,19 @@ function (e::NamedTupleEvaluator{true})(values::NamedTuple)
 end
 (e::NamedTupleEvaluator{false})(values::NamedTuple) = e.f(values)
 
-# Two separate overloads rather than one `(::VectorEvaluator)(::AbstractVector{<:Integer})`
-# to avoid ambiguity with `(::VectorEvaluator{true})(::AbstractVector)`.
-(e::VectorEvaluator{true})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
-(e::VectorEvaluator{false})(x::AbstractVector{<:Integer}) = throw(MethodError(e, (x,)))
+# Reject integer vectors so they don't silently flow into AD backends, where
+# they typically produce confusing failures. Two overloads (one per `Validate`)
+# rather than one parametric method, to avoid an ambiguity with the
+# `(::VectorEvaluator{true})(::AbstractVector)` call method above.
+function _reject_integer_input(e::VectorEvaluator, x)
+    throw(
+        ArgumentError(
+            "VectorEvaluator requires a vector of floating-point values, but received an `$(typeof(x))`. Convert to a floating-point vector (e.g. `Float64.(x)`) before calling.",
+        ),
+    )
+end
+(e::VectorEvaluator{true})(x::AbstractVector{<:Integer}) = _reject_integer_input(e, x)
+(e::VectorEvaluator{false})(x::AbstractVector{<:Integer}) = _reject_integer_input(e, x)
 
 """
     _assert_namedtuple_shape(e::NamedTupleEvaluator, values)
@@ -203,6 +208,19 @@ _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
 # These rely on the `evaluator` field contract, so they are defined after the evaluator types.
 (p::AbstractPrepared)(x) = p.evaluator(x)
+
+"""
+    _supports_gradient(::Type{T}) -> Bool
+
+Internal trait: `true` iff `value_and_gradient(::T, x)` is callable on `T`.
+
+Used by the LogDensityProblems extension to advertise `LogDensityOrder{1}` only
+for prepared shapes that actually implement gradients. Each backend extension
+overrides for its concrete `AbstractPrepared` subtype.
+"""
+_supports_gradient(::Type) = false
+_supports_gradient(::Type{<:VectorEvaluator{<:Any,true}}) = true
+_supports_gradient(x) = _supports_gradient(typeof(x))
 
 function __init__()
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
