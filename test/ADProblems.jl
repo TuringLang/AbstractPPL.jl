@@ -40,16 +40,6 @@ function AbstractPPL.value_and_gradient(p::DummyADPrepared, x::AbstractVector{<:
     return (sum(x), ones(length(x)))
 end
 
-struct ZeroDimProblem end
-struct ZeroDimVecProblem end
-
-function AbstractPPL.prepare(::ZeroDimProblem, ::AbstractVector{<:Real})
-    return (_::AbstractVector) -> 7.5
-end
-function AbstractPPL.prepare(::ZeroDimVecProblem, ::AbstractVector{<:Real})
-    return (_::AbstractVector) -> [2.0, 3.0]
-end
-
 @testset "ADProblem interface" begin
     @testset "explicit evaluator shapes" begin
         ve = AbstractPPL.ADProblems.VectorEvaluator(sum, 3)
@@ -64,7 +54,7 @@ end
         @test ne.inputspec == (a=0.0, b=zeros(2))
         @test_throws MethodError ne([1.0, 2.0, 3.0])
 
-        # `Validate=false` skips the per-call shape checks.
+        # `CheckInput=false` skips the per-call shape checks.
         ve_unchecked = AbstractPPL.ADProblems.VectorEvaluator{false}(sum, 3)
         @test ve_unchecked([1.0, 2.0]) == 3.0
 
@@ -114,23 +104,5 @@ end
         @test_throws MethodError AbstractPPL.ADProblems.prepare(
             ADTypes.AutoEnzyme(), problem, x0
         )
-    end
-
-    @testset "zero-dimensional prepared evaluator" begin
-        x = Float64[]
-
-        prepared = AbstractPPL.ADProblems.VectorEvaluator{true}(
-            AbstractPPL.prepare(ZeroDimProblem(), x), 0
-        )
-        val, grad = value_and_gradient(prepared, x)
-        @test val == 7.5
-        @test grad == Float64[]
-
-        prepared_jac = AbstractPPL.ADProblems.VectorEvaluator{true}(
-            AbstractPPL.prepare(ZeroDimVecProblem(), x), 0
-        )
-        valj, jac = value_and_jacobian(prepared_jac, x)
-        @test valj == [2.0, 3.0]
-        @test size(jac) == (2, 0)
     end
 end

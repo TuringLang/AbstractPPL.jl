@@ -20,12 +20,9 @@ function LogDensityProblems.capabilities(p::AbstractPrepared)
     return LogDensityProblems.capabilities(typeof(p))
 end
 
-# Bare `VectorEvaluator` only carries a gradient when trivial (dim == 0).
+# A bare `VectorEvaluator` is the no-AD shape; only `AbstractPrepared` advertises gradient.
 function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
     return LogDensityProblems.LogDensityOrder{0}()
-end
-function LogDensityProblems.capabilities(::Type{<:VectorEvaluator{<:Any,true}})
-    return LogDensityProblems.LogDensityOrder{1}()
 end
 function LogDensityProblems.capabilities(e::VectorEvaluator)
     return LogDensityProblems.capabilities(typeof(e))
@@ -33,9 +30,6 @@ end
 
 function LogDensityProblems.logdensity_and_gradient(p::AbstractPrepared, x)
     return AbstractPPL.value_and_gradient(p, x)
-end
-function LogDensityProblems.logdensity_and_gradient(e::VectorEvaluator{V,true}, x) where {V}
-    return AbstractPPL.value_and_gradient(e, x)
 end
 
 end # module

@@ -67,6 +67,8 @@ end
             () -> AbstractPPL.value_and_gradient(prepared_compiled, x)
         )
 
+        # Compiled tape reuse should allocate strictly less than the
+        # tape-recording path on every call.
         @test allocs_compiled < allocs_uncompiled
     end
 end
