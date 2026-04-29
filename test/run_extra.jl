@@ -1,15 +1,19 @@
 # Run a named AD-extension test in its own isolated Julia environment.
 #
 # Usage (from the repo root):
-#   LABEL=enzyme                    julia test/run_ext_tests.jl
-#   LABEL=differentiation_interface julia test/run_ext_tests.jl
-#   LABEL=logdensityproblems        julia test/run_ext_tests.jl
-#   LABEL=reversediff               julia test/run_ext_tests.jl
+#   LABEL=enzyme                    julia test/run_extra.jl
+#   LABEL=differentiation_interface julia test/run_extra.jl
+#   LABEL=forward_diff              julia test/run_extra.jl
+#   LABEL=logdensityproblems        julia test/run_extra.jl
+#   LABEL=mooncake                  julia test/run_extra.jl
+#   LABEL=reversediff               julia test/run_extra.jl
 
 const TEST_SUBDIRS = (
     enzyme="integration",
     differentiation_interface="ext",
+    forward_diff="ext",
     logdensityproblems="ext",
+    mooncake="ext",
     reversediff="integration",
 )
 const VALID_LABELS = string.(keys(TEST_SUBDIRS))

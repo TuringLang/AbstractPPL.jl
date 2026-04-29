@@ -21,12 +21,16 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 [weakdeps]
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
+Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 
 [extensions]
 AbstractPPLDifferentiationInterfaceExt = ["DifferentiationInterface"]
 AbstractPPLDistributionsExt = ["Distributions", "LinearAlgebra"]
+AbstractPPLForwardDiffExt = ["ForwardDiff"]
 AbstractPPLLogDensityProblemsExt = ["LogDensityProblems"]
+AbstractPPLMooncakeExt = ["Mooncake"]
 
 [compat]
 ADTypes = "1"
@@ -36,10 +40,12 @@ BangBang = "0.4"
 DensityInterface = "0.4"
 DifferentiationInterface = "0.6, 0.7"
 Distributions = "0.25"
+ForwardDiff = "0.10, 1"
 JSON = "0.19 - 0.21, 1"
 LogDensityProblems = "2"
 LinearAlgebra = "<0.0.1, 1"
 MacroTools = "0.5"
+Mooncake = "0.5.27"
 OrderedCollections = "1.8.1"
 Random = "1.6"
 StatsBase = "0.32, 0.33, 0.34"
