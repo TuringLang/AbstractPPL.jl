@@ -178,11 +178,10 @@ function (e::NamedTupleEvaluator{true})(values::NamedTuple)
 end
 (e::NamedTupleEvaluator{false})(values::NamedTuple) = e.f(values)
 
-# Reject integer vectors so they don't silently flow into AD backends, where
-# they typically produce confusing failures. Two overloads (one per `Validate`)
-# rather than one parametric method, to avoid an ambiguity with the
-# `(::VectorEvaluator{true})(::AbstractVector)` call method above.
-function _reject_integer_input(e::VectorEvaluator, x)
+# Reject integer vectors with a clear error rather than letting them flow into
+# AD backends (which usually fail confusingly). Split per `Validate` to avoid an
+# ambiguity with the `(::VectorEvaluator{true})(::AbstractVector)` method above.
+function _reject_integer_input(::VectorEvaluator, x)
     throw(
         ArgumentError(
             "VectorEvaluator requires a vector of floating-point values, but received an `$(typeof(x))`. Convert to a floating-point vector (e.g. `Float64.(x)`) before calling.",
