@@ -1,7 +1,7 @@
 module AbstractPPLLogDensityProblemsExt
 
 using AbstractPPL: AbstractPPL
-using AbstractPPL.ADProblems: AbstractPrepared, VectorEvaluator, _supports_gradient
+using AbstractPPL.ADProblems: AbstractPrepared, VectorEvaluator
 using LogDensityProblems: LogDensityProblems
 
 LogDensityProblems.logdensity(p::AbstractPrepared, x) = p(x)
@@ -12,25 +12,20 @@ function LogDensityProblems.dimension(p::AbstractPrepared)
 end
 LogDensityProblems.dimension(e::VectorEvaluator) = e.dim
 
-# Gradient capability is delegated to the `_supports_gradient` trait so that
-# only prepared shapes with an actual gradient implementation advertise order 1.
-function LogDensityProblems.capabilities(::Type{T}) where {T<:AbstractPrepared}
-    return if _supports_gradient(T)
-        LogDensityProblems.LogDensityOrder{1}()
-    else
-        LogDensityProblems.LogDensityOrder{0}()
-    end
+# `AbstractPrepared` is the AD-aware shape, so it always advertises gradient capability.
+function LogDensityProblems.capabilities(::Type{<:AbstractPrepared})
+    return LogDensityProblems.LogDensityOrder{1}()
 end
 function LogDensityProblems.capabilities(p::AbstractPrepared)
     return LogDensityProblems.capabilities(typeof(p))
 end
 
-function LogDensityProblems.capabilities(::Type{T}) where {T<:VectorEvaluator}
-    return if _supports_gradient(T)
-        LogDensityProblems.LogDensityOrder{1}()
-    else
-        LogDensityProblems.LogDensityOrder{0}()
-    end
+# Bare `VectorEvaluator` only carries a gradient when trivial (dim == 0).
+function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
+    return LogDensityProblems.LogDensityOrder{0}()
+end
+function LogDensityProblems.capabilities(::Type{<:VectorEvaluator{<:Any,true}})
+    return LogDensityProblems.LogDensityOrder{1}()
 end
 function LogDensityProblems.capabilities(e::VectorEvaluator)
     return LogDensityProblems.capabilities(typeof(e))

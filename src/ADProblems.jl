@@ -6,7 +6,9 @@ using ADTypes: AbstractADType
     AbstractPrepared
 
 Internal abstract supertype for all AD-prepared evaluators produced by AbstractPPL's
-extension backends.
+extension backends. Subtyping `AbstractPrepared` asserts that
+`value_and_gradient(p, x)` is implemented; the LogDensityProblems extension
+relies on this contract to advertise `LogDensityOrder{1}`.
 
 Concrete subtypes must have an `evaluator` field (`VectorEvaluator` or
 `NamedTupleEvaluator`). In exchange they inherit the callable forwarder automatically.
@@ -208,19 +210,6 @@ _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
 # These rely on the `evaluator` field contract, so they are defined after the evaluator types.
 (p::AbstractPrepared)(x) = p.evaluator(x)
-
-"""
-    _supports_gradient(::Type{T}) -> Bool
-
-Internal trait: `true` iff `value_and_gradient(::T, x)` is callable on `T`.
-
-Used by the LogDensityProblems extension to advertise `LogDensityOrder{1}` only
-for prepared shapes that actually implement gradients. Each backend extension
-overrides for its concrete `AbstractPrepared` subtype.
-"""
-_supports_gradient(::Type) = false
-_supports_gradient(::Type{<:VectorEvaluator{<:Any,true}}) = true
-_supports_gradient(x) = _supports_gradient(typeof(x))
 
 function __init__()
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
