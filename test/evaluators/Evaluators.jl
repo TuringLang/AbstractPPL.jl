@@ -23,10 +23,7 @@ end
 struct DummyADType <: ADTypes.AbstractADType end
 
 function AbstractPPL.prepare(
-    adtype::DummyADType,
-    model::DummyModel,
-    x::AbstractVector{<:Real};
-    check_dims::Bool=true,
+    adtype::DummyADType, model::DummyModel, x::AbstractVector{<:Real}; check_dims::Bool=true
 )
     f = x -> sum(x)
     return Prepared(adtype, VectorEvaluator{check_dims}(f, length(x)))
