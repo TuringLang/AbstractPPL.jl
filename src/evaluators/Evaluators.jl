@@ -197,6 +197,7 @@ function _assert_supported_output(y)
     return nothing
 end
 
+# Make prepared evaluators usable through the same `evaluate!!` API as models.
 evaluate!!(p::Prepared, x) = p(x)
 evaluate!!(e::VectorEvaluator, x) = e(x)
 evaluate!!(e::NamedTupleEvaluator, x) = e(x)

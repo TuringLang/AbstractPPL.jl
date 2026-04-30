@@ -14,8 +14,8 @@ the result past the next call.
 
 ```@example ad
 using AbstractPPL
-using AbstractPPL: prepare, value_and_gradient!!, Prepared
-using AbstractPPL.Evaluators: VectorEvaluator, NamedTupleEvaluator
+using AbstractPPL: prepare, value_and_gradient!!
+using AbstractPPL.Evaluators: Prepared, VectorEvaluator, NamedTupleEvaluator
 using ADTypes: AutoForwardDiff
 using ForwardDiff: ForwardDiff
 
