@@ -9,12 +9,22 @@ using ADTypes: AbstractADType, AutoForwardDiff
 using LogDensityProblems: LogDensityProblems
 using Test
 
+# A NamedTupleEvaluator does not satisfy LDP's vector-input contract, so the
+# extension does not define LDP methods for it.
+
 struct TestADType <: AbstractADType end
 
 function AbstractPPL.value_and_gradient!!(
     p::Prepared{TestADType}, x::AbstractVector{<:Real}
 )
     return (p(x), ones(length(x)))
+end
+
+# Backend extensions opt into gradient capability by overloading `capabilities`
+# (typically on their cache type, e.g. `<:Prepared{<:Any,<:VectorEvaluator,<:MyCache}`).
+# Here we dispatch on the AD type for simplicity.
+function LogDensityProblems.capabilities(::Type{<:Prepared{TestADType,<:VectorEvaluator}})
+    return LogDensityProblems.LogDensityOrder{1}()
 end
 
 @testset "AbstractPPLLogDensityProblemsExt" begin
@@ -27,18 +37,26 @@ end
         @test LogDensityProblems.capabilities(ve) == LogDensityProblems.LogDensityOrder{0}()
     end
 
-    @testset "Prepared advertises gradient" begin
-        p_vec = Prepared(AutoForwardDiff(), VectorEvaluator(sum, 3))
-        @test LogDensityProblems.capabilities(p_vec) ==
+    @testset "Prepared capabilities" begin
+        # Without a backend overload the fallback advertises order 0 only.
+        p_no_overload = Prepared(AutoForwardDiff(), VectorEvaluator(sum, 3))
+        @test LogDensityProblems.capabilities(p_no_overload) ==
+            LogDensityProblems.LogDensityOrder{0}()
+
+        # A backend that overloads capabilities advertises order 1.
+        p_overloaded = Prepared(TestADType(), VectorEvaluator(sum, 3))
+        @test LogDensityProblems.capabilities(p_overloaded) ==
             LogDensityProblems.LogDensityOrder{1}()
-        @test LogDensityProblems.capabilities(typeof(p_vec)) ==
+        @test LogDensityProblems.capabilities(typeof(p_overloaded)) ==
             LogDensityProblems.LogDensityOrder{1}()
 
+        # NamedTupleEvaluator-backed Prepared has no LDP methods defined; the
+        # extension only integrates vector-input evaluators.
         p_nt = Prepared(
             AutoForwardDiff(), NamedTupleEvaluator(x -> x.a + sum(x.b), (a=0.0, b=zeros(2)))
         )
-        @test LogDensityProblems.capabilities(p_nt) ==
-            LogDensityProblems.LogDensityOrder{1}()
+        @test_throws MethodError LogDensityProblems.dimension(p_nt)
+        @test LogDensityProblems.capabilities(p_nt) === nothing
     end
 
     @testset "logdensity_and_gradient" begin
