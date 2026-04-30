@@ -4,13 +4,13 @@ using AbstractPPL.Evaluators: Prepared, VectorEvaluator
 using ADTypes: ADTypes
 using Test
 
-struct DummyProblem end
+struct DummyModel end
 
 struct DummyPrepared
     prototype_keys::Tuple
 end
 
-function AbstractPPL.prepare(problem::DummyProblem, values::NamedTuple)
+function AbstractPPL.prepare(model::DummyModel, values::NamedTuple)
     return DummyPrepared(keys(values))
 end
 
@@ -24,7 +24,7 @@ struct DummyADType <: ADTypes.AbstractADType end
 
 function AbstractPPL.prepare(
     adtype::DummyADType,
-    problem::DummyProblem,
+    model::DummyModel,
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
 )
@@ -38,7 +38,7 @@ function AbstractPPL.value_and_gradient!!(
     return (sum(x), ones(length(x)))
 end
 
-@testset "ADProblem interface" begin
+@testset "Evaluators interface" begin
     @testset "explicit evaluator shapes" begin
         ve = AbstractPPL.Evaluators.VectorEvaluator(sum, 3)
         @test ve([1.0, 2.0, 3.0]) == 6.0
@@ -68,9 +68,9 @@ end
     end
 
     @testset "prepare (structural)" begin
-        problem = DummyProblem()
+        model = DummyModel()
         values = (x=0.0, y=[1.0, 2.0])
-        prepared = prepare(problem, values)
+        prepared = prepare(model, values)
         @test prepared isa DummyPrepared
         @test prepared.prototype_keys == (:x, :y)
 
@@ -81,10 +81,10 @@ end
     end
 
     @testset "prepare (AD-aware)" begin
-        problem = DummyProblem()
+        model = DummyModel()
         x0 = zeros(3)
         adtype = DummyADType()
-        prepared = prepare(adtype, problem, x0)
+        prepared = prepare(adtype, model, x0)
         @test prepared isa Prepared{DummyADType}
 
         x = [0.5, 1.5, 2.5]
@@ -95,16 +95,16 @@ end
         @test grad ≈ [1.0, 1.0, 1.0]
 
         # check_dims=false skips the per-call dimension check.
-        prepared_unchecked = prepare(adtype, problem, x0; check_dims=false)
+        prepared_unchecked = prepare(adtype, model, x0; check_dims=false)
         @test prepared_unchecked([1.0, 2.0]) ≈ 3.0  # wrong length, no error
     end
 
     @testset "missing AD package extensions" begin
-        problem = DummyProblem()
+        model = DummyModel()
         x0 = zeros(3)
 
         @test_throws MethodError AbstractPPL.Evaluators.prepare(
-            ADTypes.AutoEnzyme(), problem, x0
+            ADTypes.AutoEnzyme(), model, x0
         )
     end
 
@@ -119,7 +119,7 @@ end
         @test evaluate!!(ne, (a=1.0, b=[2.0, 3.0])) == 6.0
 
         adtype = DummyADType()
-        prepared = prepare(adtype, DummyProblem(), zeros(3))
+        prepared = prepare(adtype, DummyModel(), zeros(3))
         @test evaluate!!(prepared, [0.5, 1.5, 2.5]) ≈ 4.5
     end
 end

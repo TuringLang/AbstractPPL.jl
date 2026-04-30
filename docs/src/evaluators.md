@@ -24,7 +24,7 @@ function AbstractPPL.prepare(adtype::AutoForwardDiff, f, x::AbstractVector{<:Rea
 end
 
 function AbstractPPL.value_and_gradient!!(
-    p::Prepared{AutoForwardDiff}, x::AbstractVector{<:Real}
+    p::Prepared{<:AutoForwardDiff}, x::AbstractVector{<:Real}
 )
     return (p(x), ForwardDiff.gradient(p.evaluator.f, x))
 end
@@ -54,7 +54,7 @@ using AbstractPPL: value_and_jacobian!!
 vecfun(x) = [x[1] * x[2], x[2] + x[3]]
 
 function AbstractPPL.value_and_jacobian!!(
-    p::Prepared{AutoForwardDiff}, x::AbstractVector{<:Real}
+    p::Prepared{<:AutoForwardDiff}, x::AbstractVector{<:Real}
 )
     return (p(x), ForwardDiff.jacobian(p.evaluator.f, x))
 end
