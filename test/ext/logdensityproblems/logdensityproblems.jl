@@ -11,7 +11,9 @@ using Test
 
 struct TestADType <: AbstractADType end
 
-function AbstractPPL.value_and_gradient!!(p::Prepared{TestADType}, x::AbstractVector{<:Real})
+function AbstractPPL.value_and_gradient!!(
+    p::Prepared{TestADType}, x::AbstractVector{<:Real}
+)
     return (p(x), ones(length(x)))
 end
 
@@ -33,8 +35,7 @@ end
             LogDensityProblems.LogDensityOrder{1}()
 
         p_nt = Prepared(
-            AutoForwardDiff(),
-            NamedTupleEvaluator(x -> x.a + sum(x.b), (a=0.0, b=zeros(2))),
+            AutoForwardDiff(), NamedTupleEvaluator(x -> x.a + sum(x.b), (a=0.0, b=zeros(2)))
         )
         @test LogDensityProblems.capabilities(p_nt) ==
             LogDensityProblems.LogDensityOrder{1}()

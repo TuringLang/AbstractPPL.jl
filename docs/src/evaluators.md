@@ -100,16 +100,15 @@ function AbstractPPL.prepare(
     adtype::MyADType, problem, x::AbstractVector{<:Real}; check_dims::Bool=true
 )
     f = # extract callable from problem
-    cache = MyCache(f, x)
+        cache = MyCache(f, x)
     return Prepared(adtype, VectorEvaluator{check_dims}(f, length(x)), cache)
 end
 
 function AbstractPPL.value_and_gradient!!(
-    p::Prepared{<:AbstractADType, <:VectorEvaluator, <:MyCache},
-    x::AbstractVector{<:Real},
+    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:MyCache}, x::AbstractVector{<:Real}
 )
     # use p.cache to avoid allocations
-    ...
+    return ...
 end
 ```
 
