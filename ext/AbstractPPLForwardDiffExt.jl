@@ -2,6 +2,9 @@ module AbstractPPLForwardDiffExt
 
 using AbstractPPL: AbstractPPL
 using AbstractPPL.ADProblems:
+    Prepared,
+    VectorEvaluator,
+    NamedTupleEvaluator,
     _assert_jacobian_output,
     _assert_namedtuple_shape,
     _assert_supported_output,
@@ -10,9 +13,8 @@ using AbstractPPL.Utils: flatten_to!!, unflatten_to!!
 using ADTypes: AutoForwardDiff
 using ForwardDiff: ForwardDiff
 
-struct ForwardDiffPrepared{E,F,GC,GR,JC,JR} <: AbstractPPL.ADProblems.AbstractPrepared
-    evaluator::E
-    f::F
+struct ForwardDiffCache{F,GC,GR,JC,JR}
+    f::F                  # unchecked inner callable for AD tracing
     gradient_config::GC
     gradient_result::GR
     jacobian_config::JC
@@ -38,10 +40,10 @@ function AbstractPPL.prepare(
     adtype::AutoForwardDiff, problem, values::NamedTuple; check_dims::Bool=true
 )
     raw = AbstractPPL.prepare(problem, values)
-    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(raw, values)
+    evaluator = NamedTupleEvaluator{check_dims}(raw, values)
     # Hand ForwardDiff an unchecked wrapper: the flattened input is reconstructed
     # with Dual-typed fields during tracing, which would fail the exact-type check.
-    inner = AbstractPPL.ADProblems.NamedTupleEvaluator{false}(raw, values)
+    inner = NamedTupleEvaluator{false}(raw, values)
     x = flatten_to!!(nothing, values)
     f = let inner = inner, values = values
         x -> inner(unflatten_to!!(values, x))
@@ -54,86 +56,82 @@ function AbstractPPL.prepare(
     )
     gradient_result = ForwardDiff.DiffResults.MutableDiffResult(y, (similar(x),))
     gradient_config = _forwarddiff_config(ForwardDiff.GradientConfig, adtype, f, x)
-    return ForwardDiffPrepared(
-        evaluator, f, gradient_config, gradient_result, nothing, nothing
-    )
+    cache = ForwardDiffCache(f, gradient_config, gradient_result, nothing, nothing)
+    return Prepared(adtype, evaluator, cache)
 end
 
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff, problem, x::AbstractVector{<:Real}; check_dims::Bool=true
 )
     raw = AbstractPPL.prepare(problem, x)
-    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, length(x))
+    evaluator = VectorEvaluator{check_dims}(raw, length(x))
     # ForwardDiff has no configuration to build for length-zero arrays; short-circuit
-    # in `value_and_gradient` / `value_and_jacobian` instead.
+    # in `value_and_gradient!!` / `value_and_jacobian!!` instead.
     length(x) == 0 &&
-        return ForwardDiffPrepared(evaluator, nothing, nothing, nothing, nothing, nothing)
+        return Prepared(adtype, evaluator, ForwardDiffCache(nothing, nothing, nothing, nothing, nothing))
     # Hand ForwardDiff an unchecked wrapper so the per-call dim check does not
     # land in the dual-number hot path; user-visible `prepared(x)` still goes
     # through `evaluator` (whose `check_dims` honors the caller's request).
-    f = AbstractPPL.ADProblems.VectorEvaluator{false}(raw, length(x))
+    f = VectorEvaluator{false}(raw, length(x))
     y = f(x)
     _assert_supported_output(y)
     if _is_scalar_output(y)
         gradient_config = _forwarddiff_config(ForwardDiff.GradientConfig, adtype, f, x)
         gradient_result = ForwardDiff.DiffResults.MutableDiffResult(y, (similar(x),))
-        return ForwardDiffPrepared(
-            evaluator, f, gradient_config, gradient_result, nothing, nothing
-        )
+        cache = ForwardDiffCache(f, gradient_config, gradient_result, nothing, nothing)
     else
         _assert_jacobian_output(y)
         jacobian_config = _forwarddiff_config(ForwardDiff.JacobianConfig, adtype, f, x)
         jacobian_result = ForwardDiff.DiffResults.JacobianResult(similar(y), x)
-        return ForwardDiffPrepared(
-            evaluator, f, nothing, nothing, jacobian_config, jacobian_result
-        )
+        cache = ForwardDiffCache(f, nothing, nothing, jacobian_config, jacobian_result)
     end
+    return Prepared(adtype, evaluator, cache)
 end
 
-@inline function AbstractPPL.value_and_gradient(
-    p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator}, values::NamedTuple
+@inline function AbstractPPL.value_and_gradient!!(
+    p::Prepared{AutoForwardDiff,<:NamedTupleEvaluator,<:ForwardDiffCache}, values::NamedTuple
 )
     _assert_namedtuple_shape(p.evaluator, values)
-    p.gradient_config === nothing &&
-        throw(ArgumentError("`value_and_gradient` requires a scalar-valued function."))
+    p.cache.gradient_config === nothing &&
+        throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
     x = flatten_to!!(nothing, values)
-    # `Val(false)`: skip ForwardDiff's tag check; `p.gradient_config` is already bound to `p.f`.
-    ForwardDiff.gradient!(p.gradient_result, p.f, x, p.gradient_config, Val(false))
-    val = ForwardDiff.DiffResults.value(p.gradient_result)
+    # `Val(false)`: skip ForwardDiff's tag check; config is already bound to `p.cache.f`.
+    ForwardDiff.gradient!(p.cache.gradient_result, p.cache.f, x, p.cache.gradient_config, Val(false))
+    val = ForwardDiff.DiffResults.value(p.cache.gradient_result)
     return (
         val,
         unflatten_to!!(
-            p.evaluator.inputspec, ForwardDiff.DiffResults.gradient(p.gradient_result)
+            p.evaluator.inputspec, ForwardDiff.DiffResults.gradient(p.cache.gradient_result)
         ),
     )
 end
 
-@inline function AbstractPPL.value_and_gradient(
-    p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.VectorEvaluator}, x::AbstractVector{T}
+@inline function AbstractPPL.value_and_gradient!!(
+    p::Prepared{AutoForwardDiff,<:VectorEvaluator,<:ForwardDiffCache}, x::AbstractVector{T}
 ) where {T<:Real}
     length(x) == 0 && return (p.evaluator(x), T[])
-    p.gradient_config === nothing &&
-        throw(ArgumentError("`value_and_gradient` requires a scalar-valued function."))
-    ForwardDiff.gradient!(p.gradient_result, p.f, x, p.gradient_config, Val(false))
-    val = ForwardDiff.DiffResults.value(p.gradient_result)
-    grad = copy(ForwardDiff.DiffResults.gradient(p.gradient_result))
+    p.cache.gradient_config === nothing &&
+        throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
+    ForwardDiff.gradient!(p.cache.gradient_result, p.cache.f, x, p.cache.gradient_config, Val(false))
+    val = ForwardDiff.DiffResults.value(p.cache.gradient_result)
+    grad = ForwardDiff.DiffResults.gradient(p.cache.gradient_result)
     return (val, grad)
 end
 
-@inline function AbstractPPL.value_and_jacobian(
-    p::ForwardDiffPrepared{<:AbstractPPL.ADProblems.VectorEvaluator},
+@inline function AbstractPPL.value_and_jacobian!!(
+    p::Prepared{AutoForwardDiff,<:VectorEvaluator,<:ForwardDiffCache},
     x::AbstractVector{<:Real},
 )
     if length(x) == 0
         val = p.evaluator(x)
         return (val, similar(x, length(val), 0))
     end
-    p.jacobian_config === nothing &&
-        throw(ArgumentError("`value_and_jacobian` requires a vector-valued function."))
-    ForwardDiff.jacobian!(p.jacobian_result, p.f, x, p.jacobian_config, Val(false))
+    p.cache.jacobian_config === nothing &&
+        throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+    ForwardDiff.jacobian!(p.cache.jacobian_result, p.cache.f, x, p.cache.jacobian_config, Val(false))
     return (
-        copy(ForwardDiff.DiffResults.value(p.jacobian_result)),
-        copy(ForwardDiff.DiffResults.jacobian(p.jacobian_result)),
+        ForwardDiff.DiffResults.value(p.cache.jacobian_result),
+        ForwardDiff.DiffResults.jacobian(p.cache.jacobian_result),
     )
 end
 

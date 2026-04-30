@@ -11,9 +11,9 @@ include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
 include("ADProblems.jl")
-using .ADProblems: prepare, value_and_gradient, value_and_jacobian
+using .ADProblems: prepare, value_and_gradient!!, value_and_jacobian!!, Prepared
 @static if VERSION >= v"1.11.0"
-    eval(Meta.parse("public prepare, value_and_gradient, value_and_jacobian"))
+    eval(Meta.parse("public prepare, value_and_gradient!!, value_and_jacobian!!, Prepared"))
 end
 include("utils.jl")
 

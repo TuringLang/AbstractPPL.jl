@@ -3,17 +3,38 @@ module ADProblems
 using ADTypes: AbstractADType
 
 """
-    AbstractPrepared
+    Prepared{AD<:AbstractADType,E,C}(adtype, evaluator, cache)
+    Prepared(adtype, evaluator)   # cache defaults to `nothing`
 
-Internal abstract supertype for all AD-prepared evaluators produced by AbstractPPL's
-extension backends. Subtyping `AbstractPrepared` asserts that
-`value_and_gradient(p, x)` is implemented; the LogDensityProblems extension
-relies on this contract to advertise `LogDensityOrder{1}`.
+AD-prepared evaluator parameterised by backend type `AD`.
 
-Concrete subtypes must have an `evaluator` field whose value is callable on the
-prepared input. In exchange they inherit the `(p::AbstractPrepared)(x)` forwarder.
+- `adtype` — the backend, used for dispatch.
+- `evaluator` — the user-facing callable (typically a `VectorEvaluator` or
+  `NamedTupleEvaluator`); forwarded on `p(x)`.
+- `cache` — backend-specific pre-allocated state (ForwardDiff configs, Mooncake
+  tapes, DifferentiationInterface preps, …). `Nothing` when the backend requires
+  no cached state.
+
+Extension packages implement `value_and_gradient!!` (and optionally
+`value_and_jacobian!!`) by specialising on the cache type:
+
+```julia
+function AbstractPPL.value_and_gradient!!(
+    p::Prepared{<:AbstractADType, <:VectorEvaluator, <:MyCache}, x::AbstractVector
+)
+    ...
+end
+```
 """
-abstract type AbstractPrepared end
+struct Prepared{AD<:AbstractADType,E,C}
+    adtype::AD
+    evaluator::E
+    cache::C
+end
+
+Prepared(adtype::AbstractADType, evaluator) = Prepared(adtype, evaluator, nothing)
+
+(p::Prepared)(x) = p.evaluator(x)
 
 """
     prepare(problem, values::NamedTuple)
@@ -39,20 +60,23 @@ prepare(problem, values::NamedTuple) = problem
 prepare(problem, x::AbstractVector{<:Real}) = problem
 
 """
-    value_and_gradient(prepared, x::AbstractVector{<:Real})
+    value_and_gradient!!(prepared, x::AbstractVector{<:Real})
 
-Return `(value, gradient::AbstractVector)` for a scalar-valued evaluator prepared with a vector.
+Return `(value, gradient)` for a scalar-valued evaluator, potentially reusing
+internal cache buffers of `prepared`. The returned gradient may alias
+`prepared`'s internal storage; copy if you need to retain it past the next call.
 """
-function value_and_gradient end
+function value_and_gradient!! end
 
 """
-    value_and_jacobian(prepared, x::AbstractVector{<:Real})
+    value_and_jacobian!!(prepared, x::AbstractVector{<:Real})
 
 Return `(value::AbstractVector, jacobian::AbstractMatrix)` for a vector-valued
-evaluator prepared with a vector. The returned `jacobian` has shape
-`(length(value), length(x))`.
+evaluator, potentially reusing internal cache buffers. The returned arrays may
+alias `prepared`'s internal storage; copy if needed.
+The Jacobian has shape `(length(value), length(x))`.
 """
-function value_and_jacobian end
+function value_and_jacobian!! end
 
 """
     VectorEvaluator{CheckInput}(f, dim)
@@ -68,7 +92,7 @@ where the input length is already guaranteed and the runtime check would otherwi
 remain in the dual/shadow hot path.
 
 A bare `VectorEvaluator` is *not* differentiable; gradient capability is the
-contract of the wrapping `AbstractPrepared` returned by `prepare(adtype, ...)`.
+contract of the wrapping `Prepared` returned by `prepare(adtype, ...)`.
 """
 struct VectorEvaluator{CheckInput,F}
     f::F
@@ -152,15 +176,13 @@ function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
 end
 _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
-(p::AbstractPrepared)(x) = p.evaluator(x)
-
 _is_scalar_output(y) = y isa Number
 _is_vector_output(y) = y isa AbstractVector
 
 function _assert_jacobian_output(y)
     _is_vector_output(y) || throw(
         ArgumentError(
-            "`value_and_jacobian` requires the prepared function to return an AbstractVector; got $(typeof(y)).",
+            "`value_and_jacobian!!` requires the prepared function to return an AbstractVector; got $(typeof(y)).",
         ),
     )
     return nothing

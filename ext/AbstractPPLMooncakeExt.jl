@@ -2,6 +2,9 @@ module AbstractPPLMooncakeExt
 
 using AbstractPPL: AbstractPPL
 using AbstractPPL.ADProblems:
+    Prepared,
+    VectorEvaluator,
+    NamedTupleEvaluator,
     _assert_jacobian_output,
     _assert_namedtuple_shape,
     _assert_supported_output,
@@ -11,8 +14,7 @@ using Mooncake: Mooncake
 
 const MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 
-struct MooncakePrepared{E,GC,JC} <: AbstractPPL.ADProblems.AbstractPrepared
-    evaluator::E
+struct MooncakeCache{GC,JC}
     gradient_cache::GC
     jacobian_cache::JC
 end
@@ -34,67 +36,67 @@ end
 function AbstractPPL.prepare(
     adtype::MooncakeAD, problem, values::NamedTuple; check_dims::Bool=true
 )
-    evaluator = AbstractPPL.ADProblems.NamedTupleEvaluator{check_dims}(
+    evaluator = NamedTupleEvaluator{check_dims}(
         AbstractPPL.prepare(problem, values), values
     )
     config = _mooncake_config(adtype)
     cache = Mooncake.prepare_gradient_cache(evaluator, values; config)
-    return MooncakePrepared(evaluator, cache, nothing)
+    return Prepared(adtype, evaluator, MooncakeCache(cache, nothing))
 end
 
 function AbstractPPL.prepare(
     adtype::MooncakeAD, problem, x::AbstractVector{<:Real}; check_dims::Bool=true
 )
     raw = AbstractPPL.prepare(problem, x)
-    evaluator = AbstractPPL.ADProblems.VectorEvaluator{check_dims}(raw, length(x))
+    evaluator = VectorEvaluator{check_dims}(raw, length(x))
     # Mooncake has no tape to build for length-zero arrays; short-circuit
-    # in `value_and_gradient` / `value_and_jacobian` instead.
-    length(x) == 0 && return MooncakePrepared(evaluator, nothing, nothing)
+    # in `value_and_gradient!!` / `value_and_jacobian!!` instead.
+    length(x) == 0 && return Prepared(adtype, evaluator, MooncakeCache(nothing, nothing))
     y = evaluator(x)
     _assert_supported_output(y)
     config = _mooncake_config(adtype)
     if _is_scalar_output(y)
         cache = Mooncake.prepare_gradient_cache(evaluator, x; config)
-        return MooncakePrepared(evaluator, cache, nothing)
+        return Prepared(adtype, evaluator, MooncakeCache(cache, nothing))
     else
         _assert_jacobian_output(y)
-        cache = _mooncake_jacobian_cache(adtype, evaluator, x; config)
-        return MooncakePrepared(evaluator, nothing, cache)
+        jac_cache = _mooncake_jacobian_cache(adtype, evaluator, x; config)
+        return Prepared(adtype, evaluator, MooncakeCache(nothing, jac_cache))
     end
 end
 
-@inline function AbstractPPL.value_and_gradient(
-    p::MooncakePrepared{<:AbstractPPL.ADProblems.NamedTupleEvaluator}, values::NamedTuple
+@inline function AbstractPPL.value_and_gradient!!(
+    p::Prepared{<:MooncakeAD,<:NamedTupleEvaluator,<:MooncakeCache}, values::NamedTuple
 )
     _assert_namedtuple_shape(p.evaluator, values)
-    p.gradient_cache === nothing &&
-        throw(ArgumentError("`value_and_gradient` requires a scalar-valued function."))
+    p.cache.gradient_cache === nothing &&
+        throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
     # `value_and_gradient!!` returns (val, (∂f, ∂x)); discard the function tangent ∂f.
-    val, (_, grad) = Mooncake.value_and_gradient!!(p.gradient_cache, p.evaluator, values)
+    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache.gradient_cache, p.evaluator, values)
     return (val, grad)
 end
 
-@inline function AbstractPPL.value_and_gradient(
-    p::MooncakePrepared{<:AbstractPPL.ADProblems.VectorEvaluator}, x::AbstractVector{T}
+@inline function AbstractPPL.value_and_gradient!!(
+    p::Prepared{<:MooncakeAD,<:VectorEvaluator,<:MooncakeCache}, x::AbstractVector{T}
 ) where {T<:Real}
     length(x) == 0 && return (p.evaluator(x), T[])
-    p.gradient_cache === nothing &&
-        throw(ArgumentError("`value_and_gradient` requires a scalar-valued function."))
+    p.cache.gradient_cache === nothing &&
+        throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
     # `value_and_gradient!!` returns (val, (∂f, ∂x)); discard the function tangent ∂f.
-    val, (_, grad) = Mooncake.value_and_gradient!!(p.gradient_cache, p.evaluator, x)
+    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache.gradient_cache, p.evaluator, x)
     return (val, grad)
 end
 
-@inline function AbstractPPL.value_and_jacobian(
-    p::MooncakePrepared{<:AbstractPPL.ADProblems.VectorEvaluator}, x::AbstractVector{<:Real}
+@inline function AbstractPPL.value_and_jacobian!!(
+    p::Prepared{<:MooncakeAD,<:VectorEvaluator,<:MooncakeCache}, x::AbstractVector{<:Real}
 )
     if length(x) == 0
         val = p.evaluator(x)
         return (val, similar(x, length(val), 0))
     end
-    p.jacobian_cache === nothing &&
-        throw(ArgumentError("`value_and_jacobian` requires a vector-valued function."))
-    return Mooncake.value_and_jacobian!!(p.jacobian_cache, p.evaluator, x)
+    p.cache.jacobian_cache === nothing &&
+        throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+    return Mooncake.value_and_jacobian!!(p.cache.jacobian_cache, p.evaluator, x)
 end
 
 end # module

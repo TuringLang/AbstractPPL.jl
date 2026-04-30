@@ -37,7 +37,7 @@ function run_shared_gradient_tests(adtype, x0, x; atol=0, rtol=1e-10)
 
         @test prepared(x) ≈ 14.0
 
-        val, grad = AbstractPPL.value_and_gradient(prepared, x)
+        val, grad = AbstractPPL.value_and_gradient!!(prepared, x)
         @test val ≈ 14.0 atol = atol rtol = rtol
         @test grad ≈ [6.0, 2.0, 4.0] atol = atol rtol = rtol
 
@@ -59,11 +59,11 @@ function run_shared_jacobian_tests(adtype, x0, xj; atol=0, rtol=1e-10)
 
         @test prepared(xj) ≈ [6.0, 7.0]
 
-        val, jac = AbstractPPL.value_and_jacobian(prepared, xj)
+        val, jac = AbstractPPL.value_and_jacobian!!(prepared, xj)
         @test val ≈ [6.0, 7.0] atol = atol rtol = rtol
         @test jac ≈ [3.0 2.0 0.0; 0.0 1.0 1.0] atol = atol rtol = rtol
 
-        @test_throws r"scalar-valued" AbstractPPL.value_and_gradient(prepared, xj)
+        @test_throws r"scalar-valued" AbstractPPL.value_and_gradient!!(prepared, xj)
     end
 end
 
@@ -77,12 +77,12 @@ function run_shared_empty_input_tests(adtype)
     @testset "empty input" begin
         x_empty = Float64[]
         prepared = AbstractPPL.prepare(adtype, x -> 7.5, x_empty)
-        val, grad = AbstractPPL.value_and_gradient(prepared, x_empty)
+        val, grad = AbstractPPL.value_and_gradient!!(prepared, x_empty)
         @test val == 7.5
         @test grad == Float64[]
 
         prepared_jac = AbstractPPL.prepare(adtype, x -> [2.0, 3.0], x_empty)
-        valj, jac = AbstractPPL.value_and_jacobian(prepared_jac, x_empty)
+        valj, jac = AbstractPPL.value_and_jacobian!!(prepared_jac, x_empty)
         @test valj == [2.0, 3.0]
         @test size(jac) == (2, 0)
     end
@@ -101,12 +101,12 @@ function run_shared_namedtuple_tests(adtype)
         )
         @test prepared.evaluator isa AbstractPPL.ADProblems.NamedTupleEvaluator
 
-        val, grad = AbstractPPL.value_and_gradient(prepared, (x=3.0, y=[1.0, 2.0]))
+        val, grad = AbstractPPL.value_and_gradient!!(prepared, (x=3.0, y=[1.0, 2.0]))
         @test val ≈ 14.0
         @test grad.x ≈ 6.0
         @test grad.y ≈ [2.0, 4.0]
 
-        @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient(
+        @test_throws r"same NamedTuple structure" AbstractPPL.value_and_gradient!!(
             prepared, (x=3.0, z=[1.0, 2.0])
         )
     end
