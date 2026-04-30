@@ -18,3 +18,7 @@ evaluate!!
 ```@docs
 AbstractModelTrace
 ```
+
+## Evaluators interface
+
+See [Evaluator preparation and AD](@ref) for a full guide and API reference.
