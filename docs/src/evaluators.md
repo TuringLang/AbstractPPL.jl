@@ -113,17 +113,20 @@ end
 ```
 
 Pass `check_dims=false` in your `prepare` implementation to construct a
-`VectorEvaluator{false}`, which skips the per-call length check. The outer
-entry point (`prepared(x)` or `value_and_gradient!!(prepared, x)`) already
-validates `length(x)` once, and the AD differentiation loop then invokes the
-inner callable many times with same-length dual arrays derived from that
-`x` — re-checking on each invocation is redundant work in the hot path.
+`VectorEvaluator{false}`, which skips the per-call length check. This is an
+opt-in trust mode — the caller takes responsibility for `length(x)`. The
+typical use is inside a backend's `value_and_gradient!!`, where the AD
+library invokes the inner callable many times with same-length dual arrays
+derived from a single user-supplied `x`; re-validating on each invocation
+would be redundant work in the hot path.
 
 ## Without an AD backend
 
-The two-argument form `prepare(problem, x)` is available without any AD package.
-It returns the callable unchanged by default, so code that calls `prepare`
-unconditionally works regardless of which backends are loaded:
+The two-argument form `prepare(problem, x)` is available without any AD
+package. It returns the callable unchanged by default, so the caller doesn't
+need to know whether an AD backend is loaded — the same `prepare(...)` call
+works either way, and downstream code that only needs primal evaluation
+(e.g. log-density only, no gradient) can accept the result uniformly:
 
 ```@example ad
 sumsimple(x) = sum(x)
