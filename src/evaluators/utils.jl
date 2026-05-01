@@ -3,13 +3,40 @@
 # This utility only supports a small structural subset so flattening stays
 # predictable and reconstruction can use `x` as the template.
 
+using LinearAlgebra:
+    AbstractTriangular,
+    Bidiagonal,
+    Diagonal,
+    Hermitian,
+    Symmetric,
+    SymTridiagonal,
+    Tridiagonal
+
+# Structured wrappers from LinearAlgebra have `length(x) > # of independent
+# entries`, so a naive round-trip is lossy or fails inside `copyto!`. Reject up
+# front with a clear error rather than emitting broken results. Cholesky/LU/QR
+# are not <:AbstractArray and already fall through to the catch-all.
+const _StructuredArray = Union{
+    AbstractTriangular,Bidiagonal,Diagonal,Hermitian,Symmetric,SymTridiagonal,Tridiagonal
+}
+
+function _reject_structured(x)
+    throw(
+        ArgumentError(
+            "Structured array `$(typeof(x))` is not supported by the flatten/unflatten utilities; convert to a plain `Array` first.",
+        ),
+    )
+end
+
 flat_length(x::Union{Real,Complex}) = 1
+flat_length(x::_StructuredArray) = _reject_structured(x)
 flat_length(x::AbstractArray{<:Union{Real,Complex}}) = length(x)
-flat_length(x::Tuple) = mapreduce(flat_length, +, x; init=0)
-flat_length(x::NamedTuple) = mapreduce(flat_length, +, values(x); init=0)
+flat_length(x::Tuple) = sum(flat_length, x; init=0)
+flat_length(x::NamedTuple) = sum(flat_length, values(x); init=0)
 flat_length(x) = throw(ArgumentError("This value cannot be flattened into a vector."))
 
 flat_eltype(x::Union{Real,Complex}) = typeof(x)
+flat_eltype(x::_StructuredArray) = _reject_structured(x)
 flat_eltype(x::AbstractArray{T}) where {T<:Union{Real,Complex}} = T
 flat_eltype(::Tuple{}) = Float64
 flat_eltype(x::Tuple) = mapreduce(flat_eltype, promote_type, x)
@@ -111,9 +138,7 @@ end
     for name in Names
         v = gensym(name)
         push!(val_syms, v)
-        push!(
-            block.args, :(($v, off) = _unflatten(getfield(x, $(QuoteNode(name))), buf, off))
-        )
+        push!(block.args, :(($v, off) = _unflatten(x[$(QuoteNode(name))], buf, off)))
     end
     push!(block.args, :(return (NamedTuple{$Names}(($(val_syms...),)), off)))
     return block

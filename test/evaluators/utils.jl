@@ -1,5 +1,6 @@
 using AbstractPPL
 using AbstractPPL.Evaluators: flatten_to!!, unflatten_to!!
+using LinearAlgebra: Diagonal, Symmetric, UpperTriangular
 using Test
 
 @testset "vectorisation utilities" begin
@@ -62,6 +63,17 @@ using Test
         x3 = @test_logs (:warn, r"differs from") unflatten_to!!(x, buf; check_eltype=true)
         @test x3 == x
         @test typeof(x3) == typeof(x)
+    end
+
+    @testset "structured arrays rejected" begin
+        for x in (
+            Symmetric([1.0 2.0; 2.0 3.0]),
+            Diagonal([1.0, 2.0]),
+            UpperTriangular([1.0 2.0; 0.0 3.0]),
+        )
+            @test_throws r"Structured array" flatten_to!!(nothing, x)
+            @test_throws r"Structured array" unflatten_to!!(x, [1.0, 2.0, 3.0, 4.0])
+        end
     end
 
     @testset "buffer length mismatch" begin

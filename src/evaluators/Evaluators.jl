@@ -133,7 +133,19 @@ end
 
 NamedTupleEvaluator(f, inputspec::NamedTuple) = NamedTupleEvaluator{true}(f, inputspec)
 
-function (e::VectorEvaluator{true})(x::AbstractVector)
+# Reject integer vectors with a clear error rather than letting them flow into
+# AD backends (which usually fail confusingly). The `T <: Integer` branch is
+# resolved at compile time, so non-integer inputs pay nothing.
+function _reject_integer_input(x)
+    throw(
+        ArgumentError(
+            "VectorEvaluator requires a vector of floating-point values, but received an `$(typeof(x))`. Convert to a floating-point vector (e.g. `Float64.(x)`) before calling.",
+        ),
+    )
+end
+
+function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
+    T <: Integer && _reject_integer_input(x)
     length(x) == e.dim || throw(
         DimensionMismatch(
             "Expected a vector of length $(e.dim), but got length $(length(x))."
@@ -142,26 +154,16 @@ function (e::VectorEvaluator{true})(x::AbstractVector)
     return e.f(x)
 end
 
-(e::VectorEvaluator{false})(x::AbstractVector) = e.f(x)
+function (e::VectorEvaluator{false})(x::AbstractVector{T}) where {T}
+    T <: Integer && _reject_integer_input(x)
+    return e.f(x)
+end
 
 function (e::NamedTupleEvaluator{true})(values::NamedTuple)
     _assert_namedtuple_shape(e, values)
     return e.f(values)
 end
 (e::NamedTupleEvaluator{false})(values::NamedTuple) = e.f(values)
-
-# Reject integer vectors with a clear error rather than letting them flow into
-# AD backends (which usually fail confusingly). Split per `CheckInput` to avoid
-# an ambiguity with the `(::VectorEvaluator{true})(::AbstractVector)` method above.
-function _reject_integer_input(::VectorEvaluator, x)
-    throw(
-        ArgumentError(
-            "VectorEvaluator requires a vector of floating-point values, but received an `$(typeof(x))`. Convert to a floating-point vector (e.g. `Float64.(x)`) before calling.",
-        ),
-    )
-end
-(e::VectorEvaluator{true})(x::AbstractVector{<:Integer}) = _reject_integer_input(e, x)
-(e::VectorEvaluator{false})(x::AbstractVector{<:Integer}) = _reject_integer_input(e, x)
 
 """
     _assert_namedtuple_shape(e::NamedTupleEvaluator, values)

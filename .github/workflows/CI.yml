@@ -71,4 +71,4 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - run: julia --project=. test/run_extras.jl
         env:
-          LABEL: logdensityproblems
+          LABEL: ext/logdensityproblems

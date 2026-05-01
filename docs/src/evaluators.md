@@ -7,8 +7,21 @@ sample input that establishes the expected input shape and type;
 derivative together.
 
 The `!!` suffix signals that the returned gradient or Jacobian **may alias
-internal cache buffers** of the prepared evaluator. Copy if you need to retain
-the result past the next call.
+internal cache buffers** of the prepared evaluator. The next call to
+`value_and_gradient!!` (or `value_and_jacobian!!`) may overwrite that buffer
+in place, so a previously-returned reference will silently change. Copy
+before holding on to a result:
+
+```julia
+val, grad = value_and_gradient!!(prepared, x1)
+saved = copy(grad)                       # safe to keep
+val2, grad2 = value_and_gradient!!(prepared, x2)
+# `grad` may now reflect `x2`; `saved` still reflects `x1`
+```
+
+Backends that always allocate fresh output (e.g. `ForwardDiff.gradient`) do
+not actually alias, but consumers should not rely on that — write to the
+contract, not the implementation.
 
 ## Quick start
 
@@ -99,8 +112,8 @@ Mooncake tapes). Backend extensions dispatch on the cache type:
 function AbstractPPL.prepare(
     adtype::MyADType, problem, x::AbstractVector{<:Real}; check_dims::Bool=true
 )
-    f = # extract callable from problem
-        cache = MyCache(f, x)
+    f = ...        # extract callable from problem
+    cache = MyCache(f, x)
     return Prepared(adtype, VectorEvaluator{check_dims}(f, length(x)), cache)
 end
 
