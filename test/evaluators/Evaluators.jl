@@ -62,6 +62,20 @@ end
         @test_throws r"same NamedTuple structure" AbstractPPL.Evaluators._assert_namedtuple_shape(
             ne, (totally=:wrong,)
         )
+
+        # Nested array shape: same `typeof` (Vector{Float64}), different size.
+        @test_throws r"Nested array" ne((a=1.0, b=[2.0]))
+
+        # Array-of-arrays: same `typeof` and outer size, mismatched inner size.
+        ne_nested = AbstractPPL.Evaluators.NamedTupleEvaluator(
+            x -> sum(sum, x.b), (b=[zeros(2), zeros(2)],)
+        )
+        @test ne_nested((b=[[1.0, 2.0], [3.0, 4.0]],)) == 10.0
+        @test_throws r"Nested array" ne_nested((b=[[1.0], [2.0]],))
+
+        # Unsupported leaf types are rejected rather than silently passing.
+        ne_string = AbstractPPL.Evaluators.NamedTupleEvaluator(x -> length(x.s), (s="abc",))
+        @test_throws r"Supported leaves" ne_string((s="abcde",))
     end
 
     @testset "prepare (structural)" begin

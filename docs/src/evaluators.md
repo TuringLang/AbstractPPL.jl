@@ -79,8 +79,11 @@ value_and_jacobian!!(prepared_vec, [2.0, 3.0, 4.0])
 ### NamedTuple inputs
 
 When the callable accepts a `NamedTuple`, pass a sample `NamedTuple` whose
-field names and value types match the expected input. An extension can define a
-`prepare` overload that wraps the function in a `NamedTupleEvaluator`:
+field names and value types match the expected input. The prototype's leaves
+must be `Real`, `Complex`, `AbstractArray` (recursively), `Tuple`, or
+`NamedTuple` — the same structural model used by `flatten_to!!` /
+`unflatten_to!!`. An extension can define a `prepare` overload that wraps the
+function in a `NamedTupleEvaluator`:
 
 ```@example ad
 function AbstractPPL.prepare(adtype::AutoForwardDiff, f, values::NamedTuple)

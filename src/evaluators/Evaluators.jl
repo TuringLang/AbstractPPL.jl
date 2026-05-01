@@ -117,8 +117,18 @@ VectorEvaluator(f, dim::Int) = VectorEvaluator{true}(f, dim)
 Evaluator shape for functions of a `NamedTuple` input with a stable prototype.
 Part of the extension author API; end users interact with the wrapping `Prepared`.
 
+The `inputspec` prototype's leaves must be one of:
+
+- `Real` or `Complex` (scalar)
+- `AbstractArray` whose elements are themselves supported leaves
+- `Tuple` or `NamedTuple` recursively containing supported leaves
+
+This matches the structural model used by [`flatten_to!!`](@ref) /
+[`unflatten_to!!`](@ref). Other leaf types (e.g. `String`, `Symbol`, custom
+structs) trigger an `ArgumentError` from the per-call shape check.
+
 `CheckInput` controls whether each call validates that the input `NamedTuple`
-has the same type as the prototype captured during preparation.
+matches the prototype's `typeof` and per-leaf array `size`.
 """
 struct NamedTupleEvaluator{CheckInput,F,P<:NamedTuple}
     f::F
@@ -169,7 +179,10 @@ end
     _assert_namedtuple_shape(e::NamedTupleEvaluator, values)
 
 Throw `ArgumentError` unless `values` has the same type as the prototype captured
-during preparation. No-op when `e` was constructed with `CheckInput=false`.
+during preparation, including matching `size` for any nested `AbstractArray`
+leaves. Also throws if the prototype contains a leaf type outside the supported
+set (`Real`, `Complex`, `AbstractArray`, `Tuple`, `NamedTuple`). No-op when `e`
+was constructed with `CheckInput=false`.
 """
 function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
     typeof(values) === typeof(e.inputspec) || throw(
@@ -177,9 +190,44 @@ function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
             "Expected the same NamedTuple structure that was used to prepare this evaluator.",
         ),
     )
+    _shapes_match(values, e.inputspec) || throw(
+        ArgumentError(
+            "Nested array shape differs from the prototype captured during preparation."
+        ),
+    )
     return nothing
 end
 _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
+
+# Complements the `typeof` check above: same-typed arrays can differ in `size`.
+# Arrays with non-`Real`/`Complex` eltype are walked element-wise to catch
+# inner mismatches. Unknown leaves throw, mirroring the supported-leaves
+# contract of the flatten/unflatten utilities in `utils.jl`.
+#
+# `Tuple` recursion uses `first`/`Base.tail` rather than a `zip` loop so each
+# leaf call sees concrete element types — same idiom as `_unflatten`.
+_shapes_match(::Union{Real,Complex}, ::Union{Real,Complex}) = true
+function _shapes_match(a::AbstractArray, b::AbstractArray)
+    size(a) == size(b) || return false
+    eltype(a) <: Union{Real,Complex} && return true
+    for (ai, bi) in zip(a, b)
+        _shapes_match(ai, bi) || return false
+    end
+    return true
+end
+_shapes_match(::Tuple{}, ::Tuple{}) = true
+function _shapes_match(a::Tuple, b::Tuple)
+    _shapes_match(first(a), first(b)) || return false
+    return _shapes_match(Base.tail(a), Base.tail(b))
+end
+_shapes_match(a::NamedTuple, b::NamedTuple) = _shapes_match(values(a), values(b))
+function _shapes_match(a, _)
+    throw(
+        ArgumentError(
+            "Cannot validate shape for prototype leaf of type `$(typeof(a))`. Supported leaves are `Real`, `Complex`, `AbstractArray`, `Tuple`, and `NamedTuple`.",
+        ),
+    )
+end
 
 # Output-shape assertions for AD-backend extensions to share. Centralised here
 # so each backend's `value_and_gradient!!` / `value_and_jacobian!!` produces
