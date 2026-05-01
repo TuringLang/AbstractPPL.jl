@@ -1,40 +1,18 @@
 # Vectorisation utilities
 
-# This utility only supports a small structural subset so flattening stays
-# predictable and reconstruction can use `x` as the template.
-
-using LinearAlgebra:
-    AbstractTriangular,
-    Bidiagonal,
-    Diagonal,
-    Hermitian,
-    Symmetric,
-    SymTridiagonal,
-    Tridiagonal
-
-# Structured wrappers from LinearAlgebra have `length(x) > # of independent
-# entries`, so a naive round-trip is lossy or fails inside `copyto!`. Reject up
-# front with a clear error rather than emitting broken results. Cholesky/LU/QR
-# are not <:AbstractArray and already fall through to the catch-all.
+# Opt-in: `Array` and `SubArray` are the only `AbstractArray` subtypes that
+# round-trip cleanly through `similar` + `copyto!` while preserving structure.
+# Structured wrappers (`Symmetric`, `Diagonal`, …), lazy wrappers
+# (`Adjoint`/`Transpose`), `OffsetArray`, and custom array types fall through
+# to the catch-all rejection — callers must `collect` first.
 #
-# TODO: extend `flatten_to!!` / `unflatten_to!!` with proper support for
-# structured arrays (independent-entry packing) and factorisation types
-# (Cholesky in particular is needed for PPL covariance parameters).
-const _StructuredArray = Union{
-    AbstractTriangular,Bidiagonal,Diagonal,Hermitian,Symmetric,SymTridiagonal,Tridiagonal
-}
-
-function _reject_structured(x)
-    throw(
-        ArgumentError(
-            "Structured array `$(typeof(x))` is not supported by the flatten/unflatten utilities; convert to a plain `Array` first.",
-        ),
-    )
-end
+# TODO: extend with proper support for structured arrays (independent-entry
+# packing) and factorisation types (Cholesky in particular is needed for PPL
+# covariance parameters).
+const FlattableArray{T} = Union{Array{T},SubArray{T}}
 
 flat_length(x::Union{Real,Complex}) = 1
-flat_length(x::_StructuredArray) = _reject_structured(x)
-flat_length(x::AbstractArray{<:Union{Real,Complex}}) = length(x)
+flat_length(x::FlattableArray{<:Union{Real,Complex}}) = length(x)
 flat_length(::Tuple{}) = 0
 flat_length(x::Tuple) = sum(flat_length, x)
 flat_length(::NamedTuple{(),Tuple{}}) = 0
@@ -42,8 +20,7 @@ flat_length(x::NamedTuple) = sum(flat_length, values(x))
 flat_length(x) = throw(ArgumentError("This value cannot be flattened into a vector."))
 
 flat_eltype(x::Union{Real,Complex}) = typeof(x)
-flat_eltype(x::_StructuredArray) = _reject_structured(x)
-flat_eltype(x::AbstractArray{T}) where {T<:Union{Real,Complex}} = T
+flat_eltype(x::FlattableArray{T}) where {T<:Union{Real,Complex}} = T
 flat_eltype(::Tuple{}) = Float64
 flat_eltype(x::Tuple) = mapreduce(flat_eltype, promote_type, x)
 flat_eltype(::NamedTuple{(),Tuple{}}) = Float64
@@ -58,7 +35,8 @@ Flatten `x` into the vector-like buffer `buf`.
 Supported `x` values are:
 - `Real`
 - `Complex`
-- `AbstractArray{<:Union{Real,Complex}}`
+- `Array{<:Union{Real,Complex}}` or one-based `SubArray` thereof (other
+  `AbstractArray` subtypes must be `collect`ed first)
 - `Tuple` recursively containing supported values
 - `NamedTuple` recursively containing supported values
 
@@ -86,7 +64,7 @@ function _flatten_to!(buf::AbstractVector, x::Union{Real,Complex}, offset::Int)
 end
 
 function _flatten_to!(
-    buf::AbstractVector, x::AbstractArray{<:Union{Real,Complex}}, offset::Int
+    buf::AbstractVector, x::FlattableArray{<:Union{Real,Complex}}, offset::Int
 )
     Base.require_one_based_indexing(x)
     n = length(x)
@@ -117,7 +95,7 @@ function _unflatten(x::Union{Real,Complex}, buf::AbstractVector, offset::Int)
 end
 
 function _unflatten(
-    x::AbstractArray{<:Union{Real,Complex}}, buf::AbstractVector, offset::Int
+    x::FlattableArray{<:Union{Real,Complex}}, buf::AbstractVector, offset::Int
 )
     Base.require_one_based_indexing(x)
     n = length(x)
@@ -161,7 +139,8 @@ Reconstruct a value from the vector-like buffer `buf` using `x` as the structura
 Supported `x` values are:
 - `Real`
 - `Complex`
-- `AbstractArray{<:Union{Real,Complex}}`
+- `Array{<:Union{Real,Complex}}` or one-based `SubArray` thereof (other
+  `AbstractArray` subtypes must be `collect`ed first)
 - `Tuple` recursively containing supported values
 - `NamedTuple` recursively containing supported values
 
@@ -188,7 +167,7 @@ function unflatten_to!!(x, buf::AbstractVector; check_eltype::Bool=false)
     if check_eltype
         expected = flat_eltype(x)
         eltype(buf) === expected || @warn(
-            "Buffer eltype `$(eltype(buf))` differs from `flat_eltype(x) = $expected`; reconstructing using the leaf types from `x`."
+            "Buffer eltype `$(eltype(buf))` differs from `flat_eltype(x) = $expected`; reconstructing using the leaf types from `x`. An `InexactError` will be thrown if any value in `buf` cannot be converted back to the corresponding leaf type."
         )
     end
     value, _ = _unflatten(x, buf, 1)

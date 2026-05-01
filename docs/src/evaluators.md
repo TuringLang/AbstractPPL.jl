@@ -59,12 +59,14 @@ prepared([1.0, 2.0, 3.0])
 ```
 
 For vector-valued callables, use `value_and_jacobian!!`. The returned Jacobian
-has shape `(length(value), length(x))`:
+has shape `(length(value), length(x))`. The same backend extension that
+defines `value_and_gradient!!` typically also defines `value_and_jacobian!!`
+on the same `Prepared` type — they are separate generic functions, so the
+two methods coexist without conflict and the caller picks whichever applies
+to their function:
 
 ```@example ad
 using AbstractPPL: value_and_jacobian!!
-
-vecfun(x) = [x[1] * x[2], x[2] + x[3]]
 
 function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AutoForwardDiff}, x::AbstractVector{<:Real}
@@ -72,6 +74,7 @@ function AbstractPPL.value_and_jacobian!!(
     return (p(x), ForwardDiff.jacobian(p.evaluator.f, x))
 end
 
+vecfun(x) = [x[1] * x[2], x[2] + x[3]]
 prepared_vec = prepare(AutoForwardDiff(), vecfun, zeros(3))
 value_and_jacobian!!(prepared_vec, [2.0, 3.0, 4.0])
 ```
@@ -81,8 +84,7 @@ value_and_jacobian!!(prepared_vec, [2.0, 3.0, 4.0])
 When the callable accepts a `NamedTuple`, pass a sample `NamedTuple` whose
 field names and value types match the expected input. The prototype's leaves
 must be `Real`, `Complex`, `AbstractArray` (recursively), `Tuple`, or
-`NamedTuple` — the same structural model used by `flatten_to!!` /
-`unflatten_to!!`. An extension can define a `prepare` overload that wraps the
+`NamedTuple`. An extension can define a `prepare` overload that wraps the
 function in a `NamedTupleEvaluator`:
 
 ```@example ad
@@ -139,14 +141,16 @@ would be redundant work in the hot path.
 ## Without an AD backend
 
 The two-argument form `prepare(problem, x)` is available without any AD
-package. It returns the callable unchanged by default, so the caller doesn't
-need to know whether an AD backend is loaded — the same `prepare(...)` call
-works either way, and downstream code that only needs primal evaluation
-(e.g. log-density only, no gradient) can accept the result uniformly:
+package. By default it wraps `problem` in a `VectorEvaluator{check_dims}`
+(or `NamedTupleEvaluator{check_dims}` for the `NamedTuple` form), giving you
+a callable that runs the per-call shape check before forwarding to
+`problem`. Downstream code that only needs primal evaluation (e.g.
+log-density only, no gradient) can call `prepare(...)` uniformly without
+knowing whether an AD backend is loaded:
 
 ```@example ad
 sumsimple(x) = sum(x)
-p = prepare(sumsimple, zeros(3))
+p = prepare(sumsimple, zeros(3))   # `VectorEvaluator{true}(sumsimple, 3)`
 p([1.0, 2.0, 3.0])
 ```
 

@@ -51,17 +51,22 @@ named inputs, or with a vector when it works with vector inputs. The
 three-argument form, contributed by AD-backend extensions, additionally
 prepares gradient or jacobian machinery for vector inputs.
 
-`check_dims` (default `true`) is forwarded to the evaluator constructor by
-AD-backend extensions (three-argument form). Pass `check_dims=false` to skip
-per-call shape validation, e.g. when the AD backend already guarantees the
-input shape. The two-argument stubs ignore this keyword.
+`check_dims` (default `true`) controls whether the returned evaluator validates
+the input shape on each call. Pass `check_dims=false` to skip the per-call
+check, e.g. inside an AD backend's hot path where the input shape is already
+guaranteed.
 """
 function prepare end
 
-# Downstream packages (e.g. DynamicPPL) pass already-callable objects,
-# so the safe default is to return them unchanged.
-prepare(problem, values::NamedTuple; check_dims::Bool=true) = problem
-prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true) = problem
+# Default: wrap the callable in the appropriate evaluator so per-call shape
+# checks fire even without a backend-specific `prepare` method. Downstream
+# packages (e.g. DynamicPPL) override these for their problem types.
+function prepare(problem, values::NamedTuple; check_dims::Bool=true)
+    return NamedTupleEvaluator{check_dims}(problem, values)
+end
+function prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true)
+    return VectorEvaluator{check_dims}(problem, length(x))
+end
 
 """
     value_and_gradient!!(prepared, x::AbstractVector{<:Real})

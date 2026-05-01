@@ -66,26 +66,31 @@ using Test
         @test typeof(x3) == typeof(x)
     end
 
-    @testset "non-one-based arrays rejected" begin
-        oa = OffsetArray([1.0, 2.0, 3.0], 0:2)
-        @test_throws ArgumentError flatten_to!!(nothing, oa)
-        @test_throws ArgumentError flatten_to!!(zeros(3), oa)
-        @test_throws ArgumentError unflatten_to!!(oa, [1.0, 2.0, 3.0])
-        # Non-one-based buf is rejected even when `x` is fine.
+    @testset "non-one-based buf rejected" begin
+        # Non-one-based `buf` fails `require_one_based_indexing` even when `x`
+        # is a plain `Array`. (Non-one-based `x` is covered by the catch-all
+        # in the next testset.)
         @test_throws ArgumentError flatten_to!!(OffsetArray(zeros(3), 0:2), [1.0, 2.0, 3.0])
         @test_throws ArgumentError unflatten_to!!(
             [1.0, 2.0, 3.0], OffsetArray(zeros(3), 0:2)
         )
     end
 
-    @testset "structured arrays rejected" begin
+    @testset "non-Array/SubArray AbstractArrays rejected" begin
+        # Only `Array` and `SubArray` are opted in. Structured wrappers,
+        # `Adjoint`/`Transpose`, and any other `AbstractArray` fall through to
+        # the catch-all rejection.
+        M = [1.0 2.0; 3.0 4.0]
         for x in (
             Symmetric([1.0 2.0; 2.0 3.0]),
             Diagonal([1.0, 2.0]),
             UpperTriangular([1.0 2.0; 0.0 3.0]),
+            adjoint(M),
+            transpose(M),
+            OffsetArray([1.0, 2.0, 3.0], 0:2),
         )
-            @test_throws r"Structured array" flatten_to!!(nothing, x)
-            @test_throws r"Structured array" unflatten_to!!(x, [1.0, 2.0, 3.0, 4.0])
+            @test_throws r"cannot be flattened" flatten_to!!(nothing, x)
+            @test_throws r"cannot be flattened" unflatten_to!!(x, [1.0, 2.0, 3.0, 4.0])
         end
     end
 

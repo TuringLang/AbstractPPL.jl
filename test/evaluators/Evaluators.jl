@@ -1,6 +1,6 @@
 using AbstractPPL
 using AbstractPPL: prepare, value_and_gradient!!, evaluate!!
-using AbstractPPL.Evaluators: Prepared, VectorEvaluator
+using AbstractPPL.Evaluators: Prepared, VectorEvaluator, NamedTupleEvaluator
 using ADTypes: ADTypes
 using Test
 
@@ -89,6 +89,23 @@ end
         @test lp ≈ 0.5 + 1.5 + 2.5
 
         @test_throws ErrorException prepared((a=1.0, b=2.0))
+
+        # Generic fallback wraps a plain callable in the appropriate evaluator
+        # so per-call shape checks fire even without a backend-specific override.
+        pv = prepare(sum, zeros(3))
+        @test pv isa VectorEvaluator{true}
+        @test pv([1.0, 2.0, 3.0]) == 6.0
+        @test_throws DimensionMismatch pv([1.0, 2.0])
+
+        ntfun = v -> v.a + sum(v.b)
+        pn = prepare(ntfun, (a=0.0, b=zeros(2)))
+        @test pn isa NamedTupleEvaluator{true}
+        @test pn((a=1.0, b=[2.0, 3.0])) == 6.0
+
+        # check_dims=false propagates to the wrapper.
+        pv_unchecked = prepare(sum, zeros(3); check_dims=false)
+        @test pv_unchecked isa VectorEvaluator{false}
+        @test pv_unchecked([1.0, 2.0]) == 3.0  # wrong length, no error
     end
 
     @testset "prepare (AD-aware)" begin
