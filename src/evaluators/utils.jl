@@ -16,6 +16,10 @@ using LinearAlgebra:
 # entries`, so a naive round-trip is lossy or fails inside `copyto!`. Reject up
 # front with a clear error rather than emitting broken results. Cholesky/LU/QR
 # are not <:AbstractArray and already fall through to the catch-all.
+#
+# TODO: extend `flatten_to!!` / `unflatten_to!!` with proper support for
+# structured arrays (independent-entry packing) and factorisation types
+# (Cholesky in particular is needed for PPL covariance parameters).
 const _StructuredArray = Union{
     AbstractTriangular,Bidiagonal,Diagonal,Hermitian,Symmetric,SymTridiagonal,Tridiagonal
 }
