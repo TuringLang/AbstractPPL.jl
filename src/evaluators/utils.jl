@@ -78,14 +78,14 @@ function _flatten_to!(buf::AbstractVector, x, ::Int)
 end
 
 function _unflatten(x::Union{Real,Complex}, buf::AbstractVector, offset::Int)
-    return buf[offset], offset + 1
+    return convert(typeof(x), buf[offset]), offset + 1
 end
 
 function _unflatten(
     x::AbstractArray{<:Union{Real,Complex}}, buf::AbstractVector, offset::Int
 )
     n = length(x)
-    value = similar(x, promote_type(eltype(x), eltype(buf)))
+    value = similar(x)
     copyto!(value, 1, buf, offset, n)
     return value, offset + n
 end
@@ -120,7 +120,7 @@ end
 end
 
 """
-    unflatten_to!!(x, buf)
+    unflatten_to!!(x, buf; check_eltype::Bool=false)
 
 Reconstruct a value from the vector-like buffer `buf` using `x` as the structural template.
 
@@ -130,14 +130,32 @@ Supported `x` values are:
 - `AbstractArray{<:Union{Real,Complex}}`
 - `Tuple` recursively containing supported values
 - `NamedTuple` recursively containing supported values
+
+Pass `check_eltype=true` to emit a warning when `eltype(buf)` differs from
+`flat_eltype(x)` (off by default to keep hot paths quiet).
 """
 # Always allocates: `_unflatten` calls `similar` for each array field. Gains from
 # buffer reuse are negligible relative to gradient computation cost.
-function unflatten_to!!(x, buf::AbstractVector)
+#
+# Heterogeneous round-trip: the flat buffer widens, but leaves are rebuilt
+# from `x`'s types, so `typeof(x2) == typeof(x)`. E.g.
+#
+#     x  = (1.0, [2.0, 3.0], (4.0 + 1.0im,))      # buffer widens to ComplexF64
+#     x2 = unflatten_to!!(x, flatten_to!!(nothing, x))
+#     # x2 == (1.0, [2.0, 3.0], (4.0 + 1.0im,))
+#     # x2 == x      → true
+#     # typeof(x2) == typeof(x) → true
+function unflatten_to!!(x, buf::AbstractVector; check_eltype::Bool=false)
     n = flat_length(x)
     length(buf) == n || throw(
         DimensionMismatch("Expected a vector of length $n, but got length $(length(buf))."),
     )
+    if check_eltype
+        expected = flat_eltype(x)
+        eltype(buf) === expected || @warn(
+            "Buffer eltype `$(eltype(buf))` differs from `flat_eltype(x) = $expected`; reconstructing using the leaf types from `x`."
+        )
+    end
     value, _ = _unflatten(x, buf, 1)
     return value
 end

@@ -41,6 +41,29 @@ using Test
         @test unflatten_to!!(x, v) == x
     end
 
+    @testset "heterogeneous container preserves leaf types" begin
+        # The flat buffer widens to ComplexF64, but `unflatten_to!!` rebuilds
+        # leaves using `x`'s types, so the round-trip preserves `typeof(x)`.
+        x = (1.0, [2.0, 3.0], (4.0 + 1.0im,))
+        x2 = unflatten_to!!(x, flatten_to!!(nothing, x))
+        @test x2 == x
+        @test typeof(x2) == typeof(x)
+    end
+
+    @testset "check_eltype opt-in warning" begin
+        x = (a=1.0, b=[2.0, 3.0])
+        # buf eltype is ComplexF64, but `flat_eltype(x) == Float64` — a
+        # mismatch that should warn only with `check_eltype=true`. Imag parts
+        # are zero, so the convert succeeds.
+        buf = ComplexF64[1.0, 2.0, 3.0]
+        x2 = @test_logs unflatten_to!!(x, buf)  # default: silent
+        @test x2 == x
+        @test typeof(x2) == typeof(x)
+        x3 = @test_logs (:warn, r"differs from") unflatten_to!!(x, buf; check_eltype=true)
+        @test x3 == x
+        @test typeof(x3) == typeof(x)
+    end
+
     @testset "buffer length mismatch" begin
         @test_throws r"Expected a vector of length 4" flatten_to!!(
             Vector{Float64}(undef, 3), zeros(2, 2)
