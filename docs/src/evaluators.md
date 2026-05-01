@@ -113,9 +113,11 @@ end
 ```
 
 Pass `check_dims=false` in your `prepare` implementation to construct a
-`VectorEvaluator{false}`, which skips the per-call length check. AD libraries
-that guarantee input shape (ForwardDiff, Mooncake, etc.) should do this to
-avoid redundant checks in the dual/shadow hot path.
+`VectorEvaluator{false}`, which skips the per-call length check. The outer
+entry point (`prepared(x)` or `value_and_gradient!!(prepared, x)`) already
+validates `length(x)` once, and the AD differentiation loop then invokes the
+inner callable many times with same-length dual arrays derived from that
+`x` — re-checking on each invocation is redundant work in the hot path.
 
 ## Without an AD backend
 
