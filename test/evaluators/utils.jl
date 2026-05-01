@@ -1,6 +1,7 @@
 using AbstractPPL
 using AbstractPPL.Evaluators: flatten_to!!, unflatten_to!!
 using LinearAlgebra: Diagonal, Symmetric, UpperTriangular
+using OffsetArrays: OffsetArray
 using Test
 
 @testset "vectorisation utilities" begin
@@ -63,6 +64,18 @@ using Test
         x3 = @test_logs (:warn, r"differs from") unflatten_to!!(x, buf; check_eltype=true)
         @test x3 == x
         @test typeof(x3) == typeof(x)
+    end
+
+    @testset "non-one-based arrays rejected" begin
+        oa = OffsetArray([1.0, 2.0, 3.0], 0:2)
+        @test_throws ArgumentError flatten_to!!(nothing, oa)
+        @test_throws ArgumentError flatten_to!!(zeros(3), oa)
+        @test_throws ArgumentError unflatten_to!!(oa, [1.0, 2.0, 3.0])
+        # Non-one-based buf is rejected even when `x` is fine.
+        @test_throws ArgumentError flatten_to!!(OffsetArray(zeros(3), 0:2), [1.0, 2.0, 3.0])
+        @test_throws ArgumentError unflatten_to!!(
+            [1.0, 2.0, 3.0], OffsetArray(zeros(3), 0:2)
+        )
     end
 
     @testset "structured arrays rejected" begin

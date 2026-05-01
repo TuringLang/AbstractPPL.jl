@@ -35,8 +35,10 @@ end
 flat_length(x::Union{Real,Complex}) = 1
 flat_length(x::_StructuredArray) = _reject_structured(x)
 flat_length(x::AbstractArray{<:Union{Real,Complex}}) = length(x)
-flat_length(x::Tuple) = sum(flat_length, x; init=0)
-flat_length(x::NamedTuple) = sum(flat_length, values(x); init=0)
+flat_length(::Tuple{}) = 0
+flat_length(x::Tuple) = sum(flat_length, x)
+flat_length(::NamedTuple{(),Tuple{}}) = 0
+flat_length(x::NamedTuple) = sum(flat_length, values(x))
 flat_length(x) = throw(ArgumentError("This value cannot be flattened into a vector."))
 
 flat_eltype(x::Union{Real,Complex}) = typeof(x)
@@ -69,6 +71,7 @@ function flatten_to!!(::Nothing, x)
 end
 
 function flatten_to!!(buf::AbstractVector, x)
+    Base.require_one_based_indexing(buf)
     n = flat_length(x)
     length(buf) == n || throw(
         DimensionMismatch("Expected a vector of length $n, but got length $(length(buf))."),
@@ -85,6 +88,7 @@ end
 function _flatten_to!(
     buf::AbstractVector, x::AbstractArray{<:Union{Real,Complex}}, offset::Int
 )
+    Base.require_one_based_indexing(x)
     n = length(x)
     copyto!(buf, offset, x, 1, n)
     return offset + n
@@ -115,6 +119,7 @@ end
 function _unflatten(
     x::AbstractArray{<:Union{Real,Complex}}, buf::AbstractVector, offset::Int
 )
+    Base.require_one_based_indexing(x)
     n = length(x)
     value = similar(x)
     copyto!(value, 1, buf, offset, n)
@@ -175,6 +180,7 @@ Pass `check_eltype=true` to emit a warning when `eltype(buf)` differs from
 #     # x2 == x      → true
 #     # typeof(x2) == typeof(x) → true
 function unflatten_to!!(x, buf::AbstractVector; check_eltype::Bool=false)
+    Base.require_one_based_indexing(buf)
     n = flat_length(x)
     length(buf) == n || throw(
         DimensionMismatch("Expected a vector of length $n, but got length $(length(buf))."),
