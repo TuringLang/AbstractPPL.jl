@@ -179,6 +179,9 @@ function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
 end
 _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
+# Output-shape assertions for AD-backend extensions to share. Centralised here
+# so each backend's `value_and_gradient!!` / `value_and_jacobian!!` produces
+# the same error message rather than rolling its own.
 function _assert_jacobian_output(y)
     y isa AbstractVector || throw(
         ArgumentError(
