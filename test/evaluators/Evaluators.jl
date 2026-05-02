@@ -56,12 +56,8 @@ end
         ne_unchecked = AbstractPPL.Evaluators.NamedTupleEvaluator{false}(
             x -> 0.0, (a=0.0, b=zeros(2))
         )
-        @test AbstractPPL.Evaluators._assert_namedtuple_shape(
-            ne_unchecked, (totally=:wrong,)
-        ) === nothing
-        @test_throws r"same NamedTuple structure" AbstractPPL.Evaluators._assert_namedtuple_shape(
-            ne, (totally=:wrong,)
-        )
+        @test ne_unchecked((totally=:wrong,)) == 0.0
+        @test_throws r"same NamedTuple structure" ne((totally=:wrong,))
 
         # Nested array shape: same `typeof` (Vector{Float64}), different size.
         @test_throws r"Nested array" ne((a=1.0, b=[2.0]))

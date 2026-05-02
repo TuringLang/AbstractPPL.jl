@@ -16,22 +16,17 @@ function LogDensityProblems.dimension(p::Prepared{<:Any,<:VectorEvaluator})
 end
 LogDensityProblems.dimension(e::VectorEvaluator) = e.dim
 
-# Generic fallback: order 0. AD-backend extensions (DifferentiationInterface,
+# Order 0 by default. AD-backend extensions (DifferentiationInterface,
 # ForwardDiff, Mooncake, etc.) must overload this for their cache type to
 # advertise `LogDensityOrder{1}` — without that overload,
 # `logdensity_and_gradient` will hit the `value_and_gradient!!` stub and fail.
+# LDP defines `capabilities(x) = capabilities(typeof(x))`, so the type method
+# alone covers both call shapes.
 function LogDensityProblems.capabilities(::Type{<:Prepared{<:Any,<:VectorEvaluator}})
     return LogDensityProblems.LogDensityOrder{0}()
 end
-function LogDensityProblems.capabilities(p::Prepared{<:Any,<:VectorEvaluator})
-    return LogDensityProblems.capabilities(typeof(p))
-end
-
 function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
     return LogDensityProblems.LogDensityOrder{0}()
-end
-function LogDensityProblems.capabilities(e::VectorEvaluator)
-    return LogDensityProblems.capabilities(typeof(e))
 end
 
 function LogDensityProblems.logdensity_and_gradient(p::Prepared{<:Any,<:VectorEvaluator}, x)

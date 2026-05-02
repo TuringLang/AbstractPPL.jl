@@ -76,10 +76,10 @@ using Test
         )
     end
 
-    @testset "non-Array/SubArray AbstractArrays rejected" begin
-        # Only `Array` and `SubArray` are opted in. Structured wrappers,
-        # `Adjoint`/`Transpose`, and any other `AbstractArray` fall through to
-        # the catch-all rejection.
+    @testset "non-Array AbstractArrays rejected" begin
+        # Only `Array` is opted in. Structured wrappers, `Adjoint`/`Transpose`,
+        # `SubArray` (views), and any other `AbstractArray` fall through to the
+        # catch-all rejection.
         M = [1.0 2.0; 3.0 4.0]
         for x in (
             Symmetric([1.0 2.0; 2.0 3.0]),
@@ -88,6 +88,7 @@ using Test
             adjoint(M),
             transpose(M),
             OffsetArray([1.0, 2.0, 3.0], 0:2),
+            @view([1.0, 2.0, 3.0, 4.0][1:4]),
         )
             @test_throws r"cannot be flattened" flatten_to!!(nothing, x)
             @test_throws r"cannot be flattened" unflatten_to!!(x, [1.0, 2.0, 3.0, 4.0])
@@ -109,11 +110,6 @@ using Test
         empty = NamedTuple()
         @test flatten_to!!(nothing, empty) == Float64[]
         @test unflatten_to!!(empty, Float64[]) == empty
-
-        view_values = (x=@view([1.0, 2.0, 3.0][2:3]),)
-        flat = flatten_to!!(nothing, view_values)
-        rebuilt = unflatten_to!!(view_values, flat)
-        @test collect(rebuilt.x) == [2.0, 3.0]
     end
 
     @testset "unflatten_to!! type stability" begin

@@ -1,15 +1,17 @@
 # Vectorisation utilities
 
-# Opt-in: `Array` and `SubArray` are the only `AbstractArray` subtypes that
-# round-trip cleanly through `similar` + `copyto!` while preserving structure.
-# Structured wrappers (`Symmetric`, `Diagonal`, …), lazy wrappers
-# (`Adjoint`/`Transpose`), `OffsetArray`, and custom array types fall through
-# to the catch-all rejection — callers must `collect` first.
+# Opt-in: `Array` is the only `AbstractArray` subtype that round-trips cleanly
+# through `similar` + `copyto!` while preserving structure. `SubArray` is
+# excluded because `similar(::SubArray)` returns a plain `Array`, so the view
+# wrapper is silently dropped on `unflatten_to!!` and `typeof(x2) == typeof(x)`
+# would not hold. Structured wrappers (`Symmetric`, `Diagonal`, …), lazy
+# wrappers (`Adjoint`/`Transpose`), `OffsetArray`, and custom array types fall
+# through to the catch-all rejection — callers must `collect` first.
 #
 # TODO: extend with proper support for structured arrays (independent-entry
 # packing) and factorisation types (Cholesky in particular is needed for PPL
 # covariance parameters).
-const FlattableArray{T} = Union{Array{T},SubArray{T}}
+const FlattableArray{T} = Array{T}
 
 flat_length(x::Union{Real,Complex}) = 1
 flat_length(x::FlattableArray{<:Union{Real,Complex}}) = length(x)
@@ -35,8 +37,8 @@ Flatten `x` into the vector-like buffer `buf`.
 Supported `x` values are:
 - `Real`
 - `Complex`
-- `Array{<:Union{Real,Complex}}` or one-based `SubArray` thereof (other
-  `AbstractArray` subtypes must be `collect`ed first)
+- `Array{<:Union{Real,Complex}}` (other `AbstractArray` subtypes, including
+  views, must be `collect`ed first)
 - `Tuple` recursively containing supported values
 - `NamedTuple` recursively containing supported values
 
@@ -139,8 +141,8 @@ Reconstruct a value from the vector-like buffer `buf` using `x` as the structura
 Supported `x` values are:
 - `Real`
 - `Complex`
-- `Array{<:Union{Real,Complex}}` or one-based `SubArray` thereof (other
-  `AbstractArray` subtypes must be `collect`ed first)
+- `Array{<:Union{Real,Complex}}` (other `AbstractArray` subtypes, including
+  views, must be `collect`ed first)
 - `Tuple` recursively containing supported values
 - `NamedTuple` recursively containing supported values
 

@@ -133,7 +133,13 @@ This matches the structural model used by [`flatten_to!!`](@ref) /
 structs) trigger an `ArgumentError` from the per-call shape check.
 
 `CheckInput` controls whether each call validates that the input `NamedTuple`
-matches the prototype's `typeof` and per-leaf array `size`.
+matches the prototype's `typeof` and per-leaf array `size`. The default (`true`)
+is the safe shape exposed via `prepared(x)`. Pass `CheckInput=false` (via
+`check_dims=false` in `prepare`) for the callable handed to AD libraries: the
+prototype's `typeof` is captured at preparation time using the original element
+types, so a `CheckInput=true` evaluator will reject inputs whose leaves are
+dual/shadow numbers (or any other widened element type) even when the structure
+is otherwise correct.
 """
 struct NamedTupleEvaluator{CheckInput,F,P<:NamedTuple}
     f::F
@@ -169,6 +175,8 @@ function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     return e.f(x)
 end
 
+# `T <: Integer` resolves at compile time; the AD hot path (Float/dual `T`)
+# elides the branch entirely.
 function (e::VectorEvaluator{false})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
     return e.f(x)
@@ -263,12 +271,16 @@ evaluate!!(e::NamedTupleEvaluator, x) = e(x)
 function __init__()
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
         # `args` are argument types, not values (see `Base.Experimental.show_error_hints`).
-        if exc.f === prepare && length(args) >= 1 && args[1] <: AbstractADType
-            print(
-                io,
-                "\nCalling `prepare` with an AD backend requires loading the corresponding extension (e.g., `using DifferentiationInterface`).",
-            )
-        end
+        # Only fire when no extension has registered any AD-aware `prepare` method yet —
+        # once a backend is loaded, the candidate list in the `MethodError` is more
+        # informative than a generic "load an extension" hint.
+        exc.f === prepare || return nothing
+        length(args) >= 1 && args[1] <: AbstractADType || return nothing
+        any(m -> m.nargs >= 4, methods(prepare)) && return nothing
+        print(
+            io,
+            "\nCalling `prepare` with an AD backend requires loading the corresponding extension (e.g., `using DifferentiationInterface`).",
+        )
     end
 end
 
