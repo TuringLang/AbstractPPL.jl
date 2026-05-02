@@ -54,11 +54,14 @@ jobs:
           fail_ci_if_error: true
 
   ext:
-    name: Ext (logdensityproblems, ${{ matrix.version }})
+    name: Ext (${{ matrix.label }}, ${{ matrix.version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        label:
+          - ext/differentiationinterface
+          - ext/logdensityproblems
         version:
           - '1'
           - 'min'
@@ -71,4 +74,4 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - run: julia --project=. test/run_extras.jl
         env:
-          LABEL: ext/logdensityproblems
+          LABEL: ${{ matrix.label }}
