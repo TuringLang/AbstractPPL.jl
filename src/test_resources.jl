@@ -1,7 +1,6 @@
 module TestResources
 
 import ..AbstractPPL: prepare
-
 export TestCase, generate_testcases
 
 struct QuadraticProblem end
