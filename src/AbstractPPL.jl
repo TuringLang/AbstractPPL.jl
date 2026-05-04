@@ -12,6 +12,7 @@ include("abstractprobprog.jl")
 include("evaluate.jl")
 include("evaluators/Evaluators.jl")
 using .Evaluators: prepare, value_and_gradient!!, value_and_jacobian!!
+include("test_resources.jl")
 @static if VERSION >= v"1.11.0"
     eval(Meta.parse("public prepare, value_and_gradient!!, value_and_jacobian!!"))
 end
