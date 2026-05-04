@@ -5,24 +5,6 @@ using AbstractPPL.Evaluators: Prepared, VectorEvaluator
 using ADTypes: ADTypes, AbstractADType, AutoReverseDiff
 using DifferentiationInterface: DifferentiationInterface as DI
 
-function _assert_supported_output(y)
-    (y isa Number || y isa AbstractVector) || throw(
-        ArgumentError(
-            "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
-        ),
-    )
-    return nothing
-end
-
-function _assert_jacobian_output(y)
-    y isa AbstractVector || throw(
-        ArgumentError(
-            "`value_and_jacobian!!` requires the prepared function to return an AbstractVector; got $(typeof(y)).",
-        ),
-    )
-    return nothing
-end
-
 # Differentiate only `x`; the evaluator is passed as a `DI.Constant` context so
 # that in DynamicPPL the model and other evaluator state stay constant.
 @inline _call_evaluator(x, evaluator) = evaluator(x)
@@ -58,19 +40,23 @@ function AbstractPPL.prepare(
     length(x) == 0 &&
         return Prepared(adtype, evaluator, DICache(_call_evaluator, nothing, nothing, true))
     y = evaluator(x)
-    _assert_supported_output(y)
     if y isa Number
         target, gradient_prep, use_context = _prepare_gradient(adtype, x, evaluator)
         return Prepared(
             adtype, evaluator, DICache(target, gradient_prep, nothing, use_context)
         )
-    else
-        _assert_jacobian_output(y)
+    elseif y isa AbstractVector
         jacobian_prep = DI.prepare_jacobian(
             _call_evaluator, adtype, x, DI.Constant(evaluator)
         )
         return Prepared(
             adtype, evaluator, DICache(_call_evaluator, nothing, jacobian_prep, true)
+        )
+    else
+        throw(
+            ArgumentError(
+                "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
+            ),
         )
     end
 end
