@@ -10,6 +10,12 @@ export AbstractModelTrace
 include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
+include("evaluators/Evaluators.jl")
+using .Evaluators: prepare, value_and_gradient!!, value_and_jacobian!!
+@static if VERSION >= v"1.11.0"
+    eval(Meta.parse("public prepare, value_and_gradient!!, value_and_jacobian!!"))
+end
+
 include("varname/optic.jl")
 include("varname/varname.jl")
 include("varname/subsumes.jl")
