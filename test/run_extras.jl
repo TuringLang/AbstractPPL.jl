@@ -6,8 +6,7 @@
 const VALID_LABELS = ("ext/logdensityproblems",)
 
 label = get(ENV, "LABEL", nothing)
-label === nothing && error("Set LABEL to one of: $(join(VALID_LABELS, ", "))")
 label in VALID_LABELS ||
-    error("Unknown LABEL=$label. Valid options: $(join(VALID_LABELS, ", "))")
+    error("Set LABEL to one of: $(join(VALID_LABELS, ", ")) (got `$label`).")
 
 include(joinpath(@__DIR__, label, "main.jl"))

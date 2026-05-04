@@ -155,8 +155,8 @@ end
 NamedTupleEvaluator(f, inputspec::NamedTuple) = NamedTupleEvaluator{true}(f, inputspec)
 
 # Reject integer vectors with a clear error rather than letting them flow into
-# AD backends (which usually fail confusingly). The `T <: Integer` branch is
-# resolved at compile time, so non-integer inputs pay nothing.
+# AD backends (which usually fail confusingly). `T <: Integer` resolves at
+# compile time, so the AD hot path (Float/dual `T`) elides the branch entirely.
 function _reject_integer_input(x)
     throw(
         ArgumentError(
@@ -175,8 +175,6 @@ function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     return e.f(x)
 end
 
-# `T <: Integer` resolves at compile time; the AD hot path (Float/dual `T`)
-# elides the branch entirely.
 function (e::VectorEvaluator{false})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
     return e.f(x)
@@ -242,31 +240,8 @@ function _shapes_match(a, _)
     )
 end
 
-# Output-shape assertions for AD-backend extensions to share. Centralised here
-# so each backend's `value_and_gradient!!` / `value_and_jacobian!!` produces
-# the same error message rather than rolling its own.
-function _assert_jacobian_output(y)
-    y isa AbstractVector || throw(
-        ArgumentError(
-            "`value_and_jacobian!!` requires the prepared function to return an AbstractVector; got $(typeof(y)).",
-        ),
-    )
-    return nothing
-end
-
-function _assert_supported_output(y)
-    (y isa Number || y isa AbstractVector) || throw(
-        ArgumentError(
-            "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
-        ),
-    )
-    return nothing
-end
-
 # Make prepared evaluators usable through the same `evaluate!!` API as models.
-evaluate!!(p::Prepared, x) = p(x)
-evaluate!!(e::VectorEvaluator, x) = e(x)
-evaluate!!(e::NamedTupleEvaluator, x) = e(x)
+evaluate!!(e::Union{Prepared,VectorEvaluator,NamedTupleEvaluator}, x) = e(x)
 
 function __init__()
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
@@ -276,6 +251,7 @@ function __init__()
         # informative than a generic "load an extension" hint.
         exc.f === prepare || return nothing
         length(args) >= 1 && args[1] <: AbstractADType || return nothing
+        # `nargs` counts `self`, so `>= 4` matches the AD-aware 3-positional form.
         any(m -> m.nargs >= 4, methods(prepare)) && return nothing
         print(
             io,

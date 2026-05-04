@@ -31,6 +31,7 @@ end
 
 function LogDensityProblems.logdensity_and_gradient(p::Prepared{<:Any,<:VectorEvaluator}, x)
     val, grad = AbstractPPL.value_and_gradient!!(p, x)
+    # `value_and_gradient!!` may alias internal storage; LDP requires a stable result.
     return (val, copy(grad))
 end
 

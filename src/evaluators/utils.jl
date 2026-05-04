@@ -1,20 +1,17 @@
 # Vectorisation utilities
 
-# Opt-in: `Array` is the only `AbstractArray` subtype that round-trips cleanly
-# through `similar` + `copyto!` while preserving structure. `SubArray` is
-# excluded because `similar(::SubArray)` returns a plain `Array`, so the view
-# wrapper is silently dropped on `unflatten_to!!` and `typeof(x2) == typeof(x)`
-# would not hold. Structured wrappers (`Symmetric`, `Diagonal`, …), lazy
-# wrappers (`Adjoint`/`Transpose`), `OffsetArray`, and custom array types fall
-# through to the catch-all rejection — callers must `collect` first.
+# Opt-in: only `Array` round-trips cleanly through `similar` + `copyto!`
+# preserving `typeof`. `SubArray` is excluded because `similar(::SubArray)`
+# returns a plain `Array`, silently breaking the typeof round-trip contract
+# advertised by `unflatten_to!!`. Structured/lazy wrappers and `OffsetArray`
+# fall through to the catch-all — callers must `collect` first.
 #
 # TODO: extend with proper support for structured arrays (independent-entry
 # packing) and factorisation types (Cholesky in particular is needed for PPL
 # covariance parameters).
-const FlattableArray{T} = Array{T}
 
 flat_length(x::Union{Real,Complex}) = 1
-flat_length(x::FlattableArray{<:Union{Real,Complex}}) = length(x)
+flat_length(x::Array{<:Union{Real,Complex}}) = length(x)
 flat_length(::Tuple{}) = 0
 flat_length(x::Tuple) = sum(flat_length, x)
 flat_length(::NamedTuple{(),Tuple{}}) = 0
@@ -22,7 +19,7 @@ flat_length(x::NamedTuple) = sum(flat_length, values(x))
 flat_length(x) = throw(ArgumentError("This value cannot be flattened into a vector."))
 
 flat_eltype(x::Union{Real,Complex}) = typeof(x)
-flat_eltype(x::FlattableArray{T}) where {T<:Union{Real,Complex}} = T
+flat_eltype(x::Array{T}) where {T<:Union{Real,Complex}} = T
 flat_eltype(::Tuple{}) = Float64
 flat_eltype(x::Tuple) = mapreduce(flat_eltype, promote_type, x)
 flat_eltype(::NamedTuple{(),Tuple{}}) = Float64
@@ -65,9 +62,7 @@ function _flatten_to!(buf::AbstractVector, x::Union{Real,Complex}, offset::Int)
     return offset + 1
 end
 
-function _flatten_to!(
-    buf::AbstractVector, x::FlattableArray{<:Union{Real,Complex}}, offset::Int
-)
+function _flatten_to!(buf::AbstractVector, x::Array{<:Union{Real,Complex}}, offset::Int)
     Base.require_one_based_indexing(x)
     n = length(x)
     copyto!(buf, offset, x, 1, n)
@@ -96,9 +91,7 @@ function _unflatten(x::Union{Real,Complex}, buf::AbstractVector, offset::Int)
     return convert(typeof(x), buf[offset]), offset + 1
 end
 
-function _unflatten(
-    x::FlattableArray{<:Union{Real,Complex}}, buf::AbstractVector, offset::Int
-)
+function _unflatten(x::Array{<:Union{Real,Complex}}, buf::AbstractVector, offset::Int)
     Base.require_one_based_indexing(x)
     n = length(x)
     value = similar(x)
@@ -148,18 +141,11 @@ Supported `x` values are:
 
 Pass `check_eltype=true` to emit a warning when `eltype(buf)` differs from
 `flat_eltype(x)` (off by default to keep hot paths quiet).
+
+Leaves are rebuilt using `x`'s types, so `typeof(unflatten_to!!(x, buf)) == typeof(x)`
+even when `buf`'s element type is widened (e.g. real `x` flattened into a `ComplexF64`
+buffer). Always allocates: each array leaf goes through `similar`.
 """
-# Always allocates: `_unflatten` calls `similar` for each array field. Gains from
-# buffer reuse are negligible relative to gradient computation cost.
-#
-# Heterogeneous round-trip: the flat buffer widens, but leaves are rebuilt
-# from `x`'s types, so `typeof(x2) == typeof(x)`. E.g.
-#
-#     x  = (1.0, [2.0, 3.0], (4.0 + 1.0im,))      # buffer widens to ComplexF64
-#     x2 = unflatten_to!!(x, flatten_to!!(nothing, x))
-#     # x2 == (1.0, [2.0, 3.0], (4.0 + 1.0im,))
-#     # x2 == x      → true
-#     # typeof(x2) == typeof(x) → true
 function unflatten_to!!(x, buf::AbstractVector; check_eltype::Bool=false)
     Base.require_one_based_indexing(buf)
     n = flat_length(x)

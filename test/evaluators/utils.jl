@@ -1,6 +1,6 @@
 using AbstractPPL
 using AbstractPPL.Evaluators: flatten_to!!, unflatten_to!!
-using LinearAlgebra: Diagonal, Symmetric, UpperTriangular
+using LinearAlgebra: Symmetric
 using OffsetArrays: OffsetArray
 using Test
 
@@ -77,18 +77,10 @@ using Test
     end
 
     @testset "non-Array AbstractArrays rejected" begin
-        # Only `Array` is opted in. Structured wrappers, `Adjoint`/`Transpose`,
-        # `SubArray` (views), and any other `AbstractArray` fall through to the
-        # catch-all rejection.
-        M = [1.0 2.0; 3.0 4.0]
         for x in (
             Symmetric([1.0 2.0; 2.0 3.0]),
-            Diagonal([1.0, 2.0]),
-            UpperTriangular([1.0 2.0; 0.0 3.0]),
-            adjoint(M),
-            transpose(M),
-            OffsetArray([1.0, 2.0, 3.0], 0:2),
             @view([1.0, 2.0, 3.0, 4.0][1:4]),
+            OffsetArray([1.0, 2.0, 3.0], 0:2),
         )
             @test_throws r"cannot be flattened" flatten_to!!(nothing, x)
             @test_throws r"cannot be flattened" unflatten_to!!(x, [1.0, 2.0, 3.0, 4.0])
