@@ -160,10 +160,10 @@ Loading `LogDensityProblems` activates an extension that exposes any
 vector-input evaluator as an `LogDensityProblems` problem. The capability
 advertised follows a single rule:
 
-- **Without an AD backend** — `prepare(problem, x)` returns a bare
-  `VectorEvaluator`, which advertises `LogDensityOrder{0}` (primal only).
-- **With an AD backend** — `prepare(adtype, problem, x)` returns a
-  `Prepared`, which always advertises `LogDensityOrder{1}`.
+  - **Without an AD backend** — `prepare(problem, x)` returns a bare
+    `VectorEvaluator`, which advertises `LogDensityOrder{0}` (primal only).
+  - **With an AD backend** — `prepare(adtype, problem, x)` returns a
+    `Prepared`, which always advertises `LogDensityOrder{1}`.
 
 The order-1 advertisement is unconditional on output arity. A `Prepared`
 wrapping a vector-valued function still advertises `LogDensityOrder{1}`;
