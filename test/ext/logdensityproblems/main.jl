@@ -20,34 +20,21 @@ function AbstractPPL.value_and_gradient!!(
     return (p(x), ones(length(x)))
 end
 
-# Backend extensions opt into gradient capability by overloading `capabilities`
-# (typically on their cache type, e.g. `<:Prepared{<:Any,<:VectorEvaluator,<:MyCache}`).
-# Here we dispatch on the AD type for simplicity.
-function LogDensityProblems.capabilities(::Type{<:Prepared{TestADType,<:VectorEvaluator}})
-    return LogDensityProblems.LogDensityOrder{1}()
-end
-
 @testset "AbstractPPLLogDensityProblemsExt" begin
     @testset "VectorEvaluator" begin
         ve = VectorEvaluator(sum, 3)
         @test LogDensityProblems.dimension(ve) == 3
         @test LogDensityProblems.logdensity(ve, [1.0, 2.0, 3.0]) == 6.0
-        # A bare VectorEvaluator never advertises gradient capability;
-        # only the wrapping `Prepared` does.
+        # A bare evaluator (no `Prepared` wrapper) is primal-only.
         @test LogDensityProblems.capabilities(ve) == LogDensityProblems.LogDensityOrder{0}()
     end
 
     @testset "Prepared capabilities" begin
-        # Without a backend overload the fallback advertises order 0 only.
-        p_no_overload = Prepared(AutoForwardDiff(), VectorEvaluator(sum, 3))
-        @test LogDensityProblems.capabilities(p_no_overload) ==
-            LogDensityProblems.LogDensityOrder{0}()
-
-        # A backend that overloads capabilities advertises order 1.
-        p_overloaded = Prepared(TestADType(), VectorEvaluator(sum, 3))
-        @test LogDensityProblems.capabilities(p_overloaded) ==
-            LogDensityProblems.LogDensityOrder{1}()
-        @test LogDensityProblems.capabilities(typeof(p_overloaded)) ==
+        # Any `Prepared` advertises order 1 — backends that don't implement
+        # `value_and_gradient!!` will fail at call time, not via capabilities.
+        p = Prepared(AutoForwardDiff(), VectorEvaluator(sum, 3))
+        @test LogDensityProblems.capabilities(p) == LogDensityProblems.LogDensityOrder{1}()
+        @test LogDensityProblems.capabilities(typeof(p)) ==
             LogDensityProblems.LogDensityOrder{1}()
 
         # NamedTupleEvaluator-backed Prepared has no LDP methods defined; the
