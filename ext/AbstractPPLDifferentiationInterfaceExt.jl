@@ -33,8 +33,7 @@ end
 function AbstractPPL.prepare(
     adtype::AbstractADType, problem, x::AbstractVector{<:Real}; check_dims::Bool=true
 )
-    raw = AbstractPPL.prepare(problem, x)
-    evaluator = VectorEvaluator{check_dims}(raw, length(x))
+    evaluator = AbstractPPL.prepare(problem, x; check_dims)::VectorEvaluator
     # Empty inputs bypass `DI.prepare_*` (many backends fail on length-zero arrays);
     # `value_and_gradient!!` / `value_and_jacobian!!` short-circuit on `length(x) == 0`.
     length(x) == 0 &&

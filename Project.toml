@@ -22,11 +22,13 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [extensions]
 AbstractPPLDifferentiationInterfaceExt = ["DifferentiationInterface"]
 AbstractPPLDistributionsExt = ["Distributions", "LinearAlgebra"]
 AbstractPPLLogDensityProblemsExt = ["LogDensityProblems"]
+AbstractPPLTestExt = ["Test"]
 
 [compat]
 ADTypes = "1"
@@ -43,4 +45,5 @@ MacroTools = "0.5"
 OrderedCollections = "1.8.1"
 Random = "1.6"
 StatsBase = "0.32, 0.33, 0.34"
+Test = "1"
 julia = "1.10.8"
