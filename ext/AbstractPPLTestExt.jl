@@ -95,6 +95,22 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
             Exception,
         ),
+        ErrorCase(
+            "gradient of vector-valued output, empty input",
+            x -> [2.0, 3.0],
+            Float64[],
+            Float64[],
+            (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
+            r"scalar-valued",
+        ),
+        ErrorCase(
+            "jacobian of scalar output, empty input",
+            x -> 7.5,
+            Float64[],
+            Float64[],
+            (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
+            r"vector-valued",
+        ),
     )
 end
 
