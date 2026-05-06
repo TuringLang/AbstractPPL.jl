@@ -72,6 +72,6 @@ jobs:
           version: ${{ matrix.version }}
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
-      - run: julia --project=. test/run_extras.jl
+      - run: julia test/run_extras.jl
         env:
           LABEL: ${{ matrix.label }}
