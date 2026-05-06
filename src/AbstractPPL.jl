@@ -12,13 +12,20 @@ include("abstractprobprog.jl")
 include("evaluate.jl")
 include("evaluators/Evaluators.jl")
 using .Evaluators: prepare, value_and_gradient!!, value_and_jacobian!!
-@static if VERSION >= v"1.11.0"
-    eval(Meta.parse("public prepare, value_and_gradient!!, value_and_jacobian!!"))
-end
 
-# Stubs implemented by `AbstractPPLTestExt` (loaded with `Test`).
+# Stubs implemented by `AbstractPPLTestExt` (loaded with `Test`). Part of the
+# public API for downstream AD-backend packages that want to reuse the shared
+# conformance suite in their own test setups.
 function generate_testcases end
 function run_testcases end
+
+@static if VERSION >= v"1.11.0"
+    eval(
+        Meta.parse(
+            "public prepare, value_and_gradient!!, value_and_jacobian!!, generate_testcases, run_testcases",
+        ),
+    )
+end
 
 include("varname/optic.jl")
 include("varname/varname.jl")
