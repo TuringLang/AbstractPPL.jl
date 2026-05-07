@@ -61,7 +61,6 @@ jobs:
       matrix:
         label:
           - ext/differentiationinterface
-          - ext/logdensityproblems
         version:
           - '1'
           - 'min'

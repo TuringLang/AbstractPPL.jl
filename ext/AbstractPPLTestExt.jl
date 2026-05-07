@@ -93,7 +93,7 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             zeros(3),
             [2.0, 3.0, 4.0],
             (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
-            Exception,
+            ArgumentError,
         ),
         ErrorCase(
             "gradient of vector-valued output, empty input",
@@ -110,6 +110,22 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             Float64[],
             (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
             r"vector-valued",
+        ),
+        ErrorCase(
+            "value_and_gradient!! wrong vector length",
+            QuadraticProblem(),
+            zeros(3),
+            [3.0, 1.0, 2.0, 99.0],
+            (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
+            DimensionMismatch,
+        ),
+        ErrorCase(
+            "value_and_jacobian!! wrong vector length",
+            VectorValuedProblem(),
+            zeros(3),
+            [2.0, 3.0, 4.0, 5.0],
+            (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
+            DimensionMismatch,
         ),
     )
 end

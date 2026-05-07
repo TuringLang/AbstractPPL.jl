@@ -56,6 +56,11 @@ prepares gradient or jacobian machinery for vector inputs.
 the input shape on each call. Pass `check_dims=false` to skip the per-call
 check, e.g. inside an AD backend's hot path where the input shape is already
 guaranteed.
+
+The three-argument AD-aware form may invoke `problem` once during preparation
+to detect output arity (scalar vs vector) and select gradient or jacobian
+machinery accordingly. Avoid `prepare` calls when `problem` has side effects
+that should fire only on user-driven evaluations.
 """
 function prepare end
 
@@ -166,13 +171,16 @@ function _reject_integer_input(x)
     )
 end
 
+function _check_vector_length(dim::Int, x)
+    length(x) == dim || throw(
+        DimensionMismatch("Expected a vector of length $dim, but got length $(length(x))."),
+    )
+    return nothing
+end
+
 function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
-    length(x) == e.dim || throw(
-        DimensionMismatch(
-            "Expected a vector of length $(e.dim), but got length $(length(x))."
-        ),
-    )
+    _check_vector_length(e.dim, x)
     return e.f(x)
 end
 
@@ -262,8 +270,7 @@ function __init__()
     # `value_and_gradient!!` / `value_and_jacobian!!` are stubs until an AD
     # backend extension adds methods. Suppress the hint once any backend is
     # loaded — the standard `MethodError` candidate list is then more useful
-    # than a generic "load an extension" message. Also fires when reached via
-    # `LogDensityProblems.logdensity_and_gradient`, which delegates here.
+    # than a generic "load an extension" message.
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
         exc.f === value_and_gradient!! || exc.f === value_and_jacobian!! || return nothing
         isempty(methods(exc.f)) || return nothing

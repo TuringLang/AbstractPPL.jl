@@ -1,8 +1,8 @@
 module AbstractPPLDifferentiationInterfaceExt
 
 using AbstractPPL: AbstractPPL
-using AbstractPPL.Evaluators: Prepared, VectorEvaluator
-using ADTypes: ADTypes, AbstractADType, AutoReverseDiff
+using AbstractPPL.Evaluators: Evaluators, Prepared, VectorEvaluator
+using ADTypes: AbstractADType, AutoReverseDiff
 using DifferentiationInterface: DifferentiationInterface as DI
 
 # Differentiate only `x`; the evaluator is passed as a `DI.Constant` context so
@@ -17,17 +17,15 @@ struct DICache{F,GP,JP}
 end
 
 # Compiled ReverseDiff only reuses a compiled tape on the one-argument path;
-# the DI.Constant route would invalidate the tape across calls.
-function _prepare_gradient(adtype::AutoReverseDiff{true}, x, evaluator)
+# `DI.Constant` deactivates tape recording, so close the evaluator into the
+# target and call DI without contexts.
+function _prepare_di(prep::F, adtype::AutoReverseDiff{true}, x, evaluator) where {F}
     target = Base.Fix2(_call_evaluator, evaluator)
-    gradient_prep = DI.prepare_gradient(target, adtype, x)
-    return target, gradient_prep, false
+    return target, prep(target, adtype, x), false
 end
 
-function _prepare_gradient(adtype::AbstractADType, x, evaluator)
-    target = _call_evaluator
-    gradient_prep = DI.prepare_gradient(target, adtype, x, DI.Constant(evaluator))
-    return target, gradient_prep, true
+function _prepare_di(prep::F, adtype::AbstractADType, x, evaluator) where {F}
+    return _call_evaluator, prep(_call_evaluator, adtype, x, DI.Constant(evaluator)), true
 end
 
 function AbstractPPL.prepare(
@@ -50,15 +48,17 @@ function AbstractPPL.prepare(
         return Prepared(adtype, evaluator, DICache(_call_evaluator, gp, jp, true))
     end
     if y isa Number
-        target, gradient_prep, use_context = _prepare_gradient(adtype, x, evaluator)
+        target, gradient_prep, use_context = _prepare_di(
+            DI.prepare_gradient, adtype, x, evaluator
+        )
         return Prepared(
             adtype, evaluator, DICache(target, gradient_prep, nothing, use_context)
         )
     end
-    jacobian_prep = DI.prepare_jacobian(_call_evaluator, adtype, x, DI.Constant(evaluator))
-    return Prepared(
-        adtype, evaluator, DICache(_call_evaluator, nothing, jacobian_prep, true)
+    target, jacobian_prep, use_context = _prepare_di(
+        DI.prepare_jacobian, adtype, x, evaluator
     )
+    return Prepared(adtype, evaluator, DICache(target, nothing, jacobian_prep, use_context))
 end
 
 @inline function AbstractPPL.value_and_gradient!!(
@@ -66,16 +66,17 @@ end
 ) where {T<:Real}
     p.cache.gradient_prep === nothing &&
         throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
+    Evaluators._check_vector_length(p.evaluator.dim, x)
+    # Bypass DI on length-0 input — DI prep paths fail (e.g. ForwardDiff
+    # `BoundsError`); typed `T[]` matches the caller's element type.
     length(x) == 0 && return (p.evaluator(x), T[])
-    val, grad = if p.cache.use_context
+    return if p.cache.use_context
         DI.value_and_gradient(
             p.cache.target, p.cache.gradient_prep, p.adtype, x, DI.Constant(p.evaluator)
         )
     else
         DI.value_and_gradient(p.cache.target, p.cache.gradient_prep, p.adtype, x)
     end
-    # Some DI backends may return a non-`Vector` gradient; normalise.
-    return (val, grad isa Vector ? grad : collect(grad))
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
@@ -83,13 +84,18 @@ end
 )
     p.cache.jacobian_prep === nothing &&
         throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+    Evaluators._check_vector_length(p.evaluator.dim, x)
     if length(x) == 0
         val = p.evaluator(x)
         return (val, similar(x, length(val), 0))
     end
-    return DI.value_and_jacobian(
-        p.cache.target, p.cache.jacobian_prep, p.adtype, x, DI.Constant(p.evaluator)
-    )
+    return if p.cache.use_context
+        DI.value_and_jacobian(
+            p.cache.target, p.cache.jacobian_prep, p.adtype, x, DI.Constant(p.evaluator)
+        )
+    else
+        DI.value_and_jacobian(p.cache.target, p.cache.jacobian_prep, p.adtype, x)
+    end
 end
 
 end # module

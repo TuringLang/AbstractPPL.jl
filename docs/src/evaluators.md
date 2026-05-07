@@ -154,27 +154,6 @@ p = prepare(sumsimple, zeros(3))   # `VectorEvaluator{true}(sumsimple, 3)`
 p([1.0, 2.0, 3.0])
 ```
 
-## LogDensityProblems integration
-
-Loading `LogDensityProblems` activates an extension that exposes any
-vector-input evaluator as an `LogDensityProblems` problem. The capability
-advertised follows a single rule:
-
-  - **Without an AD backend** — `prepare(problem, x)` returns a bare
-    `VectorEvaluator`, which advertises `LogDensityOrder{0}` (primal only).
-  - **With an AD backend** — `prepare(adtype, problem, x)` returns a
-    `Prepared`, which always advertises `LogDensityOrder{1}`.
-
-The order-1 advertisement is unconditional on output arity. A `Prepared`
-wrapping a vector-valued function still advertises `LogDensityOrder{1}`;
-calling `LogDensityProblems.logdensity_and_gradient` on it raises an
-`ArgumentError` from `value_and_gradient!!` (since gradient is only defined
-for scalar output). Likewise, a `Prepared` whose backend doesn't implement
-`value_and_gradient!!` will surface a `MethodError` at call time. The trade
-is a uniform contract — "anything that came out of `prepare(adtype, …)`
-claims gradient capability" — at the cost of a runtime failure for
-mismatched arity or unimplemented backends.
-
 ## API reference
 
 ```@docs
