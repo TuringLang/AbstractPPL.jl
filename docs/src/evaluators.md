@@ -154,6 +154,29 @@ p = prepare(sumsimple, zeros(3))   # `VectorEvaluator{true}(sumsimple, 3)`
 p([1.0, 2.0, 3.0])
 ```
 
+## LogDensityProblems integration
+
+Loading `LogDensityProblems` activates an extension that exposes any
+vector-input evaluator as a `LogDensityProblems` problem. The capability
+advertised is structurally tied to whether `value_and_gradient!!` is
+guaranteed to succeed:
+
+  - **Bare `VectorEvaluator`** (`prepare(problem, x)`) — `LogDensityOrder{0}`.
+  - **`Prepared` without an AD-aware cache** — `LogDensityOrder{0}`. Order 1
+    is opted into per backend.
+  - **`Prepared` from `prepare(adtype, scalar_f, x)`** — `LogDensityOrder{1}`.
+    The DI cross-extension dispatches on the cache type: scalar output keeps
+    `gradient_prep` populated and `jacobian_prep === nothing`, which makes
+    `value_and_gradient!!` succeed by construction.
+  - **`Prepared` from `prepare(adtype, vector_f, x)`** — `LogDensityOrder{0}`.
+    Vector-output preps populate `jacobian_prep` instead; `LogDensityProblems`
+    only consumes scalar log densities, so order 0 is the truthful claim.
+
+Capability advertisement is therefore type-driven: a backend opts into order 1
+by adding a `LogDensityProblems.capabilities` overload on the cache shapes
+where its `value_and_gradient!!` is implemented. Forgetting to overload yields
+order 0 — never a false claim.
+
 ## API reference
 
 ```@docs

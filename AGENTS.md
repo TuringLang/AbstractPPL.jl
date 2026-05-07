@@ -24,12 +24,14 @@ AbstractPPL.jl provides shared interfaces and utilities for probabilistic progra
   - When touching `VarName` or optics code, test symbolic, indexed, nested, and serialization round-trip cases.
   - Respect evaluator contracts: `VectorEvaluator` is for flat vectors; `NamedTupleEvaluator` is for stable named structures; `!!` derivative APIs may return cache-aliased arrays.
   - Use `check_dims=false` only for trusted AD hot paths. Public evaluator calls should validate user input.
+  - Keep `LogDensityProblems` capability advertisement structural — the order-0 default lives in the LDP extension; backend cross-extensions (e.g. DI × LDP) opt into order 1 only on cache shapes that prove `value_and_gradient!!` will succeed.
 
 ## Tests
 
   - Core tests: `GROUP=Tests julia --project=test test/runtests.jl`
   - Doctests: `GROUP=Doctests julia --project=test test/runtests.jl`
   - Full package tests: `julia --project=. -e 'using Pkg; Pkg.test()'`
+  - LogDensityProblems extension: `LABEL=ext/logdensityproblems julia --project=. test/run_extras.jl`
   - Docs: `julia --project=docs docs/make.jl`
 
 Run the smallest relevant test first, then broaden when changing public interfaces, extensions, or downstream-facing behaviour. Do not weaken tests just to make CI pass.

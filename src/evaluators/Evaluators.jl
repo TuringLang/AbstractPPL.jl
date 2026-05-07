@@ -270,7 +270,8 @@ function __init__()
     # `value_and_gradient!!` / `value_and_jacobian!!` are stubs until an AD
     # backend extension adds methods. Suppress the hint once any backend is
     # loaded — the standard `MethodError` candidate list is then more useful
-    # than a generic "load an extension" message.
+    # than a generic "load an extension" message. Also fires when reached via
+    # `LogDensityProblems.logdensity_and_gradient`, which delegates here.
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
         exc.f === value_and_gradient!! || exc.f === value_and_jacobian!! || return nothing
         isempty(methods(exc.f)) || return nothing
