@@ -9,6 +9,11 @@ using DifferentiationInterface: DifferentiationInterface as DI
 # that in DynamicPPL the model and other evaluator state stay constant.
 @inline _call_evaluator(x, evaluator) = evaluator(x)
 
+# Convention for AD-backend caches: name the prep slots `gradient_prep` and
+# `jacobian_prep`, populate exactly one, and leave the other `Nothing`. The
+# `LogDensityProblems` extension keys `LogDensityOrder{1}` on this shape
+# (`gradient_prep !== Nothing && jacobian_prep === Nothing`), so other AD
+# extensions get capability advertisement for free by mirroring the layout.
 struct DICache{F,GP,JP}
     target::F
     gradient_prep::GP

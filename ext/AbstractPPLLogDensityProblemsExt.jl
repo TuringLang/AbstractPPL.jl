@@ -5,26 +5,34 @@ using AbstractPPL.Evaluators: Prepared, VectorEvaluator
 using ADTypes: AbstractADType
 using LogDensityProblems: LogDensityProblems
 
-# LDP integration is restricted to vector-input evaluators; `NamedTupleEvaluator`
-# does not satisfy LDP's vector-input contract. Scalar-output is a separate
-# capability advertised by AD-backend cross-extensions (e.g. the DI × LDP
-# extension overloads `capabilities` for `DICache` shapes with scalar output).
-
 LogDensityProblems.logdensity(p::Prepared{<:AbstractADType,<:VectorEvaluator}, x) = p(x)
 LogDensityProblems.logdensity(e::VectorEvaluator, x) = e(x)
 
 function LogDensityProblems.dimension(p::Prepared{<:AbstractADType,<:VectorEvaluator})
-    return LogDensityProblems.dimension(p.evaluator)
+    LogDensityProblems.dimension(p.evaluator)
 end
 LogDensityProblems.dimension(e::VectorEvaluator) = e.dim
 
-# Order 0 by default. Backend-specific cross-extensions opt into
-# `LogDensityOrder{1}` on their concrete cache type when the cache shape proves
-# `value_and_gradient!!` will succeed (scalar output, gradient prep populated).
+# AD-backend cache convention: a cache with non-`Nothing` `gradient_prep` and
+# `Nothing` `jacobian_prep` denotes a scalar-output prep where
+# `value_and_gradient!!` is structurally guaranteed to succeed. Caches that
+# follow this convention (e.g. `DICache` from the DI extension) advertise
+# `LogDensityOrder{1}` automatically; everything else stays at order 0.
+@inline function _scalar_gradient_cache(::Type{C}) where {C}
+    return hasfield(C, :gradient_prep) &&
+           hasfield(C, :jacobian_prep) &&
+           fieldtype(C, :gradient_prep) !== Nothing &&
+           fieldtype(C, :jacobian_prep) === Nothing
+end
+
 function LogDensityProblems.capabilities(
-    ::Type{<:Prepared{<:AbstractADType,<:VectorEvaluator}}
-)
-    return LogDensityProblems.LogDensityOrder{0}()
+    ::Type{<:Prepared{<:AbstractADType,<:VectorEvaluator,C}}
+) where {C}
+    return if _scalar_gradient_cache(C)
+        LogDensityProblems.LogDensityOrder{1}()
+    else
+        LogDensityProblems.LogDensityOrder{0}()
+    end
 end
 function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
     return LogDensityProblems.LogDensityOrder{0}()
