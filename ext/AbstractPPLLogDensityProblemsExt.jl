@@ -18,7 +18,7 @@ LogDensityProblems.dimension(e::VectorEvaluator) = e.dim
 # `value_and_gradient!!` is structurally guaranteed to succeed. Caches that
 # follow this convention (e.g. `DICache` from the DI extension) advertise
 # `LogDensityOrder{1}` automatically; everything else stays at order 0.
-@inline function _scalar_gradient_cache(::Type{C}) where {C}
+function _scalar_gradient_cache(::Type{C}) where {C}
     return hasfield(C, :gradient_prep) &&
            hasfield(C, :jacobian_prep) &&
            fieldtype(C, :gradient_prep) !== Nothing &&
@@ -28,11 +28,8 @@ end
 function LogDensityProblems.capabilities(
     ::Type{<:Prepared{<:AbstractADType,<:VectorEvaluator,C}}
 ) where {C}
-    return if _scalar_gradient_cache(C)
-        LogDensityProblems.LogDensityOrder{1}()
-    else
-        LogDensityProblems.LogDensityOrder{0}()
-    end
+    return _scalar_gradient_cache(C) ? LogDensityProblems.LogDensityOrder{1}() :
+           LogDensityProblems.LogDensityOrder{0}()
 end
 function LogDensityProblems.capabilities(::Type{<:VectorEvaluator})
     return LogDensityProblems.LogDensityOrder{0}()

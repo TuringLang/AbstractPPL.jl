@@ -34,7 +34,7 @@ using Test
         @test LogDensityProblems.capabilities(p_nt) === nothing
     end
 
-    @testset "DI cross-extension capability" begin
+    @testset "DI cache shape drives capability" begin
         p_scalar = AbstractPPL.prepare(
             AutoForwardDiff(), x -> -0.5 * sum(abs2, x), zeros(3)
         )
