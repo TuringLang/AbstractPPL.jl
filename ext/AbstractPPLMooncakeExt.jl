@@ -15,8 +15,7 @@ const _MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 
 # Tag a Mooncake cache with the prepared evaluator's output arity (`:scalar`
 # or `:vector`) so `value_and_gradient!!` / `value_and_jacobian!!` can raise
-# helpful arity-mismatch errors instead of failing inside Mooncake. The inner
-# `cache` is `Nothing` for the empty-input shortcut path.
+# helpful arity-mismatch errors instead of failing inside Mooncake.
 struct MooncakeCache{A,C}
     cache::C
 end
@@ -82,8 +81,7 @@ end
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar,Nothing}},
     x::AbstractVector{T},
 ) where {T<:Real}
-    T <: Integer && Evaluators._reject_integer_input(x)
-    Evaluators._check_vector_length(p.evaluator.dim, x)
+    Evaluators._check_ad_input(p.evaluator, x)
     return (p.evaluator(x), T[])
 end
 
@@ -91,8 +89,7 @@ end
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar}},
     x::AbstractVector{T},
 ) where {T<:Real}
-    T <: Integer && Evaluators._reject_integer_input(x)
-    Evaluators._check_vector_length(p.evaluator.dim, x)
+    Evaluators._check_ad_input(p.evaluator, x)
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x)
     return (val, grad)
 end
@@ -115,8 +112,7 @@ end
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector,Nothing}},
     x::AbstractVector{T},
 ) where {T<:Real}
-    T <: Integer && Evaluators._reject_integer_input(x)
-    Evaluators._check_vector_length(p.evaluator.dim, x)
+    Evaluators._check_ad_input(p.evaluator, x)
     val = p.evaluator(x)
     return (val, similar(x, length(val), 0))
 end
@@ -125,8 +121,7 @@ end
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector}},
     x::AbstractVector{T},
 ) where {T<:Real}
-    T <: Integer && Evaluators._reject_integer_input(x)
-    Evaluators._check_vector_length(p.evaluator.dim, x)
+    Evaluators._check_ad_input(p.evaluator, x)
     return Mooncake.value_and_jacobian!!(p.cache.cache, p.evaluator, x)
 end
 

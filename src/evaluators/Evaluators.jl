@@ -177,6 +177,14 @@ function _check_vector_length(dim::Int, x)
     return nothing
 end
 
+# Shared input validation for AD-backend `value_and_{gradient,jacobian}!!` entry
+# points. Same compile-time `T <: Integer` elision as the `VectorEvaluator` body.
+function _check_ad_input(e::VectorEvaluator, x::AbstractVector{T}) where {T}
+    T <: Integer && _reject_integer_input(x)
+    _check_vector_length(e.dim, x)
+    return nothing
+end
+
 function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
     _check_vector_length(e.dim, x)

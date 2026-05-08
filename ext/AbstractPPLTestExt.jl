@@ -154,6 +154,28 @@ function AbstractPPL.generate_testcases(::Val{:edge})
     )
 end
 
+function AbstractPPL.generate_testcases(::Val{:namedtuple})
+    return (
+        ValueCase(
+            "scalar output over (x::Real, y::Vector)",
+            vs -> vs.x^2 + sum(abs2, vs.y),
+            (x=0.0, y=zeros(2)),
+            (x=3.0, y=[1.0, 2.0]),
+            14.0,
+            (x=6.0, y=[2.0, 4.0]),
+            nothing,
+        ),
+        ErrorCase(
+            "wrong NamedTuple structure",
+            vs -> vs.x^2 + sum(abs2, vs.y),
+            (x=0.0, y=zeros(2)),
+            (x=3.0, z=[1.0, 2.0]),
+            (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
+            r"same NamedTuple structure",
+        ),
+    )
+end
+
 function AbstractPPL.run_testcases(
     ::Val{:vector}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
 )
@@ -184,28 +206,6 @@ function AbstractPPL.run_testcases(::Val{:edge}, prepare_fn=AbstractPPL.prepare;
         end
     end
     return nothing
-end
-
-function AbstractPPL.generate_testcases(::Val{:namedtuple})
-    return (
-        ValueCase(
-            "scalar output over (x::Real, y::Vector)",
-            vs -> vs.x^2 + sum(abs2, vs.y),
-            (x=0.0, y=zeros(2)),
-            (x=3.0, y=[1.0, 2.0]),
-            14.0,
-            (x=6.0, y=[2.0, 4.0]),
-            nothing,
-        ),
-        ErrorCase(
-            "wrong NamedTuple structure",
-            vs -> vs.x^2 + sum(abs2, vs.y),
-            (x=0.0, y=zeros(2)),
-            (x=3.0, z=[1.0, 2.0]),
-            (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
-            r"same NamedTuple structure",
-        ),
-    )
 end
 
 function AbstractPPL.run_testcases(

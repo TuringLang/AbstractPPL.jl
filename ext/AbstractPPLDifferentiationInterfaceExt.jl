@@ -58,8 +58,7 @@ end
 ) where {T<:Real}
     p.cache.gradient_prep === nothing &&
         throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
-    T <: Integer && Evaluators._reject_integer_input(x)
-    Evaluators._check_vector_length(p.evaluator.dim, x)
+    Evaluators._check_ad_input(p.evaluator, x)
     # Bypass DI on length-0 input — DI prep paths fail (e.g. ForwardDiff
     # `BoundsError`); typed `T[]` matches the caller's element type.
     length(x) == 0 && return (p.evaluator(x), T[])
@@ -77,8 +76,7 @@ end
 ) where {T<:Real}
     p.cache.jacobian_prep === nothing &&
         throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
-    T <: Integer && Evaluators._reject_integer_input(x)
-    Evaluators._check_vector_length(p.evaluator.dim, x)
+    Evaluators._check_ad_input(p.evaluator, x)
     if length(x) == 0
         val = p.evaluator(x)
         return (val, similar(x, length(val), 0))
