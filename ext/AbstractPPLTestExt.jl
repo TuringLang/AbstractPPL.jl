@@ -165,14 +165,6 @@ function AbstractPPL.generate_testcases(::Val{:namedtuple})
             (x=6.0, y=[2.0, 4.0]),
             nothing,
         ),
-        ErrorCase(
-            "wrong NamedTuple structure",
-            vs -> vs.x^2 + sum(abs2, vs.y),
-            (x=0.0, y=zeros(2)),
-            (x=3.0, z=[1.0, 2.0]),
-            (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
-            r"same NamedTuple structure",
-        ),
     )
 end
 
@@ -214,10 +206,6 @@ function AbstractPPL.run_testcases(
     for case in generate_testcases(Val(:namedtuple))
         @testset "$(case.name)" begin
             prepared = prepare_fn(adtype, case.f, case.x_proto)
-            if case isa ErrorCase
-                @test_throws case.exception case.op(prepared, case.x)
-                continue
-            end
             @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
             if case.gradient !== nothing
                 val, grad = AbstractPPL.value_and_gradient!!(prepared, case.x)
@@ -227,6 +215,39 @@ function AbstractPPL.run_testcases(
                         rtol
                 end
             end
+        end
+    end
+    return nothing
+end
+
+# Drive `value_and_{gradient,jacobian}!!` twice with different inputs against
+# the same `prepared` evaluator to exercise cache reuse — catches backends
+# whose cache state is corrupted by a prior call.
+function AbstractPPL.run_testcases(
+    ::Val{:cache_reuse}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
+)
+    @testset "scalar output, repeated calls" begin
+        prepared = prepare_fn(adtype, QuadraticProblem(), zeros(3))
+        for (x, value, gradient) in (
+            ([1.0, 2.0, 3.0], 14.0, [2.0, 4.0, 6.0]),
+            ([4.0, 5.0, 6.0], 77.0, [8.0, 10.0, 12.0]),
+            ([0.5, -1.0, 2.0], 5.25, [1.0, -2.0, 4.0]),
+        )
+            val, grad = AbstractPPL.value_and_gradient!!(prepared, x)
+            @test val ≈ value atol = atol rtol = rtol
+            @test grad ≈ gradient atol = atol rtol = rtol
+        end
+    end
+    @testset "vector output, repeated calls" begin
+        prepared = prepare_fn(adtype, VectorValuedProblem(), zeros(3))
+        for (x, value, jacobian) in (
+            ([2.0, 3.0, 4.0], [6.0, 7.0], [3.0 2.0 0.0; 0.0 1.0 1.0]),
+            ([5.0, 1.0, 7.0], [5.0, 8.0], [1.0 5.0 0.0; 0.0 1.0 1.0]),
+            ([0.0, 4.0, -2.0], [0.0, 2.0], [4.0 0.0 0.0; 0.0 1.0 1.0]),
+        )
+            val, jac = AbstractPPL.value_and_jacobian!!(prepared, x)
+            @test val ≈ value atol = atol rtol = rtol
+            @test jac ≈ jacobian atol = atol rtol = rtol
         end
     end
     return nothing

@@ -56,8 +56,7 @@ end
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DICache}, x::AbstractVector{T}
 ) where {T<:Real}
-    p.cache.gradient_prep === nothing &&
-        throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
+    p.cache.gradient_prep === nothing && Evaluators._throw_gradient_needs_scalar()
     Evaluators._check_ad_input(p.evaluator, x)
     # Bypass DI on length-0 input — DI prep paths fail (e.g. ForwardDiff
     # `BoundsError`); typed `T[]` matches the caller's element type.
@@ -74,8 +73,7 @@ end
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DICache}, x::AbstractVector{T}
 ) where {T<:Real}
-    p.cache.jacobian_prep === nothing &&
-        throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+    p.cache.jacobian_prep === nothing && Evaluators._throw_jacobian_needs_vector()
     Evaluators._check_ad_input(p.evaluator, x)
     if length(x) == 0
         val = p.evaluator(x)

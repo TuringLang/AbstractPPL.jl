@@ -2,12 +2,7 @@ module AbstractPPLMooncakeExt
 
 using AbstractPPL: AbstractPPL
 using AbstractPPL.Evaluators:
-    Evaluators,
-    Prepared,
-    VectorEvaluator,
-    NamedTupleEvaluator,
-    _ad_output_arity,
-    _assert_namedtuple_shape
+    Evaluators, Prepared, VectorEvaluator, NamedTupleEvaluator, _ad_output_arity
 using ADTypes: AutoMooncake, AutoMooncakeForward
 using Mooncake: Mooncake
 
@@ -26,19 +21,19 @@ _mooncake_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtyp
 # `value_and_gradient!!` accepts either a reverse-mode gradient cache
 # (AutoMooncake) or a forward-mode derivative cache (AutoMooncakeForward).
 function _mooncake_gradient_cache(::AutoMooncake, f, x; config)
-    return Mooncake.prepare_gradient_cache(f, x; config=config)
+    return Mooncake.prepare_gradient_cache(f, x; config)
 end
 function _mooncake_gradient_cache(::AutoMooncakeForward, f, x; config)
-    return Mooncake.prepare_derivative_cache(f, x; config=config)
+    return Mooncake.prepare_derivative_cache(f, x; config)
 end
 
 # `value_and_jacobian!!`: reverse mode wants a pullback cache, forward mode
 # wants a derivative cache.
 function _mooncake_jacobian_cache(::AutoMooncake, f, x; config)
-    return Mooncake.prepare_pullback_cache(f, x; config=config)
+    return Mooncake.prepare_pullback_cache(f, x; config)
 end
 function _mooncake_jacobian_cache(::AutoMooncakeForward, f, x; config)
-    return Mooncake.prepare_derivative_cache(f, x; config=config)
+    return Mooncake.prepare_derivative_cache(f, x; config)
 end
 
 function AbstractPPL.prepare(
@@ -69,10 +64,11 @@ end
 
 # `Mooncake.value_and_gradient!!` returns `(val, (∂f, ∂x))`; we discard the
 # function tangent `∂f` and surface only `∂x` as the user-facing gradient.
+# Shape validation is delegated to the inner `NamedTupleEvaluator{CheckInput}`
+# callable Mooncake invokes — gated by the user's `check_dims` choice.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:NamedTupleEvaluator}, values::NamedTuple
 )
-    _assert_namedtuple_shape(p.evaluator, values)
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
     return (val, grad)
 end
@@ -98,14 +94,14 @@ end
     ::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector}},
     ::AbstractVector{<:Real},
 )
-    throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
+    return Evaluators._throw_gradient_needs_scalar()
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     ::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar}},
     ::AbstractVector{<:Real},
 )
-    throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+    return Evaluators._throw_jacobian_needs_vector()
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(

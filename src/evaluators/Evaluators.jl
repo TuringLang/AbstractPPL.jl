@@ -203,13 +203,15 @@ end
 (e::NamedTupleEvaluator{false})(values::NamedTuple) = e.f(values)
 
 """
-    _assert_namedtuple_shape(e::NamedTupleEvaluator, values)
+    _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
 
 Throw `ArgumentError` unless `values` has the same type as the prototype captured
 during preparation, including matching `size` for any nested `AbstractArray`
 leaves. Also throws if the prototype contains a leaf type outside the supported
-set (`Real`, `Complex`, `AbstractArray`, `Tuple`, `NamedTuple`). No-op when `e`
-was constructed with `CheckInput=false`.
+set (`Real`, `Complex`, `AbstractArray`, `Tuple`, `NamedTuple`).
+
+Gated by `CheckInput`: the `{false}` overload is a no-op so AD hot paths and
+other opt-out callers pay nothing.
 """
 function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
     typeof(values) === typeof(e.inputspec) || throw(
@@ -238,6 +240,16 @@ function _ad_output_arity(y)
             "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
         ),
     )
+end
+
+# Arity-mismatch errors shared by the DI and Mooncake extensions; kept here so
+# the `:edge` testcase regexes (`r"scalar-valued"`, `r"vector-valued"`) pin a
+# single error string instead of one per backend.
+function _throw_gradient_needs_scalar()
+    throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
+end
+function _throw_jacobian_needs_vector()
+    throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
 end
 
 # Complements the `typeof` check above: same-typed arrays can differ in `size`.
