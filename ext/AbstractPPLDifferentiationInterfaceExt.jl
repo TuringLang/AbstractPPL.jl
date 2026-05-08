@@ -1,7 +1,7 @@
 module AbstractPPLDifferentiationInterfaceExt
 
 using AbstractPPL: AbstractPPL
-using AbstractPPL.Evaluators: Evaluators, Prepared, VectorEvaluator
+using AbstractPPL.Evaluators: Evaluators, Prepared, VectorEvaluator, _ad_output_arity
 using ADTypes: AbstractADType, AutoReverseDiff
 using DifferentiationInterface: DifferentiationInterface as DI
 
@@ -32,19 +32,14 @@ function AbstractPPL.prepare(
     adtype::AbstractADType, problem, x::AbstractVector{<:Real}; check_dims::Bool=true
 )
     evaluator = AbstractPPL.prepare(problem, x; check_dims)::VectorEvaluator
-    y = evaluator(x)
-    y isa Union{Number,AbstractVector} || throw(
-        ArgumentError(
-            "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
-        ),
-    )
+    arity = _ad_output_arity(evaluator(x))
     if length(x) == 0
         # DI prep crashes on length-0 input (e.g. ForwardDiff `BoundsError`); the
         # `Val(0)` sentinel keeps the `gradient_prep === nothing` arity check meaningful.
-        gp, jp = y isa Number ? (Val(0), nothing) : (nothing, Val(0))
+        gp, jp = arity === :scalar ? (Val(0), nothing) : (nothing, Val(0))
         return Prepared(adtype, evaluator, DICache(_call_evaluator, gp, jp, true))
     end
-    if y isa Number
+    if arity === :scalar
         target, gradient_prep, use_context = _prepare_di(
             DI.prepare_gradient, adtype, x, evaluator
         )

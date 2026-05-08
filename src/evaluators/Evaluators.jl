@@ -218,6 +218,20 @@ function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
 end
 _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
 
+# Classify the output of a probe `evaluator(x)` call into the two arities the
+# AD interface supports — `:scalar` routes to gradient prep, `:vector` to
+# jacobian prep. Shared by the DI and Mooncake extensions so both surface the
+# same error message for unsupported output types.
+function _ad_output_arity(y)
+    y isa Number && return :scalar
+    y isa AbstractVector && return :vector
+    throw(
+        ArgumentError(
+            "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
+        ),
+    )
+end
+
 # Complements the `typeof` check above: same-typed arrays can differ in `size`.
 # Arrays with non-`Real`/`Complex` eltype are walked element-wise to catch
 # inner mismatches. Unknown leaves throw, mirroring the supported-leaves

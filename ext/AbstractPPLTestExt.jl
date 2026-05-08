@@ -93,7 +93,15 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             zeros(3),
             [2.0, 3.0, 4.0],
             (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
-            ArgumentError,
+            r"scalar-valued",
+        ),
+        ErrorCase(
+            "jacobian of scalar output",
+            QuadraticProblem(),
+            zeros(3),
+            [3.0, 1.0, 2.0],
+            (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
+            r"vector-valued",
         ),
         ErrorCase(
             "gradient of vector-valued output, empty input",
@@ -173,6 +181,52 @@ function AbstractPPL.run_testcases(::Val{:edge}, prepare_fn=AbstractPPL.prepare;
         @testset "$(case.name)" begin
             prepared = prepare_fn(adtype, case.f, case.x_proto)
             @test_throws case.exception case.op(prepared, case.x)
+        end
+    end
+    return nothing
+end
+
+function AbstractPPL.generate_testcases(::Val{:namedtuple})
+    return (
+        ValueCase(
+            "scalar output over (x::Real, y::Vector)",
+            vs -> vs.x^2 + sum(abs2, vs.y),
+            (x=0.0, y=zeros(2)),
+            (x=3.0, y=[1.0, 2.0]),
+            14.0,
+            (x=6.0, y=[2.0, 4.0]),
+            nothing,
+        ),
+        ErrorCase(
+            "wrong NamedTuple structure",
+            vs -> vs.x^2 + sum(abs2, vs.y),
+            (x=0.0, y=zeros(2)),
+            (x=3.0, z=[1.0, 2.0]),
+            (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
+            r"same NamedTuple structure",
+        ),
+    )
+end
+
+function AbstractPPL.run_testcases(
+    ::Val{:namedtuple}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
+)
+    for case in generate_testcases(Val(:namedtuple))
+        @testset "$(case.name)" begin
+            prepared = prepare_fn(adtype, case.f, case.x_proto)
+            if case isa ErrorCase
+                @test_throws case.exception case.op(prepared, case.x)
+                continue
+            end
+            @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
+            if case.gradient !== nothing
+                val, grad = AbstractPPL.value_and_gradient!!(prepared, case.x)
+                @test val ≈ case.value atol = atol rtol = rtol
+                for k in keys(case.gradient)
+                    @test getproperty(grad, k) ≈ getproperty(case.gradient, k) atol = atol rtol =
+                        rtol
+                end
+            end
         end
     end
     return nothing
