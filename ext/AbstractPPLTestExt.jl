@@ -127,6 +127,22 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
             DimensionMismatch,
         ),
+        ErrorCase(
+            "value_and_gradient!! non-floating-point vector",
+            QuadraticProblem(),
+            zeros(3),
+            [3, 1, 2],
+            (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
+            r"floating-point",
+        ),
+        ErrorCase(
+            "value_and_jacobian!! non-floating-point vector",
+            VectorValuedProblem(),
+            zeros(3),
+            [2, 3, 4],
+            (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
+            r"floating-point",
+        ),
     )
 end
 

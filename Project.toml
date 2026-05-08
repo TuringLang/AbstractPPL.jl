@@ -1,6 +1,6 @@
 name = "AbstractPPL"
 uuid = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
-keywords = ["probablistic programming"]
+keywords = ["probabilistic programming"]
 license = "MIT"
 desc = "Common interfaces for probabilistic programming"
 version = "0.14.3"

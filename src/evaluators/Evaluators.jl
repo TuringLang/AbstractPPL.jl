@@ -16,8 +16,7 @@ AD-prepared evaluator parameterised by backend type `AD`.
   `NamedTupleEvaluator`); forwarded on `p(x)`.
 - `cache` — backend-specific pre-allocated state (ForwardDiff configs, Mooncake
   caches, DifferentiationInterface preps, etc.). `Nothing` when the backend requires
-  no cached state. The two-argument constructor is for backends that allocate
-  fresh storage on every `value_and_gradient!!` call.
+  no cached state.
 
 Extension packages implement `value_and_gradient!!` (and optionally
 `value_and_jacobian!!`) by specialising on the `cache` type:
@@ -267,10 +266,7 @@ function __init__()
             "\nCalling `prepare` with an AD backend requires loading the corresponding extension (e.g., `using DifferentiationInterface`).",
         )
     end
-    # `value_and_gradient!!` / `value_and_jacobian!!` are stubs until an AD
-    # backend extension adds methods. Suppress the hint once any backend is
-    # loaded — the standard `MethodError` candidate list is then more useful
-    # than a generic "load an extension" message.
+    # Same fire-only-when-no-backend-loaded logic as the `prepare` hint above.
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
         exc.f === value_and_gradient!! || exc.f === value_and_jacobian!! || return nothing
         isempty(methods(exc.f)) || return nothing

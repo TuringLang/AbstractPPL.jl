@@ -20,8 +20,7 @@ Return a tuple of test cases for the conformance `group`. Implemented by the
 `Test` extension (`AbstractPPLTestExt`). Reserved group keys (extensions must
 not redefine these): `:vector` for value/gradient/jacobian round-trips on
 vector-input evaluators; `:edge` for error-path cases. Downstream packages may
-add their own group keys (e.g. `:my_backend_group`) by adding methods to this
-function.
+add other keys.
 """
 function generate_testcases end
 

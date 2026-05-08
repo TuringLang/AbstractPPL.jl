@@ -39,11 +39,8 @@ function AbstractPPL.prepare(
         ),
     )
     if length(x) == 0
-        # `Val(0)` marks "no DI prep, but this slot's arity is supported" —
-        # DI's prep paths hit errors on length-0 input (e.g. ForwardDiff
-        # `BoundsError`), so we bypass them. The non-`nothing` marker keeps
-        # the scalar-vs-vector arity check in `value_and_{gradient,jacobian}!!`
-        # meaningful when both prep slots would otherwise be `nothing`.
+        # DI prep crashes on length-0 input (e.g. ForwardDiff `BoundsError`); the
+        # `Val(0)` sentinel keeps the `gradient_prep === nothing` arity check meaningful.
         gp, jp = y isa Number ? (Val(0), nothing) : (nothing, Val(0))
         return Prepared(adtype, evaluator, DICache(_call_evaluator, gp, jp, true))
     end
@@ -66,6 +63,7 @@ end
 ) where {T<:Real}
     p.cache.gradient_prep === nothing &&
         throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
+    T <: Integer && Evaluators._reject_integer_input(x)
     Evaluators._check_vector_length(p.evaluator.dim, x)
     # Bypass DI on length-0 input — DI prep paths fail (e.g. ForwardDiff
     # `BoundsError`); typed `T[]` matches the caller's element type.
@@ -80,10 +78,11 @@ end
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
-    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DICache}, x::AbstractVector{<:Real}
-)
+    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DICache}, x::AbstractVector{T}
+) where {T<:Real}
     p.cache.jacobian_prep === nothing &&
         throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+    T <: Integer && Evaluators._reject_integer_input(x)
     Evaluators._check_vector_length(p.evaluator.dim, x)
     if length(x) == 0
         val = p.evaluator(x)
