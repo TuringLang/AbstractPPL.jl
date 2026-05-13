@@ -21,24 +21,23 @@ Mooncake.tangent_type(::Type{<:NamedTupleEvaluator}) = Mooncake.NoTangent
 # or `:vector`) so `value_and_gradient!!` / `value_and_jacobian!!` can raise
 # helpful arity-mismatch errors instead of failing inside Mooncake.
 #
-# The optional `f` / `contexts` / `args_to_zero` fields carry the lowered
-# raw-target path opted into by `raw_gradient_target=(f, contexts)` on
-# reverse-mode `AutoMooncake`. They default to `nothing`; dispatch on
-# `CT<:Tuple` (vs `Nothing`) picks the lowered AD entry. `prepared(x)` still
+# The optional `f` / `contexts` fields carry the lowered raw-target path
+# opted into by `raw_gradient_target=(f, contexts)` on reverse-mode
+# `AutoMooncake`. They default to `nothing`; dispatch on `CT<:Tuple` (vs
+# `Nothing`) picks the lowered AD entry. `args_to_zero` is derived from
+# `contexts` at the AD entry — it's a `false, true, false…` literal that
+# constant-folds for any concrete `contexts` arity. `prepared(x)` still
 # calls `problem(x)` — only the AD entry consults the lowered fields.
-struct MooncakeCache{A,C,F,CT,AZ}
+struct MooncakeCache{A,C,F,CT}
     cache::C
     f::F
     contexts::CT
-    args_to_zero::AZ
 end
 function MooncakeCache{A}(cache::C) where {A,C}
-    return MooncakeCache{A,C,Nothing,Nothing,Nothing}(cache, nothing, nothing, nothing)
+    return MooncakeCache{A,C,Nothing,Nothing}(cache, nothing, nothing)
 end
-function MooncakeCache{A}(
-    cache::C, f::F, contexts::CT, args_to_zero::AZ
-) where {A,C,F,CT<:Tuple,AZ<:Tuple}
-    return MooncakeCache{A,C,F,CT,AZ}(cache, f, contexts, args_to_zero)
+function MooncakeCache{A}(cache::C, f::F, contexts::CT) where {A,C,F,CT<:Tuple}
+    return MooncakeCache{A,C,F,CT}(cache, f, contexts)
 end
 
 _mooncake_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtype.config
@@ -66,7 +65,7 @@ function AbstractPPL.prepare(
     problem,
     values::NamedTuple;
     check_dims::Bool=true,
-    raw_gradient_target=nothing,  # vector-only optimization; ignored here.
+    raw_gradient_target=nothing,
 )
     evaluator = AbstractPPL.prepare(problem, values; check_dims)::NamedTupleEvaluator
     config = _mooncake_config(adtype)
@@ -104,10 +103,7 @@ function AbstractPPL.prepare(
         )
         f, contexts = raw_gradient_target
         cache = Mooncake.prepare_gradient_cache(f, x, contexts...; config)
-        args_to_zero = (false, true, map(_ -> false, contexts)...)
-        return Prepared(
-            adtype, evaluator, MooncakeCache{:scalar}(cache, f, contexts, args_to_zero)
-        )
+        return Prepared(adtype, evaluator, MooncakeCache{:scalar}(cache, f, contexts))
     end
     # Mooncake builds no tape for length-zero `x`; tag with `Nothing` so the
     # empty-input methods below shortcut without invoking Mooncake.
@@ -156,18 +152,21 @@ end
 # by the `raw_gradient_target` contract. Mooncake's tape was compiled on the
 # raw shape, sidestepping the fixed `evaluator(x)` overhead. `CT<:Tuple`
 # distinguishes the lowered cache from the generic one (where `CT=Nothing`).
+# `args_to_zero` is constant-folded from `c.contexts`'s arity at compile time.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{
-        <:AutoMooncake,
-        <:VectorEvaluator,
-        <:MooncakeCache{:scalar,<:Any,<:Any,<:Tuple,<:Tuple},
+        <:AutoMooncake,<:VectorEvaluator,<:MooncakeCache{:scalar,<:Any,<:Any,<:Tuple}
     },
     x::AbstractVector{T},
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
     c = p.cache
     val, tangents = Mooncake.value_and_gradient!!(
-        c.cache, c.f, x, c.contexts...; args_to_zero=c.args_to_zero
+        c.cache,
+        c.f,
+        x,
+        c.contexts...;
+        args_to_zero=(false, true, map(_ -> false, c.contexts)...),
     )
     return (val, tangents[2])
 end

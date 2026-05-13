@@ -45,7 +45,7 @@ function AbstractPPL.prepare(
     problem,
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
-    raw_gradient_target=nothing,  # Mooncake-only optimization; ignored here.
+    raw_gradient_target=nothing,
 )
     evaluator = AbstractPPL.prepare(problem, x; check_dims)::VectorEvaluator
     arity = _ad_output_arity(evaluator(x))
