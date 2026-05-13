@@ -41,7 +41,11 @@ end
     DICache{UseContext}(target, gp, jp)
 
 function AbstractPPL.prepare(
-    adtype::AbstractADType, problem, x::AbstractVector{<:Real}; check_dims::Bool=true
+    adtype::AbstractADType,
+    problem,
+    x::AbstractVector{<:Real};
+    check_dims::Bool=true,
+    raw_gradient_target=nothing,  # Mooncake-only optimization; ignored here.
 )
     evaluator = AbstractPPL.prepare(problem, x; check_dims)::VectorEvaluator
     arity = _ad_output_arity(evaluator(x))

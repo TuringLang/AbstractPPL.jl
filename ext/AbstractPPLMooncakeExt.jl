@@ -20,23 +20,25 @@ Mooncake.tangent_type(::Type{<:NamedTupleEvaluator}) = Mooncake.NoTangent
 # Tag a Mooncake cache with the prepared evaluator's output arity (`:scalar`
 # or `:vector`) so `value_and_gradient!!` / `value_and_jacobian!!` can raise
 # helpful arity-mismatch errors instead of failing inside Mooncake.
-struct MooncakeCache{A,C}
-    cache::C
-end
-MooncakeCache{A}(cache::C) where {A,C} = MooncakeCache{A,C}(cache)
-
-# Opt-in lowered-target cache for reverse-mode `AutoMooncake`: callers who
-# know a raw `f(x, contexts...)` equivalent to `problem(x)` can hand it in
-# via `raw_gradient_target=(f, contexts)`. Mooncake then compiles a tape on
-# `(f, x, contexts...)` rather than the generic `evaluator(x)` shape — the
-# inactive `contexts` ride along as plain positional args with
-# `args_to_zero=false`. `prepared(x)` still calls `problem(x)`; only the AD
-# entry point uses the lowered cache.
-struct MooncakeLoweredCache{C,F,CT<:Tuple,AZ<:Tuple}
+#
+# The optional `f` / `contexts` / `args_to_zero` fields carry the lowered
+# raw-target path opted into by `raw_gradient_target=(f, contexts)` on
+# reverse-mode `AutoMooncake`. They default to `nothing`; dispatch on
+# `CT<:Tuple` (vs `Nothing`) picks the lowered AD entry. `prepared(x)` still
+# calls `problem(x)` — only the AD entry consults the lowered fields.
+struct MooncakeCache{A,C,F,CT,AZ}
     cache::C
     f::F
     contexts::CT
     args_to_zero::AZ
+end
+function MooncakeCache{A}(cache::C) where {A,C}
+    return MooncakeCache{A,C,Nothing,Nothing,Nothing}(cache, nothing, nothing, nothing)
+end
+function MooncakeCache{A}(
+    cache::C, f::F, contexts::CT, args_to_zero::AZ
+) where {A,C,F,CT<:Tuple,AZ<:Tuple}
+    return MooncakeCache{A,C,F,CT,AZ}(cache, f, contexts, args_to_zero)
 end
 
 _mooncake_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtype.config
@@ -60,7 +62,11 @@ function _mooncake_jacobian_cache(::AutoMooncakeForward, f, x; config)
 end
 
 function AbstractPPL.prepare(
-    adtype::_MooncakeAD, problem, values::NamedTuple; check_dims::Bool=true
+    adtype::_MooncakeAD,
+    problem,
+    values::NamedTuple;
+    check_dims::Bool=true,
+    raw_gradient_target=nothing,  # vector-only optimization; ignored here.
 )
     evaluator = AbstractPPL.prepare(problem, values; check_dims)::NamedTupleEvaluator
     config = _mooncake_config(adtype)
@@ -100,7 +106,7 @@ function AbstractPPL.prepare(
         cache = Mooncake.prepare_gradient_cache(f, x, contexts...; config)
         args_to_zero = (false, true, map(_ -> false, contexts)...)
         return Prepared(
-            adtype, evaluator, MooncakeLoweredCache(cache, f, contexts, args_to_zero)
+            adtype, evaluator, MooncakeCache{:scalar}(cache, f, contexts, args_to_zero)
         )
     end
     # Mooncake builds no tape for length-zero `x`; tag with `Nothing` so the
@@ -148,9 +154,14 @@ end
 
 # Lowered raw-target gradient — `p.cache.f(x, p.cache.contexts...) ≡ p.evaluator(x)`
 # by the `raw_gradient_target` contract. Mooncake's tape was compiled on the
-# raw shape, sidestepping the fixed `evaluator(x)` overhead.
+# raw shape, sidestepping the fixed `evaluator(x)` overhead. `CT<:Tuple`
+# distinguishes the lowered cache from the generic one (where `CT=Nothing`).
 @inline function AbstractPPL.value_and_gradient!!(
-    p::Prepared{<:AutoMooncake,<:VectorEvaluator,<:MooncakeLoweredCache},
+    p::Prepared{
+        <:AutoMooncake,
+        <:VectorEvaluator,
+        <:MooncakeCache{:scalar,<:Any,<:Any,<:Tuple,<:Tuple},
+    },
     x::AbstractVector{T},
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
@@ -173,15 +184,6 @@ end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     ::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar}},
-    ::AbstractVector{<:Real},
-)
-    return Evaluators._throw_jacobian_needs_vector()
-end
-
-# `raw_gradient_target` is a scalar-only fast path; jacobians must use the
-# generic preparation.
-@inline function AbstractPPL.value_and_jacobian!!(
-    ::Prepared{<:AutoMooncake,<:VectorEvaluator,<:MooncakeLoweredCache},
     ::AbstractVector{<:Real},
 )
     return Evaluators._throw_jacobian_needs_vector()
