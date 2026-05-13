@@ -75,6 +75,7 @@ end
     p::Prepared{<:_MooncakeAD,<:NamedTupleEvaluator}, values::NamedTuple
 )
     val, (_, grad) = if p.cache isa Mooncake.Cache
+        # Skip re-zeroing the evaluator's tangent buffer; we discard `∂f`.
         Mooncake.value_and_gradient!!(p.cache, p.evaluator, values; args_to_zero=(false, true))
     else
         Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
@@ -82,6 +83,9 @@ end
     return (val, grad)
 end
 
+# Empty-input shortcut: tagged with `MooncakeCache{…,Nothing}` at prepare time
+# so dispatch resolves the no-Mooncake path at compile time — no runtime
+# `isnothing(cache)` branch in the hot path.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar,Nothing}},
     x::AbstractVector{T},
@@ -96,6 +100,7 @@ end
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
     val, (_, grad) = if p.cache.cache isa Mooncake.Cache
+        # Skip re-zeroing the evaluator's tangent buffer; we discard `∂f`.
         Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x; args_to_zero=(false, true))
     else
         Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x)
@@ -103,6 +108,9 @@ end
     return (val, grad)
 end
 
+# Arity-mismatch errors as dedicated methods so dispatch on
+# `MooncakeCache{:scalar}` vs `{:vector}` resolves at compile time instead of
+# a runtime check on the cache contents.
 @inline function AbstractPPL.value_and_gradient!!(
     ::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector}},
     ::AbstractVector{<:Real},
@@ -117,6 +125,8 @@ end
     return Evaluators._throw_jacobian_needs_vector()
 end
 
+# Empty-input jacobian shortcut — same compile-time dispatch trick as the
+# scalar Nothing-tagged case; skips Mooncake entirely.
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector,Nothing}},
     x::AbstractVector{T},

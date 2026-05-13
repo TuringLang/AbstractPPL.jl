@@ -189,6 +189,9 @@ function _check_ad_input(e::VectorEvaluator{true}, x::AbstractVector{T}) where {
 end
 _check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
 
+# Both bodies rely on `T <: Integer` being a static check so the AD hot path
+# (Float/dual `T`) elides the branch; the `{false}` callable additionally skips
+# `_check_vector_length` since AD libraries pass length-matching dual inputs.
 function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
     _check_vector_length(e.dim, x)
