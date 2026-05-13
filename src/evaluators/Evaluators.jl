@@ -179,11 +179,15 @@ end
 
 # Shared input validation for AD-backend `value_and_{gradient,jacobian}!!` entry
 # points. Same compile-time `T <: Integer` elision as the `VectorEvaluator` body.
-function _check_ad_input(e::VectorEvaluator, x::AbstractVector{T}) where {T}
+# Gated by `CheckInput`: the `{false}` overload is a no-op so the AD hot path
+# pays nothing when the caller has already validated the input (e.g. via
+# `prepare(...; check_dims=false)`).
+function _check_ad_input(e::VectorEvaluator{true}, x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
     _check_vector_length(e.dim, x)
     return nothing
 end
+_check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
 
 function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
