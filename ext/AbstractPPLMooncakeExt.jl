@@ -64,12 +64,21 @@ end
 
 # `Mooncake.value_and_gradient!!` returns `(val, (∂f, ∂x))`; we discard the
 # function tangent `∂f` and surface only `∂x` as the user-facing gradient.
+# Reverse-mode caches accept `args_to_zero` to skip re-zeroing the evaluator's
+# tangent buffer each call (the dominant overhead when the user's problem
+# carries large fields whose gradient we never consume); forward-mode caches
+# don't take the kwarg, so the branch is `isa`-dispatched on the concrete
+# `p.cache` type and constant-folds away.
 # Shape validation is delegated to the inner `NamedTupleEvaluator{CheckInput}`
 # callable Mooncake invokes — gated by the user's `check_dims` choice.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:NamedTupleEvaluator}, values::NamedTuple
 )
-    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
+    val, (_, grad) = if p.cache isa Mooncake.Cache
+        Mooncake.value_and_gradient!!(p.cache, p.evaluator, values; args_to_zero=(false, true))
+    else
+        Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
+    end
     return (val, grad)
 end
 
@@ -86,7 +95,11 @@ end
     x::AbstractVector{T},
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x)
+    val, (_, grad) = if p.cache.cache isa Mooncake.Cache
+        Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x; args_to_zero=(false, true))
+    else
+        Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x)
+    end
     return (val, grad)
 end
 
