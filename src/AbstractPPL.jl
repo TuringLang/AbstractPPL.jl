@@ -12,8 +12,34 @@ include("abstractprobprog.jl")
 include("evaluate.jl")
 include("evaluators/Evaluators.jl")
 using .Evaluators: prepare, value_and_gradient!!, value_and_jacobian!!
+
+"""
+    generate_testcases(::Val{group})
+
+Return a tuple of test cases for the conformance `group`. Implemented by the
+`Test` extension (`AbstractPPLTestExt`). Reserved group keys (extensions must
+not redefine these): `:vector` for value/gradient/jacobian round-trips on
+vector-input evaluators; `:edge` for error-path cases. Downstream packages may
+add other keys.
+"""
+function generate_testcases end
+
+"""
+    run_testcases(::Val{group}, prepare_fn=AbstractPPL.prepare; adtype, kwargs...)
+
+Run the test cases produced by [`generate_testcases`](@ref) against an AD
+backend, using `prepare_fn` (default `AbstractPPL.prepare`) to construct each
+prepared evaluator. Implemented by the `Test` extension. See
+[`generate_testcases`](@ref) for reserved group keys.
+"""
+function run_testcases end
+
 @static if VERSION >= v"1.11.0"
-    eval(Meta.parse("public prepare, value_and_gradient!!, value_and_jacobian!!"))
+    eval(
+        Meta.parse(
+            "public prepare, value_and_gradient!!, value_and_jacobian!!, generate_testcases, run_testcases",
+        ),
+    )
 end
 
 include("varname/optic.jl")

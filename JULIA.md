@@ -1,6 +1,6 @@
 # JULIA.md
 
-Shared day-to-day Julia practices. DynamicPPL-specific review notes live in `AGENTS.md`; newcomer context lives in `docs/src/onboarding.md`.
+Shared day-to-day Julia practices. AbstractPPL-specific review notes live in `AGENTS.md`.
 
 ## Engineering
 
