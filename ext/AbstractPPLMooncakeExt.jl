@@ -8,6 +8,15 @@ using Mooncake: Mooncake
 
 const _MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 
+# Tell Mooncake that the evaluator wrappers are constants from its
+# perspective: their fields hold the user's problem state, which Mooncake
+# would otherwise derive a nested `Tangent{NamedTuple{f::Tangent{...}}}` for
+# and walk on every backward pass. The evaluators are AbstractPPL's own
+# types and only ever appear as the callable argument to Mooncake — no
+# downstream caller asks for a gradient w.r.t. them.
+Mooncake.tangent_type(::Type{<:VectorEvaluator}) = Mooncake.NoTangent
+Mooncake.tangent_type(::Type{<:NamedTupleEvaluator}) = Mooncake.NoTangent
+
 # Tag a Mooncake cache with the prepared evaluator's output arity (`:scalar`
 # or `:vector`) so `value_and_gradient!!` / `value_and_jacobian!!` can raise
 # helpful arity-mismatch errors instead of failing inside Mooncake.
@@ -62,24 +71,15 @@ function AbstractPPL.prepare(
     return Prepared(adtype, evaluator, MooncakeCache{arity}(cache))
 end
 
-# `Mooncake.value_and_gradient!!` returns `(val, (∂f, ∂x))`; we discard the
-# function tangent `∂f` and surface only `∂x` as the user-facing gradient.
-# Reverse-mode caches accept `args_to_zero` to skip re-zeroing the evaluator's
-# tangent buffer each call (the dominant overhead when the user's problem
-# carries large fields whose gradient we never consume); forward-mode caches
-# don't take the kwarg, so the branch is `isa`-dispatched on the concrete
-# `p.cache` type and constant-folds away.
+# `Mooncake.value_and_gradient!!` returns `(val, (∂f, ∂x))`; `∂f` is `NoTangent`
+# because we registered `tangent_type(::Type{<:NamedTupleEvaluator}) = NoTangent`
+# above, so the cache never carries a tangent for the user's problem.
 # Shape validation is delegated to the inner `NamedTupleEvaluator{CheckInput}`
 # callable Mooncake invokes — gated by the user's `check_dims` choice.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:NamedTupleEvaluator}, values::NamedTuple
 )
-    val, (_, grad) = if p.cache isa Mooncake.Cache
-        # Skip re-zeroing the evaluator's tangent buffer; we discard `∂f`.
-        Mooncake.value_and_gradient!!(p.cache, p.evaluator, values; args_to_zero=(false, true))
-    else
-        Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
-    end
+    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
     return (val, grad)
 end
 
@@ -99,12 +99,7 @@ end
     x::AbstractVector{T},
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    val, (_, grad) = if p.cache.cache isa Mooncake.Cache
-        # Skip re-zeroing the evaluator's tangent buffer; we discard `∂f`.
-        Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x; args_to_zero=(false, true))
-    else
-        Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x)
-    end
+    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x)
     return (val, grad)
 end
 
