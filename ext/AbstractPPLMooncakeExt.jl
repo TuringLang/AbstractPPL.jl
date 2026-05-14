@@ -17,17 +17,11 @@ const _MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 Mooncake.tangent_type(::Type{<:VectorEvaluator}) = Mooncake.NoTangent
 Mooncake.tangent_type(::Type{<:NamedTupleEvaluator}) = Mooncake.NoTangent
 
-# Tag a Mooncake cache with the prepared evaluator's output arity (`:scalar`
-# or `:vector`) so `value_and_gradient!!` / `value_and_jacobian!!` can raise
-# helpful arity-mismatch errors instead of failing inside Mooncake.
-#
-# The optional `f` / `contexts` fields carry the lowered raw-target path
-# opted into by `raw_gradient_target=(f, contexts)` on reverse-mode
-# `AutoMooncake`. They default to `nothing`; dispatch on `CT<:Tuple` (vs
-# `Nothing`) picks the lowered AD entry. `args_to_zero` is derived from
-# `contexts` at the AD entry — it's a `false, true, false…` literal that
-# constant-folds for any concrete `contexts` arity. `prepared(x)` still
-# calls `problem(x)` — only the AD entry consults the lowered fields.
+# `A` tags the evaluator's output arity (`:scalar`/`:vector`) so arity
+# mismatches dispatch to a dedicated error method instead of failing inside
+# Mooncake. `f`/`contexts` are `nothing` on the generic path; on the
+# `raw_gradient_target` path they carry the lowered target so `CT<:Tuple`
+# selects the lowered AD entry by dispatch.
 struct MooncakeCache{A,C,F,CT}
     cache::C
     f::F
@@ -42,8 +36,6 @@ end
 
 _mooncake_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtype.config
 
-# `value_and_gradient!!` accepts either a reverse-mode gradient cache
-# (AutoMooncake) or a forward-mode derivative cache (AutoMooncakeForward).
 function _mooncake_gradient_cache(::AutoMooncake, f, x; config)
     return Mooncake.prepare_gradient_cache(f, x; config)
 end
@@ -51,8 +43,6 @@ function _mooncake_gradient_cache(::AutoMooncakeForward, f, x; config)
     return Mooncake.prepare_derivative_cache(f, x; config)
 end
 
-# `value_and_jacobian!!`: reverse mode wants a pullback cache, forward mode
-# wants a derivative cache.
 function _mooncake_jacobian_cache(::AutoMooncake, f, x; config)
     return Mooncake.prepare_pullback_cache(f, x; config)
 end
@@ -67,12 +57,48 @@ function AbstractPPL.prepare(
     check_dims::Bool=true,
     raw_gradient_target=nothing,
 )
+    raw_gradient_target === nothing || throw(
+        ArgumentError(
+            "`raw_gradient_target` is only supported on the vector `prepare` path."
+        ),
+    )
     evaluator = AbstractPPL.prepare(problem, values; check_dims)::NamedTupleEvaluator
     config = _mooncake_config(adtype)
     cache = _mooncake_gradient_cache(adtype, evaluator, values; config)
     return Prepared(adtype, evaluator, cache)
 end
 
+"""
+    prepare(adtype::AutoMooncake, problem, x; check_dims=true, raw_gradient_target=nothing)
+    prepare(adtype::AutoMooncakeForward, problem, x; check_dims=true)
+
+Prepare a Mooncake gradient/Jacobian evaluator for a dense vector input.
+
+Non-`DenseVector` inputs (views, strided slices) are rejected: Mooncake
+assumes a contiguous primal and otherwise returns shape-incorrect tangents
+on reverse mode and crashes on forward/Jacobian paths.
+
+# `raw_gradient_target` (unsafe)
+
+Optional reverse-mode kwarg of the form `(f, contexts::Tuple)`. When
+supplied, Mooncake compiles its tape against `f(x, contexts...)` instead of
+the wrapping `VectorEvaluator`, which avoids the per-call indirection
+through the evaluator on the AD hot path.
+
+This is an **unsafe escape hatch**:
+
+  - The caller asserts `f(x, contexts...) ≡ evaluator(x)` for every `x`
+    Mooncake will see — AbstractPPL does not (and cannot) verify this.
+  - The AD pass calls `f(x, contexts...)` directly; the `VectorEvaluator`
+    wrapper is bypassed. Input shape is still validated up front by
+    `_check_ad_input` on the user-facing call.
+  - The `(f, contexts)` shape is destructured directly; malformed values
+    (e.g. a bare function, or `contexts` that isn't a tuple) will raise
+    `MethodError`/`BoundsError` rather than a structured `ArgumentError`.
+
+Use only when the indirection cost is measured and the equivalence is
+known to hold.
+"""
 function AbstractPPL.prepare(
     adtype::_MooncakeAD,
     problem,
@@ -80,6 +106,13 @@ function AbstractPPL.prepare(
     check_dims::Bool=true,
     raw_gradient_target=nothing,
 )
+    x isa DenseVector || throw(
+        ArgumentError(
+            "AutoMooncake / AutoMooncakeForward require a dense vector input " *
+            "(e.g. `Vector{<:Real}`); got $(typeof(x)). Wrap non-dense inputs " *
+            "(views, strided slices) with `collect` before calling `prepare`.",
+        ),
+    )
     # Validate `raw_gradient_target` preconditions that don't need an arity
     # probe, so the probe `evaluator(x)` below cannot crash on user code that
     # assumes non-empty `x`.
@@ -116,11 +149,12 @@ function AbstractPPL.prepare(
     return Prepared(adtype, evaluator, MooncakeCache{arity}(cache))
 end
 
-# `Mooncake.value_and_gradient!!` returns `(val, (∂f, ∂x))`; `∂f` is `NoTangent`
-# because we registered `tangent_type(::Type{<:NamedTupleEvaluator}) = NoTangent`
-# above, so the cache never carries a tangent for the user's problem.
-# Shape validation is delegated to the inner `NamedTupleEvaluator{CheckInput}`
-# callable Mooncake invokes — gated by the user's `check_dims` choice.
+# Input-shape validation is delegated to the AD backend: Mooncake catches
+# top-level NamedTuple-type mismatches, and the inner
+# `NamedTupleEvaluator{CheckInput}` callable catches nested-array size
+# mismatches (gated by `check_dims`). Running `_assert_namedtuple_shape`
+# again here would duplicate the second check on every AD call.
+# (`∂f` is `NoTangent` thanks to the `tangent_type` overload above.)
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:NamedTupleEvaluator}, values::NamedTuple
 )

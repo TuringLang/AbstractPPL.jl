@@ -17,7 +17,6 @@ struct DICache{UseContext,F,GP,JP}
     gradient_prep::GP
     jacobian_prep::JP
     function DICache{UseContext}(target::F, gp::GP, jp::JP) where {UseContext,F,GP,JP}
-        UseContext isa Bool || throw(ArgumentError("`UseContext` must be a Bool."))
         return new{UseContext,F,GP,JP}(target, gp, jp)
     end
 end
@@ -40,6 +39,9 @@ end
 @inline _wrap_cache(target, gp, jp, ::Val{UseContext}) where {UseContext} =
     DICache{UseContext}(target, gp, jp)
 
+# `raw_gradient_target` is accepted for signature parity with the Mooncake
+# extension's vector `prepare`, but DI has no equivalent context-lowering
+# entry — only `nothing` is supported here.
 function AbstractPPL.prepare(
     adtype::AbstractADType,
     problem,
@@ -47,6 +49,11 @@ function AbstractPPL.prepare(
     check_dims::Bool=true,
     raw_gradient_target=nothing,
 )
+    raw_gradient_target === nothing || throw(
+        ArgumentError(
+            "`raw_gradient_target` is not supported by the DifferentiationInterface extension.",
+        ),
+    )
     evaluator = AbstractPPL.prepare(problem, x; check_dims)::VectorEvaluator
     arity = _ad_output_arity(evaluator(x))
     if length(x) == 0

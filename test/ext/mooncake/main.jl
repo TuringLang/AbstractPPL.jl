@@ -75,4 +75,14 @@ using Test
         # Jacobian on a scalar-only lowered cache surfaces our arity-mismatch error.
         @test_throws r"vector-valued" AbstractPPL.value_and_jacobian!!(lowered, x)
     end
+
+    @testset "dense vector requirement" begin
+        # Non-dense AbstractVectors (e.g. `view`s) are rejected up front rather
+        # than reaching Mooncake, where reverse-mode silently returns a
+        # `Mooncake.Tangent` and forward/Jacobian paths crash.
+        problem = x -> sum(abs2, x)
+        v = view([1.0, 2.0, 3.0], :)
+        @test_throws r"dense vector" prepare(AutoMooncake(), problem, v)
+        @test_throws r"dense vector" prepare(AutoMooncakeForward(), problem, v)
+    end
 end
