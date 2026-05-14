@@ -19,8 +19,9 @@ using .Evaluators: prepare, value_and_gradient!!, value_and_jacobian!!
 Return a tuple of test cases for the conformance `group`. Implemented by the
 `Test` extension (`AbstractPPLTestExt`). Reserved group keys (extensions must
 not redefine these): `:vector` for value/gradient/jacobian round-trips on
-vector-input evaluators; `:edge` for error-path cases. Downstream packages may
-add other keys.
+vector-input evaluators; `:namedtuple` for `NamedTuple`-input evaluators;
+`:edge` for error-path cases; `:cache_reuse` for repeated calls against a
+single prepared evaluator. Downstream packages may add other keys.
 """
 function generate_testcases end
 

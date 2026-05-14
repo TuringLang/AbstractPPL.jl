@@ -2,8 +2,9 @@
 #
 # Usage (from the repo root):
 #   LABEL=ext/differentiationinterface julia test/run_extras.jl
+#   LABEL=ext/mooncake                 julia test/run_extras.jl
 
-const VALID_LABELS = ("ext/differentiationinterface",)
+const VALID_LABELS = ("ext/differentiationinterface", "ext/mooncake")
 
 label = get(ENV, "LABEL", nothing)
 label in VALID_LABELS ||

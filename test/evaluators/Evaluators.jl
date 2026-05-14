@@ -72,6 +72,21 @@ end
         # Unsupported leaf types are rejected rather than silently passing.
         ne_string = AbstractPPL.Evaluators.NamedTupleEvaluator(x -> length(x.s), (s="abc",))
         @test_throws r"Supported leaves" ne_string((s="abcde",))
+
+        # `_check_ad_input` is dispatch-gated by `CheckInput` so the AD hot
+        # path pays nothing when the evaluator was prepared with
+        # `check_dims=false`.
+        ve_checked = AbstractPPL.Evaluators.VectorEvaluator{true}(sum, 3)
+        @test AbstractPPL.Evaluators._check_ad_input(ve_checked, [1.0, 2.0, 3.0]) ===
+            nothing
+        @test_throws DimensionMismatch AbstractPPL.Evaluators._check_ad_input(
+            ve_checked, [1.0, 2.0]
+        )
+        @test_throws r"floating-point" AbstractPPL.Evaluators._check_ad_input(
+            ve_checked, [1, 2, 3]
+        )
+        @test AbstractPPL.Evaluators._check_ad_input(ve_unchecked, [1.0, 2.0]) === nothing
+        @test AbstractPPL.Evaluators._check_ad_input(ve_unchecked, [1, 2, 3]) === nothing
     end
 
     @testset "prepare (structural)" begin
