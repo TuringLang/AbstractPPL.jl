@@ -117,6 +117,15 @@ end
         pv_unchecked = prepare(sum, zeros(3); check_dims=false)
         @test pv_unchecked isa VectorEvaluator{false}
         @test pv_unchecked([1.0, 2.0]) == 3.0  # wrong length, no error
+
+        # `context` threads constant args through to the callable; AD-unaware
+        # `prepare` constructs the `VectorEvaluator` with the same shape and
+        # `prepared(x)` evaluates `f(x, context...)`.
+        affine(x, a, b) = sum(x) * a + b
+        pv_ctx = prepare(affine, zeros(2); context=(2.0, 1.0))
+        @test pv_ctx isa VectorEvaluator{true}
+        @test pv_ctx.context === (2.0, 1.0)
+        @test pv_ctx([3.0, 4.0]) == 15.0
     end
 
     @testset "prepare (AD-aware)" begin

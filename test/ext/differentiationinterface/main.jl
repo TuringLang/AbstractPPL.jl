@@ -31,20 +31,30 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         run_testcases(Val(:edge); adtype=adtype)
     end
 
-    # `DICache` encodes `UseContext` as a type parameter so the
-    # context-vs-no-context DI call is resolved by dispatch, not a runtime
-    # `Bool` branch in the AD hot path.
-    @testset "DICache encodes UseContext as a type parameter" begin
+    # `DICache`'s `Mode` parameter is either `:closure` (compiled-tape
+    # ReverseDiff) or the integer context length on the constants path. The
+    # constants-path integer also documents how many `DI.Constant`s the AD
+    # call passes.
+    @testset "DICache encodes the call mode as a type parameter" begin
         x = [1.0, 2.0, 3.0]
-        prep_ctx = prepare(AutoForwardDiff(), quadratic, x)
-        prep_noctx = prepare(AutoReverseDiff(; compile=true), quadratic, x)
+        prep_noctx = prepare(AutoForwardDiff(), quadratic, x)
+        prep_closure = prepare(AutoReverseDiff(; compile=true), quadratic, x)
+        affine(y, a, b) = a * sum(abs2, y) + b
+        prep_ctx = prepare(AutoForwardDiff(), affine, x; context=(2.0, 1.0))
 
-        @test prep_ctx.cache isa DIExt.DICache{true}
-        @test prep_noctx.cache isa DIExt.DICache{false}
-        @test !hasfield(typeof(prep_ctx.cache), :use_context)
+        @test prep_noctx.cache isa DIExt.DICache{0}
+        @test prep_closure.cache isa DIExt.DICache{:closure}
+        @test prep_ctx.cache isa DIExt.DICache{2}
 
-        # Hot path is type-stable on both branches.
-        @inferred value_and_gradient!!(prep_ctx, x)
+        # Non-empty-context primal matches the underlying `f(x, context...)`.
+        @test prep_ctx(x) == affine(x, 2.0, 1.0)
+        val, grad = value_and_gradient!!(prep_ctx, x)
+        @test val == affine(x, 2.0, 1.0)
+        @test grad ≈ [4.0, 8.0, 12.0]  # 2 * 2x
+
+        # Hot path is type-stable on all three preps.
         @inferred value_and_gradient!!(prep_noctx, x)
+        @inferred value_and_gradient!!(prep_closure, x)
+        @inferred value_and_gradient!!(prep_ctx, x)
     end
 end

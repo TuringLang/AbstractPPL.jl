@@ -138,6 +138,23 @@ library invokes the inner callable many times with same-length dual arrays
 derived from a single user-supplied `x`; re-validating on each invocation
 would be redundant work in the hot path.
 
+## Constant context arguments
+
+When the underlying callable naturally takes the form `f(x, context...)` —
+where everything after `x` is constant state — pass `context` as a tuple to
+the vector form of `prepare`. AD differentiates only w.r.t. `x`; every
+value in `context` is treated as inactive:
+
+```julia
+affine(x, scale, offset) = scale * sum(x) + offset
+prepared = prepare(adtype, affine, zeros(3); context=(2.0, 1.0))
+val, grad = value_and_gradient!!(prepared, [1.0, 2.0, 3.0])
+# val == 2.0 * 6.0 + 1.0; grad == [2.0, 2.0, 2.0]
+```
+
+`prepared(x)` evaluates `f(x, context...)`, and `context=()` (the default)
+preserves the unary `f(x)` shape.
+
 ## Without an AD backend
 
 The two-argument form `prepare(problem, x)` is available without any AD

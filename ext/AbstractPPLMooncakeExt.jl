@@ -8,31 +8,23 @@ using Mooncake: Mooncake
 
 const _MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 
-# Tell Mooncake that the evaluator wrappers are constants from its
-# perspective: their fields hold the user's problem state, which Mooncake
-# would otherwise derive a nested `Tangent{NamedTuple{f::Tangent{...}}}` for
-# and walk on every backward pass. The evaluators are AbstractPPL's own
-# types and only ever appear as the callable argument to Mooncake — no
-# downstream caller asks for a gradient w.r.t. them.
+# `NamedTupleEvaluator` is the callable on the NamedTuple path; `NoTangent`
+# stops Mooncake from deriving a `Tangent{NamedTuple{...}}` for its fields
+# on every backward pass. `VectorEvaluator` is no longer passed to Mooncake
+# after the raw-target merge; the override is kept as a defensive guard.
 Mooncake.tangent_type(::Type{<:VectorEvaluator}) = Mooncake.NoTangent
 Mooncake.tangent_type(::Type{<:NamedTupleEvaluator}) = Mooncake.NoTangent
 
-# `A` tags the evaluator's output arity (`:scalar`/`:vector`) so arity
-# mismatches dispatch to a dedicated error method instead of failing inside
-# Mooncake. `f`/`contexts` are `nothing` on the generic path; on the
-# `raw_gradient_target` path they carry the lowered target so `CT<:Tuple`
-# selects the lowered AD entry by dispatch.
-struct MooncakeCache{A,C,F,CT}
+# Type parameters:
+#
+#   * `A::Symbol` — output arity, `:scalar` or `:vector`. Drives the
+#                   gradient/jacobian dispatch and the arity-mismatch errors.
+#   * `C`         — the underlying Mooncake cache, or `Nothing` for the
+#                   empty-input shortcut.
+struct MooncakeCache{A,C}
     cache::C
-    f::F
-    contexts::CT
 end
-function MooncakeCache{A}(cache::C) where {A,C}
-    return MooncakeCache{A,C,Nothing,Nothing}(cache, nothing, nothing)
-end
-function MooncakeCache{A}(cache::C, f::F, contexts::CT) where {A,C,F,CT<:Tuple}
-    return MooncakeCache{A,C,F,CT}(cache, f, contexts)
-end
+MooncakeCache{A}(cache::C) where {A,C} = MooncakeCache{A,C}(cache)
 
 _mooncake_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtype.config
 
@@ -43,6 +35,15 @@ function _mooncake_gradient_cache(::AutoMooncakeForward, f, x; config)
     return Mooncake.prepare_derivative_cache(f, x; config)
 end
 
+# Vector-scalar overloads — splat `context` into the underlying Mooncake
+# prep call (empty tuple is a no-op).
+function _mooncake_gradient_cache(::AutoMooncake, f, x, context::Tuple; config)
+    return Mooncake.prepare_gradient_cache(f, x, context...; config)
+end
+function _mooncake_gradient_cache(::AutoMooncakeForward, f, x, context::Tuple; config)
+    return Mooncake.prepare_derivative_cache(f, x, context...; config)
+end
+
 function _mooncake_jacobian_cache(::AutoMooncake, f, x; config)
     return Mooncake.prepare_pullback_cache(f, x; config)
 end
@@ -51,17 +52,8 @@ function _mooncake_jacobian_cache(::AutoMooncakeForward, f, x; config)
 end
 
 function AbstractPPL.prepare(
-    adtype::_MooncakeAD,
-    problem,
-    values::NamedTuple;
-    check_dims::Bool=true,
-    raw_gradient_target=nothing,
+    adtype::_MooncakeAD, problem, values::NamedTuple; check_dims::Bool=true
 )
-    raw_gradient_target === nothing || throw(
-        ArgumentError(
-            "`raw_gradient_target` is only supported on the vector `prepare` path."
-        ),
-    )
     evaluator = AbstractPPL.prepare(problem, values; check_dims)::NamedTupleEvaluator
     config = _mooncake_config(adtype)
     cache = _mooncake_gradient_cache(adtype, evaluator, values; config)
@@ -69,8 +61,8 @@ function AbstractPPL.prepare(
 end
 
 """
-    prepare(adtype::AutoMooncake, problem, x; check_dims=true, raw_gradient_target=nothing)
-    prepare(adtype::AutoMooncakeForward, problem, x; check_dims=true)
+    prepare(adtype::AutoMooncake, problem, x; check_dims=true, context::Tuple=())
+    prepare(adtype::AutoMooncakeForward, problem, x; check_dims=true, context::Tuple=())
 
 Prepare a Mooncake gradient/Jacobian evaluator for a dense vector input.
 
@@ -78,33 +70,21 @@ Non-`DenseVector` inputs (views, strided slices) are rejected: Mooncake
 assumes a contiguous primal and otherwise returns shape-incorrect tangents
 on reverse mode and crashes on forward/Jacobian paths.
 
-# `raw_gradient_target` (unsafe)
+`context` follows the base `prepare` contract — the prepared evaluator
+computes `problem(x, context...)` with AD differentiating only `x`. One
+Mooncake-specific restriction: vector-valued problems require `context=()`.
 
-Optional reverse-mode kwarg of the form `(f, contexts::Tuple)`. When
-supplied, Mooncake compiles its tape against `f(x, contexts...)` instead of
-the wrapping `VectorEvaluator`, which avoids the per-call indirection
-through the evaluator on the AD hot path.
-
-This is an **unsafe escape hatch**:
-
-  - The caller asserts `f(x, contexts...) ≡ evaluator(x)` for every `x`
-    Mooncake will see — AbstractPPL does not (and cannot) verify this.
-  - The AD pass calls `f(x, contexts...)` directly; the `VectorEvaluator`
-    wrapper is bypassed. Input shape is still validated up front by
-    `_check_ad_input` on the user-facing call.
-  - The `(f, contexts)` shape is destructured directly; malformed values
-    (e.g. a bare function, or `contexts` that isn't a tuple) will raise
-    `MethodError`/`BoundsError` rather than a structured `ArgumentError`.
-
-Use only when the indirection cost is measured and the equivalence is
-known to hold.
+Empty input (`length(x) == 0`) is supported with any `context`; Mooncake
+builds no tape for zero-length `x`, so the prepared evaluator's AD entry
+short-circuits to `(problem(x, context...), eltype(x)[])` without invoking
+Mooncake.
 """
 function AbstractPPL.prepare(
     adtype::_MooncakeAD,
     problem,
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
-    raw_gradient_target=nothing,
+    context::Tuple=(),
 )
     x isa DenseVector || throw(
         ArgumentError(
@@ -113,38 +93,30 @@ function AbstractPPL.prepare(
             "(views, strided slices) with `collect` before calling `prepare`.",
         ),
     )
-    # Validate `raw_gradient_target` preconditions that don't need an arity
-    # probe, so the probe `evaluator(x)` below cannot crash on user code that
-    # assumes non-empty `x`.
-    if raw_gradient_target !== nothing
-        adtype isa AutoMooncake || throw(
-            ArgumentError(
-                "`raw_gradient_target` is only supported with reverse-mode `AutoMooncake`.",
-            ),
-        )
-        length(x) > 0 ||
-            throw(ArgumentError("`raw_gradient_target` is not supported for empty input."))
-    end
-    evaluator = AbstractPPL.prepare(problem, x; check_dims)::VectorEvaluator
+    evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
     arity = _ad_output_arity(evaluator(x))
     config = _mooncake_config(adtype)
-    if raw_gradient_target !== nothing
-        arity === :scalar || throw(
+    if !isempty(evaluator.context) && arity !== :scalar
+        throw(
             ArgumentError(
-                "`raw_gradient_target` is only supported for scalar-valued problems."
+                "Non-empty `context` is only supported for scalar-valued problems."
             ),
         )
-        f, contexts = raw_gradient_target
-        cache = Mooncake.prepare_gradient_cache(f, x, contexts...; config)
-        return Prepared(adtype, evaluator, MooncakeCache{:scalar}(cache, f, contexts))
     end
     # Mooncake builds no tape for length-zero `x`; tag with `Nothing` so the
-    # empty-input methods below shortcut without invoking Mooncake.
+    # empty-input methods below shortcut without invoking Mooncake. Empty `x`
+    # with non-empty context also routes here — the hot-path shortcut just
+    # calls `p.evaluator(x)` which already does `f([], context...)`.
     length(x) == 0 && return Prepared(adtype, evaluator, MooncakeCache{arity}(nothing))
+    # Compile the tape on the evaluator's `f` and `context` (not the raw
+    # `problem` passed in): a downstream override of structural `prepare`
+    # may return a `VectorEvaluator` whose `.f`/`.context` differ from the
+    # caller-supplied `problem`/`context`. The hot path uses `evaluator.f`
+    # / `evaluator.context`, so the cache must agree.
     cache = if arity === :scalar
-        _mooncake_gradient_cache(adtype, evaluator, x; config)
+        _mooncake_gradient_cache(adtype, evaluator.f, x, evaluator.context; config)
     else
-        _mooncake_jacobian_cache(adtype, evaluator, x; config)
+        _mooncake_jacobian_cache(adtype, evaluator.f, x; config)
     end
     return Prepared(adtype, evaluator, MooncakeCache{arity}(cache))
 end
@@ -162,9 +134,10 @@ end
     return (val, grad)
 end
 
-# Empty-input shortcut: tagged with `MooncakeCache{…,Nothing}` at prepare time
-# so dispatch resolves the no-Mooncake path at compile time — no runtime
-# `isnothing(cache)` branch in the hot path.
+# Empty-input shortcut. `MooncakeCache{:scalar,Nothing}` is strictly more
+# specific than `MooncakeCache{:scalar}` on `C`, so dispatch unambiguously
+# selects this method over the general scalar-gradient hot path below for
+# zero-length `x`.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar,Nothing}},
     x::AbstractVector{T},
@@ -173,35 +146,30 @@ end
     return (p.evaluator(x), T[])
 end
 
+# Reverse-mode `Mooncake.Cache` needs `args_to_zero` to mark `x` as the lone
+# active input (`false` on `f`, `true` on `x`, `false` on each context value).
+# Forward-mode `ForwardCache` derives activity from its seeded argument and
+# rejects the kwarg. Dispatching on the AD type keeps each call mode-specific
+# without a runtime branch.
+@inline _mooncake_value_and_gradient(
+    ::AutoMooncake, cache, f::F, x, context::Tuple
+) where {F} = Mooncake.value_and_gradient!!(
+    cache, f, x, context...; args_to_zero=(false, true, map(_ -> false, context)...)
+)
+@inline _mooncake_value_and_gradient(
+    ::AutoMooncakeForward, cache, f::F, x, context::Tuple
+) where {F} = Mooncake.value_and_gradient!!(cache, f, x, context...)
+
+# Scalar-gradient hot path. Empty `context` collapses the splat and reduces
+# `args_to_zero` to `(false, true)`. `tangents[2]` is the `x`-gradient — the
+# trailing entries (one per context value) are zeroed and discarded.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar}},
     x::AbstractVector{T},
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    val, (_, grad) = Mooncake.value_and_gradient!!(p.cache.cache, p.evaluator, x)
-    return (val, grad)
-end
-
-# Lowered raw-target gradient — `p.cache.f(x, p.cache.contexts...) ≡ p.evaluator(x)`
-# by the `raw_gradient_target` contract. Mooncake's tape was compiled on the
-# raw shape, sidestepping the fixed `evaluator(x)` overhead. `CT<:Tuple`
-# distinguishes the lowered cache from the generic one (where `CT=Nothing`).
-# `args_to_zero` is constant-folded from `c.contexts`'s arity at compile time.
-@inline function AbstractPPL.value_and_gradient!!(
-    p::Prepared{
-        <:AutoMooncake,<:VectorEvaluator,<:MooncakeCache{:scalar,<:Any,<:Any,<:Tuple}
-    },
-    x::AbstractVector{T},
-) where {T<:Real}
-    Evaluators._check_ad_input(p.evaluator, x)
-    c = p.cache
-    val, tangents = Mooncake.value_and_gradient!!(
-        c.cache,
-        c.f,
-        x,
-        c.contexts...;
-        args_to_zero=(false, true, map(_ -> false, c.contexts)...),
-    )
+    e = p.evaluator
+    val, tangents = _mooncake_value_and_gradient(p.adtype, p.cache.cache, e.f, x, e.context)
     return (val, tangents[2])
 end
 
@@ -222,8 +190,8 @@ end
     return Evaluators._throw_jacobian_needs_vector()
 end
 
-# Empty-input jacobian shortcut — same compile-time dispatch trick as the
-# scalar Nothing-tagged case; skips Mooncake entirely.
+# Empty-input jacobian shortcut. Same `Nothing` specificity trick as the
+# scalar case above; skips Mooncake entirely.
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector,Nothing}},
     x::AbstractVector{T},
@@ -238,7 +206,11 @@ end
     x::AbstractVector{T},
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return Mooncake.value_and_jacobian!!(p.cache.cache, p.evaluator, x)
+    # Vector arity rejects non-empty `context` at prepare time, so the tape
+    # is compiled on `problem(x)` and there is no splat or `args_to_zero` to
+    # propagate. Mooncake's `value_and_jacobian!!` returns `(val, jac)`
+    # directly with `x` as the only active argument.
+    return Mooncake.value_and_jacobian!!(p.cache.cache, p.evaluator.f, x)
 end
 
 end # module
