@@ -1,3 +1,19 @@
+## 0.15.0
+
+New evaluator-preparation and AD interface: `prepare` binds a callable to a sample input (vector or `NamedTuple`); `value_and_gradient!!` / `value_and_jacobian!!` return value-and-derivative pairs from the resulting `Prepared` wrapper. The `!!` suffix signals the returned derivative may alias the cache — copy if you need to keep it.
+
+```julia
+using ADTypes, Mooncake  # or DifferentiationInterface + ForwardDiff
+using AbstractPPL: prepare, value_and_gradient!!
+prepared = prepare(AutoMooncake(), x -> -0.5 * sum(abs2, x), zeros(3))
+val, grad = value_and_gradient!!(prepared, [1.0, 2.0, 3.0])
+# val == -7.0; grad == [-1.0, -2.0, -3.0]
+```
+
+Two new AD-backend extensions ship with it: `AbstractPPLDifferentiationInterfaceExt` (any DI backend) and `AbstractPPLMooncakeExt` (`AutoMooncake`, `AutoMooncakeForward`). `AbstractPPLTestExt` gains a conformance harness via `generate_testcases` / `run_testcases` (reserved groups: `:vector`, `:namedtuple`, `:edge`, `:cache_reuse`).
+
+See [`docs/src/evaluators.md`](docs/src/evaluators.md) for the full interface, the `check_dims` and `context::Tuple` options, the `NamedTuple` input path, and extension-author guidance.
+
 ## 0.14.2
 
 Fix string serialisation of VarNames such that the order of keyword arguments is preserved (this was previously guaranteed, but JSON.jl v1.5.0 introduced a change that caused the keyword arguments to always be sorted.)
