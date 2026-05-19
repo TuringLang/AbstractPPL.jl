@@ -12,8 +12,8 @@ val, grad = value_and_gradient!!(prepared, [1.0, 2.0, 3.0])
 
 Added two AD-backend extensions:
 
-- `AbstractPPLDifferentiationInterfaceExt`, supporting DifferentiationInterface backends.
-- `AbstractPPLMooncakeExt`, supporting `AutoMooncake` and `AutoMooncakeForward`.
+  - `AbstractPPLDifferentiationInterfaceExt`, supporting DifferentiationInterface backends.
+  - `AbstractPPLMooncakeExt`, supporting `AutoMooncake` and `AutoMooncakeForward`.
 
 The new evaluator path supports scalar gradients, vector-output Jacobians, `NamedTuple` inputs, reusable AD caches, input-shape checks, and constant context arguments via `context::Tuple`.
 
