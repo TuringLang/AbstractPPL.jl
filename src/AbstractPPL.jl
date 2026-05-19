@@ -11,7 +11,8 @@ include("abstractmodeltrace.jl")
 include("abstractprobprog.jl")
 include("evaluate.jl")
 include("evaluators/Evaluators.jl")
-using .Evaluators: prepare, value_and_gradient!!, value_and_jacobian!!
+using .Evaluators:
+    prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!
 
 """
     generate_testcases(::Val{group})
@@ -19,9 +20,11 @@ using .Evaluators: prepare, value_and_gradient!!, value_and_jacobian!!
 Return a tuple of test cases for the conformance `group`. Implemented by the
 `Test` extension (`AbstractPPLTestExt`). Reserved group keys (extensions must
 not redefine these): `:vector` for value/gradient/jacobian round-trips on
-vector-input evaluators; `:namedtuple` for `NamedTuple`-input evaluators;
-`:edge` for error-path cases; `:cache_reuse` for repeated calls against a
-single prepared evaluator. Downstream packages may add other keys.
+vector-input evaluators; `:hessian` for `order=2` value/gradient/Hessian
+round-trips on vector-input scalar-output evaluators; `:namedtuple` for
+`NamedTuple`-input evaluators; `:edge` for error-path cases; `:cache_reuse`
+for repeated calls against a single prepared evaluator. Downstream packages
+may add other keys.
 """
 function generate_testcases end
 
@@ -38,7 +41,7 @@ function run_testcases end
 @static if VERSION >= v"1.11.0"
     eval(
         Meta.parse(
-            "public prepare, value_and_gradient!!, value_and_jacobian!!, generate_testcases, run_testcases",
+            "public prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, generate_testcases, run_testcases",
         ),
     )
 end

@@ -19,6 +19,19 @@ struct ValueCase
     jacobian::Any
 end
 
+# Mirror of `ValueCase` for `order=2` prep + `value_gradient_and_hessian!!`.
+# A separate type keeps the order=1 cases narrow and lets `run_testcases`
+# dispatch on the prep order without an extra field.
+struct HessianCase
+    name::String
+    f::Any
+    x_proto::Any
+    x::Any
+    value::Any
+    gradient::Any
+    hessian::Any
+end
+
 struct ErrorCase
     name::String
     f::Any
@@ -65,6 +78,29 @@ function AbstractPPL.generate_testcases(::Val{:vector})
             [2.0, 3.0],
             nothing,
             zeros(2, 0),
+        ),
+    )
+end
+
+function AbstractPPL.generate_testcases(::Val{:hessian})
+    return (
+        HessianCase(
+            "quadratic (scalar output)",
+            QuadraticProblem(),
+            zeros(3),
+            [3.0, 1.0, 2.0],
+            14.0,
+            [6.0, 2.0, 4.0],
+            [2.0 0.0 0.0; 0.0 2.0 0.0; 0.0 0.0 2.0],
+        ),
+        HessianCase(
+            "empty input, scalar output",
+            x -> 7.5,
+            Float64[],
+            Float64[],
+            7.5,
+            Float64[],
+            zeros(0, 0),
         ),
     )
 end
@@ -151,6 +187,17 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
             r"floating-point",
         ),
+        # `value_gradient_and_hessian!!` rejects order=1 preps regardless of
+        # the underlying problem arity — both paths share the same dispatch
+        # so one case suffices.
+        ErrorCase(
+            "value_gradient_and_hessian!! on order=1 prep",
+            QuadraticProblem(),
+            zeros(3),
+            [3.0, 1.0, 2.0],
+            (prepared, x) -> AbstractPPL.value_gradient_and_hessian!!(prepared, x),
+            r"order=2",
+        ),
     )
 end
 
@@ -185,6 +232,22 @@ function AbstractPPL.run_testcases(
                 @test val ≈ case.value atol = atol rtol = rtol
                 @test jac ≈ case.jacobian atol = atol rtol = rtol
             end
+        end
+    end
+    return nothing
+end
+
+function AbstractPPL.run_testcases(
+    ::Val{:hessian}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
+)
+    for case in generate_testcases(Val(:hessian))
+        @testset "$(case.name)" begin
+            prepared = prepare_fn(adtype, case.f, case.x_proto; order=2)
+            @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
+            val, grad, hess = AbstractPPL.value_gradient_and_hessian!!(prepared, case.x)
+            @test val ≈ case.value atol = atol rtol = rtol
+            @test grad ≈ case.gradient atol = atol rtol = rtol
+            @test hess ≈ case.hessian atol = atol rtol = rtol
         end
     end
     return nothing

@@ -18,6 +18,10 @@ using Test
             run_testcases(Val(:namedtuple); adtype=adtype, atol=1e-6, rtol=1e-6)
             run_testcases(Val(:cache_reuse); adtype=adtype, atol=1e-6, rtol=1e-6)
             run_testcases(Val(:edge); adtype=adtype)
+            # Hessian (`order=2`) is reverse-mode only on the AutoMooncake side;
+            # AutoMooncakeForward routes through the same generic Hessian path
+            # since `Mooncake.prepare_hessian_cache` is mode-agnostic.
+            run_testcases(Val(:hessian); adtype=adtype, atol=1e-6, rtol=1e-6)
         end
     end
 

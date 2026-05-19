@@ -138,6 +138,56 @@ library invokes the inner callable many times with same-length dual arrays
 derived from a single user-supplied `x`; re-validating on each invocation
 would be redundant work in the hot path.
 
+## Hessian (`order=2`)
+
+Pass `order=2` to `prepare` to build a Hessian-capable evaluator. The
+returned object answers `value_gradient_and_hessian!!`, which returns
+`(value, gradient, hessian)` in a single call. `order=2` requires
+`problem` to be scalar-valued; a vector-valued probe throws at preparation
+time.
+
+```julia
+using AbstractPPL: prepare, value_gradient_and_hessian!!
+using ADTypes: AutoForwardDiff
+using ForwardDiff, DifferentiationInterface
+
+quadratic(x) = sum(abs2, x)
+prepared = prepare(AutoForwardDiff(), quadratic, zeros(3); order=2)
+val, grad, hess = value_gradient_and_hessian!!(prepared, [1.0, 2.0, 3.0])
+# val == 14.0
+# grad == [2.0, 4.0, 6.0]
+# hess == [2 0 0; 0 2 0; 0 0 2]
+```
+
+Both `context=` and `check_dims=` apply to `order=2` preps with the same
+semantics as for `order=1`. The `!!` aliasing contract also extends: the
+returned gradient and Hessian may alias internal cache buffers of
+`prepared`, so copy before retaining them past the next call. NamedTuple
+inputs are not supported at `order=2`.
+
+For DifferentiationInterface, `adtype` can be either a single backend
+(letting DI pick its own Hessian strategy) or a
+[`DifferentiationInterface.SecondOrder(outer, inner)`](https://juliadiff.org/DifferentiationInterface.jl/stable/api/#DifferentiationInterface.SecondOrder)
+composition that selects the outer differentiator and the inner gradient
+backend independently — typically forward-over-reverse:
+
+```julia
+using DifferentiationInterface: SecondOrder
+using ADTypes: AutoForwardDiff, AutoReverseDiff
+
+adtype = SecondOrder(AutoForwardDiff(), AutoReverseDiff())
+prepared = prepare(adtype, quadratic, zeros(3); order=2)
+```
+
+`SecondOrder <: AbstractADType`, so the same `prepare(adtype, problem, x; order=2)`
+entry handles it.
+
+Calling `value_gradient_and_hessian!!` on an `order=1` prep throws an
+`ArgumentError` — re-prepare with `order=2` instead. Likewise, calling
+`value_and_gradient!!` or `value_and_jacobian!!` on an `order=2` prep is
+unsupported; use `value_gradient_and_hessian!!` and discard the unused
+return value.
+
 ## Constant context arguments
 
 When the underlying callable naturally takes the form `f(x, context...)` —
@@ -177,4 +227,5 @@ p([1.0, 2.0, 3.0])
 AbstractPPL.prepare
 AbstractPPL.value_and_gradient!!
 AbstractPPL.value_and_jacobian!!
+AbstractPPL.value_gradient_and_hessian!!
 ```

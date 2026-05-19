@@ -42,14 +42,14 @@ Prepared(adtype::AbstractADType, evaluator) = Prepared(adtype, evaluator, nothin
 """
     prepare(problem, values::NamedTuple; check_dims::Bool=true)
     prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=())
-    prepare(adtype, problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=())
+    prepare(adtype, problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=(), order::Int=1)
 
 Prepare a callable evaluator for `problem`.
 
 Use the two-argument form with a `NamedTuple` when the evaluator works with
 named inputs, or with a vector when it works with vector inputs. The
 three-argument form, contributed by AD-backend extensions, additionally
-prepares gradient or jacobian machinery for vector inputs.
+prepares gradient, jacobian, or Hessian machinery for vector inputs.
 
 `check_dims` (default `true`) controls whether the returned evaluator validates
 the input shape on each call. Pass `check_dims=false` to skip the per-call
@@ -61,9 +61,15 @@ through to `problem`: the prepared evaluator computes `problem(x, context...)`,
 and AD backends differentiate only with respect to `x`. `context=()` (the
 default) preserves the unary `problem(x)` contract.
 
+`order` selects the derivative order to prepare for on the AD-aware form. The
+default `order=1` prepares gradient (scalar output) or jacobian (vector output)
+machinery. `order=2` prepares Hessian machinery via `value_gradient_and_hessian!!`
+and requires `problem` to be scalar-valued — vector-valued problems will throw
+during preparation.
+
 The three-argument AD-aware form may invoke `problem` once during preparation
-to detect output arity (scalar vs vector) and select gradient or jacobian
-machinery accordingly. Avoid `prepare` calls when `problem` has side effects
+to detect output arity (scalar vs vector) and select the appropriate
+derivative machinery. Avoid `prepare` calls when `problem` has side effects
 that should fire only on user-driven evaluations.
 """
 function prepare end
@@ -98,6 +104,17 @@ alias `prepared`'s internal storage; copy if needed.
 The Jacobian has shape `(length(value), length(x))`.
 """
 function value_and_jacobian!! end
+
+"""
+    value_gradient_and_hessian!!(prepared, x::AbstractVector{<:Real})
+
+Return `(value, gradient::AbstractVector, hessian::AbstractMatrix)` for a
+scalar-valued evaluator prepared with `order=2`, potentially reusing internal
+cache buffers. The returned gradient and Hessian may alias `prepared`'s
+internal storage; copy if you need to retain them past the next call.
+The Hessian has shape `(length(x), length(x))`.
+"""
+function value_gradient_and_hessian!! end
 
 """
     VectorEvaluator{CheckInput}(f, dim, context::Tuple=())
@@ -264,14 +281,37 @@ function _ad_output_arity(y)
     )
 end
 
-# Arity-mismatch errors shared by the DI and Mooncake extensions; kept here so
-# the `:edge` testcase regexes (`r"scalar-valued"`, `r"vector-valued"`) pin a
-# single error string instead of one per backend.
+# Error helpers shared by the DI and Mooncake extensions; kept here so the
+# `:edge` testcase regexes (`r"scalar-valued"`, `r"vector-valued"`, `r"order=2"`)
+# pin a single error string instead of one per backend. Covers two failure
+# modes:
+#   * arity mismatch — function output doesn't match the requested derivative;
+#   * wrong prep order — caller asked for the derivative the prep wasn't built
+#     for, in either direction.
 function _throw_gradient_needs_scalar()
     throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
 end
 function _throw_jacobian_needs_vector()
     throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+end
+function _throw_hessian_needs_scalar()
+    throw(
+        ArgumentError("`value_gradient_and_hessian!!` requires a scalar-valued function.")
+    )
+end
+function _throw_hessian_needs_order_2_prep()
+    throw(
+        ArgumentError(
+            "`value_gradient_and_hessian!!` requires an evaluator prepared with `order=2`."
+        ),
+    )
+end
+function _throw_use_value_gradient_and_hessian()
+    throw(
+        ArgumentError(
+            "This evaluator was prepared with `order=2`; use `value_gradient_and_hessian!!` to compute its derivatives.",
+        ),
+    )
 end
 
 # Complements the `typeof` check above: same-typed arrays can differ in `size`.
@@ -324,11 +364,14 @@ function __init__()
     end
     # Same fire-only-when-no-backend-loaded logic as the `prepare` hint above.
     Base.Experimental.register_error_hint(MethodError) do io, exc, args, kwargs
-        exc.f === value_and_gradient!! || exc.f === value_and_jacobian!! || return nothing
+        exc.f === value_and_gradient!! ||
+            exc.f === value_and_jacobian!! ||
+            exc.f === value_gradient_and_hessian!! ||
+            return nothing
         isempty(methods(exc.f)) || return nothing
         print(
             io,
-            "\nNo AD backend extension is loaded. Load `DifferentiationInterface` (with a backend like `ForwardDiff`) or `Mooncake` to enable gradient/jacobian computation.",
+            "\nNo AD backend extension is loaded. Load `DifferentiationInterface` (with a backend like `ForwardDiff`) or `Mooncake` to enable gradient/jacobian/Hessian computation.",
         )
     end
 end

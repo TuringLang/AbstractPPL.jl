@@ -3,9 +3,10 @@ Pkg.activate(@__DIR__)
 Pkg.develop(; path=joinpath(@__DIR__, "..", "..", ".."))
 Pkg.instantiate()
 
-using AbstractPPL: AbstractPPL, prepare, run_testcases, value_and_gradient!!
+using AbstractPPL:
+    AbstractPPL, prepare, run_testcases, value_and_gradient!!, value_gradient_and_hessian!!
 using ADTypes: AutoForwardDiff, AutoReverseDiff
-using DifferentiationInterface: DifferentiationInterface as DI
+using DifferentiationInterface: DifferentiationInterface as DI, SecondOrder
 using ForwardDiff
 using ReverseDiff
 using Test
@@ -17,6 +18,7 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
 @testset "AbstractPPLDifferentiationInterfaceExt" begin
     @testset "ForwardDiff" begin
         run_testcases(Val(:vector); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
+        run_testcases(Val(:hessian); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         run_testcases(Val(:cache_reuse); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         run_testcases(Val(:edge); adtype=AutoForwardDiff())
     end
@@ -56,5 +58,29 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         @inferred value_and_gradient!!(prep_noctx, x)
         @inferred value_and_gradient!!(prep_closure, x)
         @inferred value_and_gradient!!(prep_ctx, x)
+    end
+
+    # `SecondOrder(outer, inner)` lets the caller pick the inner gradient
+    # backend and the outer differentiator independently — useful when the
+    # default Hessian strategy DI picks for a single `adtype` is suboptimal.
+    # Since `SecondOrder <: AbstractADType`, the existing `order=2` dispatch
+    # routes it through `DI.prepare_hessian` / `DI.value_gradient_and_hessian`
+    # without any extension-side changes.
+    @testset "SecondOrder for order=2" begin
+        adtype = SecondOrder(AutoForwardDiff(), AutoReverseDiff())
+        x = [1.0, 2.0, 3.0]
+        prep = prepare(adtype, quadratic, zeros(3); order=2)
+        val, grad, hess = value_gradient_and_hessian!!(prep, x)
+        @test val ≈ 14.0
+        @test grad ≈ [2.0, 4.0, 6.0]
+        @test hess ≈ [2.0 0 0; 0 2.0 0; 0 0 2.0]
+
+        # `context=` composes with `SecondOrder` the same way as for a plain `adtype`.
+        affine(y, a, b) = a * sum(abs2, y) + b
+        prep_ctx = prepare(adtype, affine, zeros(3); context=(2.0, 1.0), order=2)
+        val_ctx, grad_ctx, hess_ctx = value_gradient_and_hessian!!(prep_ctx, x)
+        @test val_ctx ≈ affine(x, 2.0, 1.0)
+        @test grad_ctx ≈ [4.0, 8.0, 12.0]
+        @test hess_ctx ≈ [4.0 0 0; 0 4.0 0; 0 0 4.0]
     end
 end
