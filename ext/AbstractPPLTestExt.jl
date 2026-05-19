@@ -105,6 +105,22 @@ function AbstractPPL.generate_testcases(::Val{:hessian})
     )
 end
 
+function AbstractPPL.generate_testcases(::Val{:hessian_edge})
+    return (
+        # `value_gradient_and_hessian!!` rejects order=1 preps regardless of
+        # the underlying problem arity — both paths share the same dispatch
+        # so one case suffices.
+        ErrorCase(
+            "value_gradient_and_hessian!! on order=1 prep",
+            QuadraticProblem(),
+            zeros(3),
+            [3.0, 1.0, 2.0],
+            (prepared, x) -> AbstractPPL.value_gradient_and_hessian!!(prepared, x),
+            r"order=2",
+        ),
+    )
+end
+
 function AbstractPPL.generate_testcases(::Val{:edge})
     return (
         ErrorCase(
@@ -187,17 +203,6 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
             r"floating-point",
         ),
-        # `value_gradient_and_hessian!!` rejects order=1 preps regardless of
-        # the underlying problem arity — both paths share the same dispatch
-        # so one case suffices.
-        ErrorCase(
-            "value_gradient_and_hessian!! on order=1 prep",
-            QuadraticProblem(),
-            zeros(3),
-            [3.0, 1.0, 2.0],
-            (prepared, x) -> AbstractPPL.value_gradient_and_hessian!!(prepared, x),
-            r"order=2",
-        ),
     )
 end
 
@@ -248,6 +253,12 @@ function AbstractPPL.run_testcases(
             @test val ≈ case.value atol = atol rtol = rtol
             @test grad ≈ case.gradient atol = atol rtol = rtol
             @test hess ≈ case.hessian atol = atol rtol = rtol
+        end
+    end
+    for case in generate_testcases(Val(:hessian_edge))
+        @testset "$(case.name)" begin
+            prepared = prepare_fn(adtype, case.f, case.x_proto)
+            @test_throws case.exception case.op(prepared, case.x)
         end
     end
     return nothing
