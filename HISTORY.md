@@ -1,6 +1,6 @@
 ## 0.15.0
 
-New evaluator-preparation and AD interface: `prepare` binds a callable to a sample input (vector or `NamedTuple`); `value_and_gradient!!` / `value_and_jacobian!!` return value-and-derivative pairs from the resulting `Prepared` wrapper. The `!!` suffix signals the returned derivative may alias the cache — copy if you need to keep it.
+Added a new evaluator-preparation interface for AD backends. `prepare` binds a callable to a sample input, either a vector or a `NamedTuple`, and returns a `Prepared` wrapper. `value_and_gradient!!` and `value_and_jacobian!!` then compute value-and-derivative pairs from that wrapper. The `!!` suffix means the returned derivative may alias backend cache storage, so copy it if you need to keep it across calls.
 
 ```julia
 using ADTypes, Mooncake  # or DifferentiationInterface + ForwardDiff
@@ -10,7 +10,14 @@ val, grad = value_and_gradient!!(prepared, [1.0, 2.0, 3.0])
 # val == -7.0; grad == [-1.0, -2.0, -3.0]
 ```
 
-Two new AD-backend extensions ship with it: `AbstractPPLDifferentiationInterfaceExt` (any DI backend) and `AbstractPPLMooncakeExt` (`AutoMooncake`, `AutoMooncakeForward`). `AbstractPPLTestExt` gains a conformance harness via `generate_testcases` / `run_testcases` (reserved groups: `:vector`, `:namedtuple`, `:edge`, `:cache_reuse`).
+Added two AD-backend extensions:
+
+  - `AbstractPPLDifferentiationInterfaceExt`, supporting DifferentiationInterface backends.
+  - `AbstractPPLMooncakeExt`, supporting `AutoMooncake` and `AutoMooncakeForward`.
+
+The new evaluator path supports scalar gradients, vector-output Jacobians, `NamedTuple` inputs, reusable AD caches, input-shape checks, and constant context arguments via `context::Tuple`.
+
+`AbstractPPLTestExt` now provides a small AD conformance harness through `generate_testcases` and `run_testcases`, with reserved groups `:vector`, `:namedtuple`, `:edge`, and `:cache_reuse`.
 
 See [`docs/src/evaluators.md`](docs/src/evaluators.md) for the full interface, the `check_dims` and `context::Tuple` options, the `NamedTuple` input path, and extension-author guidance.
 
