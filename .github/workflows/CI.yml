@@ -61,6 +61,7 @@ jobs:
       matrix:
         label:
           - ext/differentiationinterface
+          - ext/mooncake
         version:
           - '1'
           - 'min'

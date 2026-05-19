@@ -93,7 +93,15 @@ function AbstractPPL.generate_testcases(::Val{:edge})
             zeros(3),
             [2.0, 3.0, 4.0],
             (prepared, x) -> AbstractPPL.value_and_gradient!!(prepared, x),
-            ArgumentError,
+            r"scalar-valued",
+        ),
+        ErrorCase(
+            "jacobian of scalar output",
+            QuadraticProblem(),
+            zeros(3),
+            [3.0, 1.0, 2.0],
+            (prepared, x) -> AbstractPPL.value_and_jacobian!!(prepared, x),
+            r"vector-valued",
         ),
         ErrorCase(
             "gradient of vector-valued output, empty input",
@@ -146,6 +154,20 @@ function AbstractPPL.generate_testcases(::Val{:edge})
     )
 end
 
+function AbstractPPL.generate_testcases(::Val{:namedtuple})
+    return (
+        ValueCase(
+            "scalar output over (x::Real, y::Vector)",
+            vs -> vs.x^2 + sum(abs2, vs.y),
+            (x=0.0, y=zeros(2)),
+            (x=3.0, y=[1.0, 2.0]),
+            14.0,
+            (x=6.0, y=[2.0, 4.0]),
+            nothing,
+        ),
+    )
+end
+
 function AbstractPPL.run_testcases(
     ::Val{:vector}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
 )
@@ -173,6 +195,59 @@ function AbstractPPL.run_testcases(::Val{:edge}, prepare_fn=AbstractPPL.prepare;
         @testset "$(case.name)" begin
             prepared = prepare_fn(adtype, case.f, case.x_proto)
             @test_throws case.exception case.op(prepared, case.x)
+        end
+    end
+    return nothing
+end
+
+function AbstractPPL.run_testcases(
+    ::Val{:namedtuple}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
+)
+    for case in generate_testcases(Val(:namedtuple))
+        @testset "$(case.name)" begin
+            prepared = prepare_fn(adtype, case.f, case.x_proto)
+            @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
+            if case.gradient !== nothing
+                val, grad = AbstractPPL.value_and_gradient!!(prepared, case.x)
+                @test val ≈ case.value atol = atol rtol = rtol
+                for k in keys(case.gradient)
+                    @test getproperty(grad, k) ≈ getproperty(case.gradient, k) atol = atol rtol =
+                        rtol
+                end
+            end
+        end
+    end
+    return nothing
+end
+
+# Drive `value_and_{gradient,jacobian}!!` twice with different inputs against
+# the same `prepared` evaluator to exercise cache reuse — catches backends
+# whose cache state is corrupted by a prior call.
+function AbstractPPL.run_testcases(
+    ::Val{:cache_reuse}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
+)
+    @testset "scalar output, repeated calls" begin
+        prepared = prepare_fn(adtype, QuadraticProblem(), zeros(3))
+        for (x, value, gradient) in (
+            ([1.0, 2.0, 3.0], 14.0, [2.0, 4.0, 6.0]),
+            ([4.0, 5.0, 6.0], 77.0, [8.0, 10.0, 12.0]),
+            ([0.5, -1.0, 2.0], 5.25, [1.0, -2.0, 4.0]),
+        )
+            val, grad = AbstractPPL.value_and_gradient!!(prepared, x)
+            @test val ≈ value atol = atol rtol = rtol
+            @test grad ≈ gradient atol = atol rtol = rtol
+        end
+    end
+    @testset "vector output, repeated calls" begin
+        prepared = prepare_fn(adtype, VectorValuedProblem(), zeros(3))
+        for (x, value, jacobian) in (
+            ([2.0, 3.0, 4.0], [6.0, 7.0], [3.0 2.0 0.0; 0.0 1.0 1.0]),
+            ([5.0, 1.0, 7.0], [5.0, 8.0], [1.0 5.0 0.0; 0.0 1.0 1.0]),
+            ([0.0, 4.0, -2.0], [0.0, 2.0], [4.0 0.0 0.0; 0.0 1.0 1.0]),
+        )
+            val, jac = AbstractPPL.value_and_jacobian!!(prepared, x)
+            @test val ≈ value atol = atol rtol = rtol
+            @test jac ≈ jacobian atol = atol rtol = rtol
         end
     end
     return nothing

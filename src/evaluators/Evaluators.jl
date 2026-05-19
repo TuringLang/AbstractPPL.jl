@@ -41,8 +41,8 @@ Prepared(adtype::AbstractADType, evaluator) = Prepared(adtype, evaluator, nothin
 
 """
     prepare(problem, values::NamedTuple; check_dims::Bool=true)
-    prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true)
-    prepare(adtype, problem, x::AbstractVector{<:Real}; check_dims::Bool=true)
+    prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=())
+    prepare(adtype, problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=())
 
 Prepare a callable evaluator for `problem`.
 
@@ -55,6 +55,11 @@ prepares gradient or jacobian machinery for vector inputs.
 the input shape on each call. Pass `check_dims=false` to skip the per-call
 check, e.g. inside an AD backend's hot path where the input shape is already
 guaranteed.
+
+The vector-input forms accept a `context::Tuple` of constant arguments threaded
+through to `problem`: the prepared evaluator computes `problem(x, context...)`,
+and AD backends differentiate only with respect to `x`. `context=()` (the
+default) preserves the unary `problem(x)` contract.
 
 The three-argument AD-aware form may invoke `problem` once during preparation
 to detect output arity (scalar vs vector) and select gradient or jacobian
@@ -69,8 +74,10 @@ function prepare end
 function prepare(problem, values::NamedTuple; check_dims::Bool=true)
     return NamedTupleEvaluator{check_dims}(problem, values)
 end
-function prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true)
-    return VectorEvaluator{check_dims}(problem, length(x))
+function prepare(
+    problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
+)
+    return VectorEvaluator{check_dims}(problem, length(x), context)
 end
 
 """
@@ -93,8 +100,8 @@ The Jacobian has shape `(length(value), length(x))`.
 function value_and_jacobian!! end
 
 """
-    VectorEvaluator{CheckInput}(f, dim)
-    VectorEvaluator(f, dim)  # equivalent to `VectorEvaluator{true}(f, dim)`
+    VectorEvaluator{CheckInput}(f, dim, context::Tuple=())
+    VectorEvaluator(f, dim, context::Tuple=())  # equivalent to `VectorEvaluator{true}(f, dim, context)`
 
 Evaluator shape for scalar functions of a vector input. Part of the extension
 author API; end users interact with the wrapping `Prepared` instead.
@@ -105,20 +112,28 @@ author API; end users interact with the wrapping `Prepared` instead.
 where input shape is already guaranteed and the runtime check would persist in
 the dual/shadow hot path.
 
+`context` is a tuple of constant arguments threaded through to `f`:
+`evaluator(x)` computes `f(x, context...)`. AD backends treat every value in
+`context` as inactive and differentiate only with respect to `x`. The default
+empty tuple keeps the unary `f(x)` contract.
+
 A bare `VectorEvaluator` is *not* differentiable; gradient capability is the
 contract of the wrapping `Prepared` returned by `prepare(adtype, ...)`.
 """
-struct VectorEvaluator{CheckInput,F}
+struct VectorEvaluator{CheckInput,F,C<:Tuple}
     f::F
     dim::Int
-    function VectorEvaluator{CheckInput}(f::F, dim::Int) where {CheckInput,F}
+    context::C
+    function VectorEvaluator{CheckInput}(
+        f::F, dim::Int, context::C=()
+    ) where {CheckInput,F,C<:Tuple}
         CheckInput isa Bool || throw(ArgumentError("`CheckInput` must be a Bool."))
         dim >= 0 || throw(ArgumentError("`dim` must be non-negative, got $dim."))
-        return new{CheckInput,F}(f, dim)
+        return new{CheckInput,F,C}(f, dim, context)
     end
 end
 
-VectorEvaluator(f, dim::Int) = VectorEvaluator{true}(f, dim)
+VectorEvaluator(f, dim::Int, context::Tuple=()) = VectorEvaluator{true}(f, dim, context)
 
 """
     NamedTupleEvaluator{CheckInput}(f, inputspec)
@@ -177,15 +192,30 @@ function _check_vector_length(dim::Int, x)
     return nothing
 end
 
+# Shared input validation for AD-backend `value_and_{gradient,jacobian}!!` entry
+# points. Same compile-time `T <: Integer` elision as the `VectorEvaluator` body.
+# Gated by `CheckInput`: the `{false}` overload is a no-op so the AD hot path
+# pays nothing when the caller has already validated the input (e.g. via
+# `prepare(...; check_dims=false)`).
+function _check_ad_input(e::VectorEvaluator{true}, x::AbstractVector{T}) where {T}
+    T <: Integer && _reject_integer_input(x)
+    _check_vector_length(e.dim, x)
+    return nothing
+end
+_check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
+
+# Both bodies rely on `T <: Integer` being a static check so the AD hot path
+# (Float/dual `T`) elides the branch; the `{false}` callable additionally skips
+# `_check_vector_length` since AD libraries pass length-matching dual inputs.
 function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
     _check_vector_length(e.dim, x)
-    return e.f(x)
+    return e.f(x, e.context...)
 end
 
 function (e::VectorEvaluator{false})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
-    return e.f(x)
+    return e.f(x, e.context...)
 end
 
 function (e::NamedTupleEvaluator{true})(values::NamedTuple)
@@ -195,13 +225,15 @@ end
 (e::NamedTupleEvaluator{false})(values::NamedTuple) = e.f(values)
 
 """
-    _assert_namedtuple_shape(e::NamedTupleEvaluator, values)
+    _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
 
 Throw `ArgumentError` unless `values` has the same type as the prototype captured
 during preparation, including matching `size` for any nested `AbstractArray`
 leaves. Also throws if the prototype contains a leaf type outside the supported
-set (`Real`, `Complex`, `AbstractArray`, `Tuple`, `NamedTuple`). No-op when `e`
-was constructed with `CheckInput=false`.
+set (`Real`, `Complex`, `AbstractArray`, `Tuple`, `NamedTuple`).
+
+Gated by `CheckInput`: the `{false}` overload is a no-op so AD hot paths and
+other opt-out callers pay nothing.
 """
 function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
     typeof(values) === typeof(e.inputspec) || throw(
@@ -217,6 +249,30 @@ function _assert_namedtuple_shape(e::NamedTupleEvaluator{true}, values)
     return nothing
 end
 _assert_namedtuple_shape(::NamedTupleEvaluator{false}, _) = nothing
+
+# Classify the output of a probe `evaluator(x)` call into the two arities the
+# AD interface supports — `:scalar` routes to gradient prep, `:vector` to
+# jacobian prep. Shared by the DI and Mooncake extensions so both surface the
+# same error message for unsupported output types.
+function _ad_output_arity(y)
+    y isa Number && return :scalar
+    y isa AbstractVector && return :vector
+    throw(
+        ArgumentError(
+            "A prepared AD evaluator must return a scalar or AbstractVector; got $(typeof(y)).",
+        ),
+    )
+end
+
+# Arity-mismatch errors shared by the DI and Mooncake extensions; kept here so
+# the `:edge` testcase regexes (`r"scalar-valued"`, `r"vector-valued"`) pin a
+# single error string instead of one per backend.
+function _throw_gradient_needs_scalar()
+    throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
+end
+function _throw_jacobian_needs_vector()
+    throw(ArgumentError("`value_and_jacobian!!` requires a vector-valued function."))
+end
 
 # Complements the `typeof` check above: same-typed arrays can differ in `size`.
 # Arrays with non-`Real`/`Complex` eltype are walked element-wise to catch

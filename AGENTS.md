@@ -32,6 +32,8 @@ AbstractPPL.jl provides shared interfaces and utilities for probabilistic progra
   - Full package tests: `julia --project=. -e 'using Pkg; Pkg.test()'`
   - Docs: `julia --project=docs docs/make.jl`
 
+Always refresh each environment (`Pkg.update()` / `up`) before tests or doc builds — a stale manifest can cause subtle resolution and loading issues.
+
 Run the smallest relevant test first, then broaden when changing public interfaces, extensions, or downstream-facing behaviour. Do not weaken tests just to make CI pass.
 
 ## Documentation

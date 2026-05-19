@@ -72,6 +72,21 @@ end
         # Unsupported leaf types are rejected rather than silently passing.
         ne_string = AbstractPPL.Evaluators.NamedTupleEvaluator(x -> length(x.s), (s="abc",))
         @test_throws r"Supported leaves" ne_string((s="abcde",))
+
+        # `_check_ad_input` is dispatch-gated by `CheckInput` so the AD hot
+        # path pays nothing when the evaluator was prepared with
+        # `check_dims=false`.
+        ve_checked = AbstractPPL.Evaluators.VectorEvaluator{true}(sum, 3)
+        @test AbstractPPL.Evaluators._check_ad_input(ve_checked, [1.0, 2.0, 3.0]) ===
+            nothing
+        @test_throws DimensionMismatch AbstractPPL.Evaluators._check_ad_input(
+            ve_checked, [1.0, 2.0]
+        )
+        @test_throws r"floating-point" AbstractPPL.Evaluators._check_ad_input(
+            ve_checked, [1, 2, 3]
+        )
+        @test AbstractPPL.Evaluators._check_ad_input(ve_unchecked, [1.0, 2.0]) === nothing
+        @test AbstractPPL.Evaluators._check_ad_input(ve_unchecked, [1, 2, 3]) === nothing
     end
 
     @testset "prepare (structural)" begin
@@ -102,6 +117,15 @@ end
         pv_unchecked = prepare(sum, zeros(3); check_dims=false)
         @test pv_unchecked isa VectorEvaluator{false}
         @test pv_unchecked([1.0, 2.0]) == 3.0  # wrong length, no error
+
+        # `context` threads constant args through to the callable; AD-unaware
+        # `prepare` constructs the `VectorEvaluator` with the same shape and
+        # `prepared(x)` evaluates `f(x, context...)`.
+        affine(x, a, b) = sum(x) * a + b
+        pv_ctx = prepare(affine, zeros(2); context=(2.0, 1.0))
+        @test pv_ctx isa VectorEvaluator{true}
+        @test pv_ctx.context === (2.0, 1.0)
+        @test pv_ctx([3.0, 4.0]) == 15.0
     end
 
     @testset "prepare (AD-aware)" begin
