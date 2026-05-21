@@ -51,10 +51,10 @@ _mooncake_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtyp
 # shape (callable + active arg + extra args) is the same. Used by the
 # NamedTuple path, the order=1 scalar branch, and the order=2 gradient prep.
 function _mooncake_gradient_cache(::AutoMooncake, f, x, args...; config)
-    Mooncake.prepare_gradient_cache(f, x, args...; config)
+    return Mooncake.prepare_gradient_cache(f, x, args...; config)
 end
 function _mooncake_gradient_cache(::AutoMooncakeForward, f, x, args...; config)
-    Mooncake.prepare_derivative_cache(f, x, args...; config)
+    return Mooncake.prepare_derivative_cache(f, x, args...; config)
 end
 
 function AbstractPPL.prepare(

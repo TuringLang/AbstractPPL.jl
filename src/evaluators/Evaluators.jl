@@ -50,7 +50,7 @@ function Prepared(
     return Prepared{AD,E,C,Order}(adtype, evaluator, cache)
 end
 function Prepared(adtype::AbstractADType, evaluator, cache)
-    Prepared(adtype, evaluator, cache, Val(1))
+    return Prepared(adtype, evaluator, cache, Val(1))
 end
 Prepared(adtype::AbstractADType, evaluator) = Prepared(adtype, evaluator, nothing, Val(1))
 

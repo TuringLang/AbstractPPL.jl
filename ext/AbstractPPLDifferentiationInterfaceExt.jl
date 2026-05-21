@@ -148,9 +148,9 @@ end
 # the `map` splat to nothing.
 const _GradientCapable = Union{DIGradientCache,DIHessianCache}
 
-@inline _di_value_and_gradient(c::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, ad, x, _) = DI.value_and_gradient(
-    c.target, c.gradient_prep, _gradient_adtype(ad), x
-)
+@inline _di_value_and_gradient(
+    c::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, ad, x, _
+) = DI.value_and_gradient(c.target, c.gradient_prep, _gradient_adtype(ad), x)
 @inline _di_value_and_gradient(c::_GradientCapable, ad, x, eval) = DI.value_and_gradient(
     c.target,
     c.gradient_prep,
@@ -160,26 +160,30 @@ const _GradientCapable = Union{DIGradientCache,DIHessianCache}
     map(DI.Constant, eval.context)...,
 )
 
-@inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _) = DI.value_and_jacobian(
-    c.target, c.jacobian_prep, ad, x
-)
+@inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _) =
+    DI.value_and_jacobian(c.target, c.jacobian_prep, ad, x)
 @inline _di_value_and_jacobian(c::DIJacobianCache, ad, x, eval) = DI.value_and_jacobian(
-    c.target, c.jacobian_prep, ad, x, DI.Constant(eval.f), map(DI.Constant, eval.context)...
-)
-
-@inline _di_value_gradient_and_hessian(c::DIHessianCache{:closure}, ad, x, _) = DI.value_gradient_and_hessian!(
-    c.target, c.grad_buf, c.hess_buf, c.hessian_prep, ad, x
-)
-@inline _di_value_gradient_and_hessian(c::DIHessianCache, ad, x, eval) = DI.value_gradient_and_hessian!(
     c.target,
-    c.grad_buf,
-    c.hess_buf,
-    c.hessian_prep,
+    c.jacobian_prep,
     ad,
     x,
     DI.Constant(eval.f),
     map(DI.Constant, eval.context)...,
 )
+
+@inline _di_value_gradient_and_hessian(c::DIHessianCache{:closure}, ad, x, _) =
+    DI.value_gradient_and_hessian!(c.target, c.grad_buf, c.hess_buf, c.hessian_prep, ad, x)
+@inline _di_value_gradient_and_hessian(c::DIHessianCache, ad, x, eval) =
+    DI.value_gradient_and_hessian!(
+        c.target,
+        c.grad_buf,
+        c.hess_buf,
+        c.hessian_prep,
+        ad,
+        x,
+        DI.Constant(eval.f),
+        map(DI.Constant, eval.context)...,
+    )
 
 # `value_and_gradient!!`: works on both `DIGradientCache` (order=1 scalar) and
 # `DIHessianCache` (order=2). Empty-input caches carry `gradient_prep::Nothing`
