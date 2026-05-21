@@ -1,3 +1,11 @@
+## 0.15.1
+
+Added Hessian support to the AD interface. Pass `order=2` to `prepare(adtype, problem, x)` to build a Hessian-capable evaluator. The new `value_gradient_and_hessian!!(prepared, x)` then returns `(value, gradient, hessian)` in a single call. Both the DifferentiationInterface and Mooncake extensions implement this.
+
+`order=2` accepts the same `context::Tuple` and `check_dims` options as `order=1`. NamedTuple inputs are not supported with `order=2`.
+
+The `AbstractPPLTestExt` conformance harness now provides a `:hessian` group covering value, gradient and Hessian round-trips, along with an order-mismatch edge case.
+
 ## 0.15.0
 
 Added a new evaluator-preparation interface for AD backends. `prepare` binds a callable to a sample input, either a vector or a `NamedTuple`, and returns a `Prepared` wrapper. `value_and_gradient!!` and `value_and_jacobian!!` then compute value-and-derivative pairs from that wrapper. The `!!` suffix means the returned derivative may alias backend cache storage, so copy it if you need to keep it across calls.
