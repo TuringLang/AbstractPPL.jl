@@ -6,10 +6,14 @@ import ..evaluate!!
 include("utils.jl")
 
 """
-    Prepared{AD<:AbstractADType,E,C}(adtype, evaluator, cache)
-    Prepared(adtype, evaluator)   # cache defaults to `nothing`
+    Prepared{AD<:AbstractADType,E,C,Order}(adtype, evaluator, cache)
+    Prepared(adtype, evaluator, cache, Val(Order))
+    Prepared(adtype, evaluator, cache)          # defaults `Order` to 1
+    Prepared(adtype, evaluator)                 # cache defaults to `nothing`
 
-AD-prepared evaluator parameterised by backend type `AD`.
+AD-prepared evaluator parameterised by backend type `AD` and derivative order
+`Order` (`1` for gradient/jacobian, `2` for Hessian). Retrieve `Order` via
+[`order`](@ref).
 
 - `adtype` — the backend, used for dispatch.
 - `evaluator` — the user-facing callable (typically a `VectorEvaluator` or
@@ -29,15 +33,37 @@ function AbstractPPL.value_and_gradient!!(
 end
 ```
 """
-struct Prepared{AD<:AbstractADType,E,C}
+struct Prepared{AD<:AbstractADType,E,C,Order}
     adtype::AD
     evaluator::E
     cache::C
+    function Prepared{AD,E,C,Order}(
+        adtype, evaluator, cache
+    ) where {AD<:AbstractADType,E,C,Order}
+        return new{AD,E,C,Order}(adtype, evaluator, cache)
+    end
 end
 
-Prepared(adtype::AbstractADType, evaluator) = Prepared(adtype, evaluator, nothing)
+function Prepared(
+    adtype::AD, evaluator::E, cache::C, ::Val{Order}
+) where {AD<:AbstractADType,E,C,Order}
+    return Prepared{AD,E,C,Order}(adtype, evaluator, cache)
+end
+function Prepared(adtype::AbstractADType, evaluator, cache)
+    Prepared(adtype, evaluator, cache, Val(1))
+end
+Prepared(adtype::AbstractADType, evaluator) = Prepared(adtype, evaluator, nothing, Val(1))
 
 (p::Prepared)(x) = p.evaluator(x)
+
+"""
+    order(p::Prepared)
+
+Return the derivative order `p` was prepared for (`1` for gradient/jacobian,
+`2` for Hessian). Type-stable — folds to the `Order` type parameter at compile
+time.
+"""
+order(::Prepared{<:Any,<:Any,<:Any,O}) where {O} = O
 
 """
     prepare(problem, values::NamedTuple; check_dims::Bool=true)
@@ -283,11 +309,7 @@ end
 
 # Error helpers shared by the DI and Mooncake extensions; kept here so the
 # `:edge` testcase regexes (`r"scalar-valued"`, `r"vector-valued"`, `r"order=2"`)
-# pin a single error string instead of one per backend. Covers two failure
-# modes:
-#   * arity mismatch — function output doesn't match the requested derivative;
-#   * wrong prep order — caller asked for the derivative the prep wasn't built
-#     for, in either direction.
+# pin a single error string instead of one per backend.
 function _throw_gradient_needs_scalar()
     throw(ArgumentError("`value_and_gradient!!` requires a scalar-valued function."))
 end
@@ -306,13 +328,11 @@ function _throw_hessian_needs_order_2_prep()
         ),
     )
 end
-function _throw_use_value_gradient_and_hessian()
-    throw(
-        ArgumentError(
-            "This evaluator was prepared with `order=2`; use `value_gradient_and_hessian!!` to compute its derivatives.",
-        ),
-    )
-end
+
+# Validate the `order=` kwarg of `prepare(adtype, problem, x; order)`. Shared by
+# the DI and Mooncake extensions so the error string is identical.
+@inline _validate_ad_order(order::Int) =
+    order in (1, 2) || throw(ArgumentError("`order` must be 1 or 2, got $order."))
 
 # Complements the `typeof` check above: same-typed arrays can differ in `size`.
 # Arrays with non-`Real`/`Complex` eltype are walked element-wise to catch

@@ -183,10 +183,11 @@ prepared = prepare(adtype, quadratic, zeros(3); order=2)
 entry handles it.
 
 Calling `value_gradient_and_hessian!!` on an `order=1` prep throws an
-`ArgumentError` — re-prepare with `order=2` instead. Likewise, calling
-`value_and_gradient!!` or `value_and_jacobian!!` on an `order=2` prep is
-unsupported; use `value_gradient_and_hessian!!` and discard the unused
-return value.
+`ArgumentError` — re-prepare with `order=2` instead. The reverse is allowed:
+`value_and_gradient!!` on an `order=2` prep returns `(value, gradient)`
+without paying the Hessian cost, since `prepare` builds a dedicated
+gradient prep alongside the Hessian one. `value_and_jacobian!!` is rejected
+because `order=2` requires a scalar-valued problem.
 
 ## Constant context arguments
 

@@ -19,9 +19,6 @@ struct ValueCase
     jacobian::Any
 end
 
-# Mirror of `ValueCase` for `order=2` prep + `value_gradient_and_hessian!!`.
-# A separate type keeps the order=1 cases narrow and lets `run_testcases`
-# dispatch on the prep order without an extra field.
 struct HessianCase
     name::String
     f::Any
@@ -226,6 +223,7 @@ function AbstractPPL.run_testcases(
     for case in generate_testcases(Val(:vector))
         @testset "$(case.name)" begin
             prepared = prepare_fn(adtype, case.f, case.x_proto)
+            @test AbstractPPL.order(prepared) == 1
             @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
             if case.gradient !== nothing
                 val, grad = AbstractPPL.value_and_gradient!!(prepared, case.x)
@@ -248,11 +246,16 @@ function AbstractPPL.run_testcases(
     for case in generate_testcases(Val(:hessian))
         @testset "$(case.name)" begin
             prepared = prepare_fn(adtype, case.f, case.x_proto; order=2)
+            @test AbstractPPL.order(prepared) == 2
             @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
             val, grad, hess = AbstractPPL.value_gradient_and_hessian!!(prepared, case.x)
             @test val ≈ case.value atol = atol rtol = rtol
             @test grad ≈ case.gradient atol = atol rtol = rtol
             @test hess ≈ case.hessian atol = atol rtol = rtol
+            # Order=2 prep also satisfies the order=1 gradient contract.
+            val1, grad1 = AbstractPPL.value_and_gradient!!(prepared, case.x)
+            @test val1 ≈ case.value atol = atol rtol = rtol
+            @test grad1 ≈ case.gradient atol = atol rtol = rtol
         end
     end
     for case in generate_testcases(Val(:hessian_edge))

@@ -12,7 +12,7 @@ include("abstractprobprog.jl")
 include("evaluate.jl")
 include("evaluators/Evaluators.jl")
 using .Evaluators:
-    prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!
+    prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, order
 
 """
     generate_testcases(::Val{group})
@@ -41,7 +41,7 @@ function run_testcases end
 @static if VERSION >= v"1.11.0"
     eval(
         Meta.parse(
-            "public prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, generate_testcases, run_testcases",
+            "public prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, order, generate_testcases, run_testcases",
         ),
     )
 end
