@@ -13,15 +13,12 @@ using Test
 #   * `value_and_jacobian!!` allocates fresh cotangent/Jacobian buffers on
 #     every call (both modes); forward-mode Jacobian return type infers as
 #     `Tuple{Any, Union{Array{T,3}, Matrix}}`.
-#   * `value_and_gradient!!` on a context-lowered prep splats `args_to_zero`
-#     per call (reverse mode allocates; forward mode also fails inference).
-# Julia 1.10 also heap-allocates `Fix2`/closure captures that 1.11+ elides.
+#   * `value_and_gradient!!` on a forward-mode context-lowered prep splats
+#     `args_to_zero` per call and allocates; forward mode also fails inference.
 function _mooncake_alloc(case, adtype)
     if case.tag === :vector && case.jacobian !== nothing
         return :broken
     elseif case.tag === :context && adtype isa AutoMooncakeForward
-        return :broken
-    elseif VERSION < v"1.11"
         return :broken
     else
         return :test
