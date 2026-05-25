@@ -339,13 +339,13 @@ end
 # each AD entry in a tiny named function that returns `true` on success — that
 # value lets `@test` / `@test_broken` evaluate the call uniformly.
 function _inferred_gradient(prepared, x)
-    (@inferred AbstractPPL.value_and_gradient!!(prepared, x); true)
+    return (@inferred AbstractPPL.value_and_gradient!!(prepared, x); true)
 end
 function _inferred_jacobian(prepared, x)
-    (@inferred AbstractPPL.value_and_jacobian!!(prepared, x); true)
+    return (@inferred AbstractPPL.value_and_jacobian!!(prepared, x); true)
 end
 function _inferred_hessian(prepared, x)
-    (@inferred AbstractPPL.value_gradient_and_hessian!!(prepared, x); true)
+    return (@inferred AbstractPPL.value_gradient_and_hessian!!(prepared, x); true)
 end
 
 # Backends with known regressions (e.g. Mooncake's allocating
@@ -416,6 +416,24 @@ function AbstractPPL.run_testcases(
         else
             @test _inferred_hessian(prepared, x)
         end
+    end
+    return nothing
+end
+
+function AbstractPPL.run_testcases(
+    ::Val{:context}, prepare_fn=AbstractPPL.prepare; adtype, atol=0, rtol=1e-10
+)
+    # `prepare(adtype, f, x; context=(c,))` builds an evaluator that computes
+    # `f(x, context...)` with AD differentiating only `x`.
+    f(y::AbstractVector{<:Real}, offset) = -0.5 * (y[1] - offset)^2
+    x = [0.3]
+    c = 0.1
+    @testset "scalar gradient with context" begin
+        prepared = prepare_fn(adtype, f, x; check_dims=false, context=(c,))
+        @test prepared(x) ≈ f(x, c) atol = atol rtol = rtol
+        val, grad = AbstractPPL.value_and_gradient!!(prepared, x)
+        @test val ≈ f(x, c) atol = atol rtol = rtol
+        @test grad ≈ [-(x[1] - c)] atol = 1e-10 rtol = rtol
     end
     return nothing
 end

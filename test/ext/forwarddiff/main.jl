@@ -14,7 +14,15 @@ using Test
         run_testcases(Val(:hessian); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         run_testcases(Val(:cache_reuse); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         run_testcases(Val(:edge); adtype=AutoForwardDiff())
-        run_testcases(Val(:allocations); adtype=AutoForwardDiff())
+        # Julia 1.10 heap-allocates some `Fix2`/closure captures that 1.11+
+        # elides. Mark `:allocations` broken on min to flag the regression
+        # detection without failing the suite on the older runtime.
+        run_testcases(
+            Val(:allocations);
+            adtype=AutoForwardDiff(),
+            gradient_broken=VERSION < v"1.11",
+            jacobian_broken=VERSION < v"1.11",
+        )
         run_testcases(Val(:type_stability); adtype=AutoForwardDiff())
     end
 
@@ -27,20 +35,8 @@ using Test
         )
     end
 
-    # `run_testcases` doesn't exercise `context=`; this fills that gap.
-    @testset "context-lowered gradient" begin
-        raw_logdensity(x::AbstractVector{<:Real}, offset) = -0.5 * (x[1] - offset)^2
-
-        x = [0.3]
-        ad = AutoForwardDiff()
-
-        lowered = prepare(ad, raw_logdensity, x; check_dims=false, context=(0.1,))
-
-        @test lowered(x) == raw_logdensity(x, 0.1)
-
-        val, grad = value_and_gradient!!(lowered, x)
-        @test val ≈ raw_logdensity(x, 0.1)
-        @test grad ≈ [-(x[1] - 0.1)] atol = 1e-10
+    @testset "AutoForwardDiff context" begin
+        run_testcases(Val(:context); adtype=AutoForwardDiff(), atol=1e-10, rtol=1e-10)
     end
 
     # `AutoForwardDiff(; tag=...)` exists for nested differentiation. Check the

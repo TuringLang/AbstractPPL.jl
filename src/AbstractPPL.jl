@@ -26,8 +26,9 @@ round-trips on vector-input scalar-output evaluators; `:namedtuple` for
 for repeated calls against a single prepared evaluator; `:allocations` and
 `:type_stability` for `@allocated == 0` and `@inferred` checks on the AD hot paths
 (both accept `gradient_broken`, `jacobian_broken`, and (`:type_stability` only)
-`hessian_broken` kwargs for backends with known broken paths). Downstream
-packages may add other keys.
+`hessian_broken` kwargs for backends with known broken paths); `:context` for
+the `prepare(adtype, f, x; context=(c,))` lowering on a scalar gradient.
+Downstream packages may add other keys.
 """
 function generate_testcases end
 

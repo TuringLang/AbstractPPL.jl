@@ -26,12 +26,20 @@ using Test
             # cotangent/Jacobian buffers each call, and the forward-mode
             # Jacobian return type infers as `Tuple{Any, Union{Array{T,3},
             # Matrix}}`. Mark those known-broken; the other paths must hold.
-            run_testcases(Val(:allocations); adtype=adtype, jacobian_broken=true)
+            # Julia 1.10 also heap-allocates `Fix2`/closure captures the AD
+            # path uses, so scalar gradient is marked broken on min.
+            run_testcases(
+                Val(:allocations);
+                adtype=adtype,
+                gradient_broken=VERSION < v"1.11",
+                jacobian_broken=true,
+            )
             run_testcases(
                 Val(:type_stability);
                 adtype=adtype,
                 jacobian_broken=adtype isa AutoMooncakeForward,
             )
+            run_testcases(Val(:context); adtype=adtype, atol=1e-6, rtol=1e-6)
         end
     end
 
