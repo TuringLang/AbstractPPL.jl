@@ -20,6 +20,10 @@ function _mooncake_alloc(case, adtype)
         return :broken
     elseif case.tag === :context && adtype isa AutoMooncakeForward
         return :broken
+    elseif VERSION < v"1.11"
+        # Mooncake's value_and_gradient!! allocations are flaky on Julia 1.10
+        # (resolver-dependent: some Mooncake versions alloc, others don't).
+        return :skip
     else
         return :test
     end
