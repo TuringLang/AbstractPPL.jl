@@ -155,7 +155,7 @@ function AbstractPPL.generate_testcases(::Val{:vector})
             value=7.5,
             gradient=Float64[],
             hessian=zeros(0, 0),
-            allocations_safe=false,
+            allocations_safe=false,  # empty-input hessian shortcut allocates
         ),
         # value_gradient_and_hessian!! rejects order=1 preps regardless of arity;
         # both paths share the dispatch so one case suffices.
@@ -268,7 +268,7 @@ function AbstractPPL.generate_testcases(::Val{:vector})
                 (x=[4.0, 5.0, 6.0], value=77.0, gradient=[8.0, 10.0, 12.0]),
                 (x=[0.5, -1.0, 2.0], value=5.25, gradient=[1.0, -2.0, 4.0]),
             ],
-            allocations_safe=false,
+            allocations_safe=false,  # cache-reuse loops aren't single-call alloc tests
         ),
         TestCase(
             "vector output, cache reuse",
@@ -280,7 +280,7 @@ function AbstractPPL.generate_testcases(::Val{:vector})
                 (x=[5.0, 1.0, 7.0], value=[5.0, 8.0], jacobian=[1.0 5.0 0.0; 0.0 1.0 1.0]),
                 (x=[0.0, 4.0, -2.0], value=[0.0, 2.0], jacobian=[4.0 0.0 0.0; 0.0 1.0 1.0]),
             ],
-            allocations_safe=false,
+            allocations_safe=false,  # cache-reuse loops aren't single-call alloc tests
         ),
     )
 end
