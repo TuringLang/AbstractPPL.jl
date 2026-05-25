@@ -6,16 +6,14 @@ using ADTypes: AutoForwardDiff
 using ForwardDiff: ForwardDiff
 using DiffResults: DiffResults
 
-# ─── Chunk helper ─────────────────────────────────────────────────────────────
-# `AutoForwardDiff{CS}` carries the chunk size as a type parameter. `nothing`
-# means "let ForwardDiff pick automatically".
+# `AutoForwardDiff{CS}` carries the chunk size as a type parameter; `nothing`
+# defers the choice to ForwardDiff.
 _fd_chunk(::AutoForwardDiff{nothing}, x) = ForwardDiff.Chunk(x)
 _fd_chunk(::AutoForwardDiff{CS}, _) where {CS} = ForwardDiff.Chunk{CS}()
 
-# ─── Cache types ──────────────────────────────────────────────────────────────
-# Each cache pre-allocates the `DiffResults` buffer and the ForwardDiff config
-# so the hot path is allocation-free (modulo ForwardDiff's internals).
-
+# Three cache types so arity (scalar/vector) and order (1/2) are encoded in the
+# type and dispatch resolves the hot path without runtime branching. The stored
+# `result` aliases the arrays returned by `value_and_*!!`, per the `!!` contract.
 struct FDGradientCache{R,C}
     result::R
     config::C
@@ -26,6 +24,8 @@ struct FDJacobianCache{R,C}
     config::C
 end
 
+# `gradient_result` / `gradient_config` are kept alongside the Hessian cache so
+# `value_and_gradient!!` on an order=2 prep skips the O(n²) Hessian work.
 struct FDHessianCache{R,C,GR,GC}
     result::R
     config::C
@@ -33,17 +33,13 @@ struct FDHessianCache{R,C,GR,GC}
     gradient_config::GC
 end
 
-# ─── prepare (vector input) ──────────────────────────────────────────────────
 """
     prepare(adtype::AutoForwardDiff, problem, x; check_dims=true, context::Tuple=(), order=1)
 
 Prepare a ForwardDiff gradient, Jacobian, or Hessian evaluator for a vector
-input. `order=1` (default) picks gradient/Jacobian by output arity;
-`order=2` builds Hessian machinery (`value_gradient_and_hessian!!`) and
-requires a scalar-valued problem.
-
-`context` follows the base `prepare` contract — the prepared evaluator
-computes `problem(x, context...)` with AD differentiating only `x`.
+input. `order=1` (default) picks gradient/Jacobian by output arity; `order=2`
+builds Hessian machinery and requires a scalar-valued problem. `context` and
+`check_dims` follow the base `prepare` contract.
 """
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff,
@@ -66,15 +62,12 @@ function AbstractPPL.prepare(
             FDHessianCache(nothing, nothing, nothing, nothing),
             Val(2),
         )
-        # Hessian cache: DiffResults buffer for value + gradient + hessian.
         hess_result = DiffResults.MutableDiffResult(
             zero(eltype(x)), (similar(x), similar(x, length(x), length(x)))
         )
-        # ForwardDiff.HessianConfig needs the result buffer.
         hess_config = ForwardDiff.HessianConfig(
             _fd_target(evaluator), hess_result, x, chunk
         )
-        # Separate gradient cache for order=1 queries on an order=2 prep.
         grad_result = DiffResults.MutableDiffResult(zero(eltype(x)), (similar(x),))
         grad_config = ForwardDiff.GradientConfig(_fd_target(evaluator), x, chunk)
         cache = FDHessianCache(hess_result, hess_config, grad_result, grad_config)
@@ -99,14 +92,12 @@ function AbstractPPL.prepare(
     end
 end
 
-# ─── Target closure ──────────────────────────────────────────────────────────
-# ForwardDiff differentiates a single-argument function; context is closed over.
+# ForwardDiff's `*Config` keys its `Tag` on the *type* of the target, so
+# constructing a fresh `Fix2` per hot-path call is free — the type matches the
+# one captured in the config at prep time.
 @inline _fd_target(e::VectorEvaluator) = Base.Fix2(_fd_call, e)
 @inline _fd_call(x, e::VectorEvaluator) = e.f(x, e.context...)
 
-# ─── value_and_gradient!! ────────────────────────────────────────────────────
-
-# Empty-input shortcut.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDGradientCache{Nothing}},
     x::AbstractVector{T},
@@ -115,7 +106,6 @@ end
     return (p.evaluator(x), T[])
 end
 
-# Scalar-gradient hot path.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDGradientCache},
     x::AbstractVector{<:Real},
@@ -125,7 +115,8 @@ end
     return (DiffResults.value(p.cache.result), DiffResults.gradient(p.cache.result))
 end
 
-# Arity mismatch: vector-valued problem queried for gradient.
+# Arity-mismatch rejections live on dedicated cache types so dispatch resolves
+# the failure mode at compile time.
 @inline function AbstractPPL.value_and_gradient!!(
     ::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDJacobianCache},
     ::AbstractVector{<:Real},
@@ -133,7 +124,6 @@ end
     return Evaluators._throw_gradient_needs_scalar()
 end
 
-# Order=2 prep: empty-input shortcut.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDHessianCache{Nothing}},
     x::AbstractVector{T},
@@ -142,7 +132,6 @@ end
     return (p.evaluator(x), T[])
 end
 
-# Order=2 prep: use the dedicated gradient cache to skip Hessian work.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDHessianCache},
     x::AbstractVector{<:Real},
@@ -157,9 +146,6 @@ end
     )
 end
 
-# ─── value_and_jacobian!! ────────────────────────────────────────────────────
-
-# Arity mismatch: scalar-valued problem queried for jacobian.
 @inline function AbstractPPL.value_and_jacobian!!(
     ::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:Union{FDGradientCache,FDHessianCache}},
     ::AbstractVector{<:Real},
@@ -167,7 +153,6 @@ end
     return Evaluators._throw_jacobian_needs_vector()
 end
 
-# Empty-input shortcut.
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDJacobianCache{Nothing}},
     x::AbstractVector{T},
@@ -177,7 +162,6 @@ end
     return (val, similar(x, length(val), 0))
 end
 
-# Jacobian hot path.
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDJacobianCache},
     x::AbstractVector{<:Real},
@@ -187,9 +171,6 @@ end
     return (DiffResults.value(p.cache.result), DiffResults.jacobian(p.cache.result))
 end
 
-# ─── value_gradient_and_hessian!! ────────────────────────────────────────────
-
-# Order=1 prep rejected for Hessian.
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     ::Prepared{
         <:AutoForwardDiff,<:VectorEvaluator,<:Union{FDGradientCache,FDJacobianCache}
@@ -199,7 +180,6 @@ end
     return Evaluators._throw_hessian_needs_order_2_prep()
 end
 
-# Empty-input shortcut.
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDHessianCache{Nothing}},
     x::AbstractVector{T},
@@ -208,7 +188,6 @@ end
     return (p.evaluator(x), T[], similar(x, 0, 0))
 end
 
-# Hessian hot path.
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDHessianCache},
     x::AbstractVector{<:Real},
