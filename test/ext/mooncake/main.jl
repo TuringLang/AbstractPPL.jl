@@ -3,10 +3,42 @@ Pkg.activate(@__DIR__)
 Pkg.develop(; path=joinpath(@__DIR__, "..", "..", ".."))
 Pkg.instantiate()
 
-using AbstractPPL: AbstractPPL, prepare, run_testcases, value_and_gradient!!
+using AbstractPPL:
+    AbstractPPL, prepare, generate_testcases, run_testcase, value_and_gradient!!
 using ADTypes: AutoMooncake, AutoMooncakeForward
 using Mooncake
 using Test
+
+# Known-broken paths in Mooncake:
+#   * `value_and_jacobian!!` allocates fresh cotangent/Jacobian buffers on
+#     every call (both modes); forward-mode Jacobian return type infers as
+#     `Tuple{Any, Union{Array{T,3}, Matrix}}`.
+#   * `value_and_gradient!!` on a forward-mode context-lowered prep splats
+#     `args_to_zero` per call and allocates; forward mode also fails inference.
+function _mooncake_alloc(case, adtype)
+    if case.tag === :vector && case.jacobian !== nothing
+        return :broken
+    elseif case.tag === :context && adtype isa AutoMooncakeForward
+        return :broken
+    elseif VERSION < v"1.11"
+        # Mooncake's value_and_gradient!! allocations are flaky on Julia 1.10
+        # (resolver-dependent: some Mooncake versions alloc, others don't).
+        return :skip
+    else
+        return :test
+    end
+end
+# The forward-mode Jacobian inference issue only affects non-empty input;
+# the empty-input shortcut bypasses Mooncake and is inferable on either mode.
+function _mooncake_inferred(case, adtype)
+    is_jac_inf_broken =
+        case.tag === :vector &&
+        case.jacobian !== nothing &&
+        length(case.x) > 0 &&
+        adtype isa AutoMooncakeForward
+    is_ctx_inf_broken = case.tag === :context && adtype isa AutoMooncakeForward
+    return (is_jac_inf_broken || is_ctx_inf_broken) ? :broken : :test
+end
 
 @testset "AbstractPPLMooncakeExt" begin
     for (label, adtype) in (
@@ -14,14 +46,19 @@ using Test
         ("Mooncake (forward)", AutoMooncakeForward()),
     )
         @testset "$label" begin
-            run_testcases(Val(:vector); adtype=adtype, atol=1e-6, rtol=1e-6)
-            run_testcases(Val(:namedtuple); adtype=adtype, atol=1e-6, rtol=1e-6)
-            run_testcases(Val(:cache_reuse); adtype=adtype, atol=1e-6, rtol=1e-6)
-            run_testcases(Val(:edge); adtype=adtype)
-            # Hessian (`order=2`) is reverse-mode only on the AutoMooncake side;
-            # AutoMooncakeForward routes through the same generic Hessian path
-            # since `Mooncake.prepare_hessian_cache` is mode-agnostic.
-            run_testcases(Val(:hessian); adtype=adtype, atol=1e-6, rtol=1e-6)
+            for case in generate_testcases(Val(:vector))
+                run_testcase(
+                    case;
+                    adtype,
+                    atol=1e-6,
+                    rtol=1e-6,
+                    allocations=_mooncake_alloc(case, adtype),
+                    type_stability=_mooncake_inferred(case, adtype),
+                )
+            end
+            for case in generate_testcases(Val(:namedtuple))
+                run_testcase(case; adtype, atol=1e-6, rtol=1e-6)
+            end
         end
     end
 

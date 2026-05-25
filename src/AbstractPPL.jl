@@ -17,31 +17,30 @@ using .Evaluators:
 """
     generate_testcases(::Val{group})
 
-Return a tuple of test cases for the conformance `group`. Implemented by the
-`Test` extension (`AbstractPPLTestExt`). Reserved group keys (extensions must
-not redefine these): `:vector` for value/gradient/jacobian round-trips on
-vector-input evaluators; `:hessian` for `order=2` value/gradient/Hessian
-round-trips on vector-input scalar-output evaluators; `:namedtuple` for
-`NamedTuple`-input evaluators; `:edge` for error-path cases; `:cache_reuse`
-for repeated calls against a single prepared evaluator. Downstream packages
-may add other keys.
+Return a tuple of AD conformance test cases for the input-shape `group`.
+Reserved groups: `:vector` (vector input) and `:namedtuple` (NamedTuple
+input; Mooncake-only). Iterate and pass each to [`run_testcase`](@ref).
+Implemented by the `Test` extension (`AbstractPPLTestExt`).
 """
 function generate_testcases end
 
 """
-    run_testcases(::Val{group}, prepare_fn=AbstractPPL.prepare; adtype, kwargs...)
+    run_testcase(case; adtype, prepare_fn=AbstractPPL.prepare, atol=0, rtol=1e-10,
+                 check_dims=true, type_stability=:skip, allocations=:skip)
 
-Run the test cases produced by [`generate_testcases`](@ref) against an AD
-backend, using `prepare_fn` (default `AbstractPPL.prepare`) to construct each
-prepared evaluator. Implemented by the `Test` extension. See
-[`generate_testcases`](@ref) for reserved group keys.
+Run a single conformance case against an AD backend. `type_stability` and
+`allocations` accept `:skip` / `:test` / `:broken` — `:test` asserts the
+invariant, `:broken` marks it `@test_broken` (use for backends with known
+regressions). Implemented by the `Test` extension.
 """
-function run_testcases end
+function run_testcase end
 
 @static if VERSION >= v"1.11.0"
     eval(
         Meta.parse(
-            "public prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, order, generate_testcases, run_testcases",
+            "public prepare, value_and_gradient!!, value_and_jacobian!!, " *
+            "value_gradient_and_hessian!!, order, " *
+            "generate_testcases, run_testcase",
         ),
     )
 end

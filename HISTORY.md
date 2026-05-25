@@ -1,3 +1,7 @@
+## 0.15.2
+
+Added `AbstractPPLForwardDiffExt`, a direct ForwardDiff path for `AutoForwardDiff` (gradient, Jacobian, Hessian, `context`, chunk size, custom `tag`).
+
 ## 0.15.1
 
 Added Hessian support to the AD interface. Pass `order=2` to `prepare(adtype, problem, x)` to build a Hessian-capable evaluator. The new `value_gradient_and_hessian!!(prepared, x)` then returns `(value, gradient, hessian)` in a single call. Both the DifferentiationInterface and Mooncake extensions implement this.

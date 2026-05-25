@@ -6,7 +6,8 @@ Pkg.instantiate()
 using AbstractPPL:
     AbstractPPL,
     prepare,
-    run_testcases,
+    generate_testcases,
+    run_testcase,
     value_and_gradient!!,
     value_gradient_and_hessian!!,
     order
@@ -22,32 +23,35 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
 
 @testset "AbstractPPLDifferentiationInterfaceExt" begin
     @testset "ForwardDiff" begin
-        run_testcases(Val(:vector); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:hessian); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:cache_reuse); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:edge); adtype=AutoForwardDiff())
+        for case in generate_testcases(Val(:vector))
+            run_testcase(case; adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
+        end
     end
 
-    # Compiled-tape ReverseDiff goes through the `_di_call_shape(::AutoReverseDiff{true}, …)`
-    # specialisation that closes the evaluator into a `Base.Fix2` target — the
-    # `:cache_reuse` group exercises that path across multiple inputs.
+    # Compiled-tape ReverseDiff closes the evaluator into a `Base.Fix2` target
+    # via `_di_call_shape(::AutoReverseDiff{true}, …)`; the `:cache_reuse`
+    # cases exercise that path across multiple inputs. Skip `:hessian`
+    # (compiled tape doesn't support `prepare_hessian`).
     @testset "ReverseDiff (compiled tape)" begin
         adtype = AutoReverseDiff(; compile=true)
-        run_testcases(Val(:vector); adtype=adtype, atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:cache_reuse); adtype=adtype, atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:edge); adtype=adtype)
+        for case in generate_testcases(Val(:vector))
+            case.tag === :hessian && continue
+            run_testcase(case; adtype, atol=1e-6, rtol=1e-6)
+        end
     end
 
     # The DI cache types' `Mode` parameter is either `:closure` (compiled-tape
     # ReverseDiff) or the integer context length on the constants path. The
     # constants-path integer also documents how many `DI.Constant`s the AD
-    # call passes.
+    # call passes. `AutoReverseDiff()` (non-compiled) is used here because the
+    # direct `AbstractPPLForwardDiffExt` path takes precedence over DI for
+    # `AutoForwardDiff` when both extensions are loaded.
     @testset "DI cache encodes the call mode as a type parameter" begin
         x = [1.0, 2.0, 3.0]
-        prep_noctx = prepare(AutoForwardDiff(), quadratic, x)
+        prep_noctx = prepare(AutoReverseDiff(), quadratic, x)
         prep_closure = prepare(AutoReverseDiff(; compile=true), quadratic, x)
         affine(y, a, b) = a * sum(abs2, y) + b
-        prep_ctx = prepare(AutoForwardDiff(), affine, x; context=(2.0, 1.0))
+        prep_ctx = prepare(AutoReverseDiff(), affine, x; context=(2.0, 1.0))
 
         @test prep_noctx.cache isa DIExt.DIGradientCache{0}
         @test prep_closure.cache isa DIExt.DIGradientCache{:closure}
