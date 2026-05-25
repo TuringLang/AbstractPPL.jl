@@ -23,8 +23,11 @@ not redefine these): `:vector` for value/gradient/jacobian round-trips on
 vector-input evaluators; `:hessian` for `order=2` value/gradient/Hessian
 round-trips on vector-input scalar-output evaluators; `:namedtuple` for
 `NamedTuple`-input evaluators; `:edge` for error-path cases; `:cache_reuse`
-for repeated calls against a single prepared evaluator. Downstream packages
-may add other keys.
+for repeated calls against a single prepared evaluator; `:allocations` and
+`:type_stability` for `@allocated == 0` and `@inferred` checks on the AD hot paths
+(both accept `gradient_broken`, `jacobian_broken`, and (`:type_stability` only)
+`hessian_broken` kwargs for backends with known broken paths). Downstream
+packages may add other keys.
 """
 function generate_testcases end
 

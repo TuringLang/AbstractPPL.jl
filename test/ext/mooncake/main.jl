@@ -22,6 +22,16 @@ using Test
             # AutoMooncakeForward routes through the same generic Hessian path
             # since `Mooncake.prepare_hessian_cache` is mode-agnostic.
             run_testcases(Val(:hessian); adtype=adtype, atol=1e-6, rtol=1e-6)
+            # Mooncake's `value_and_jacobian!!` currently allocates fresh
+            # cotangent/Jacobian buffers each call, and the forward-mode
+            # Jacobian return type infers as `Tuple{Any, Union{Array{T,3},
+            # Matrix}}`. Mark those known-broken; the other paths must hold.
+            run_testcases(Val(:allocations); adtype=adtype, jacobian_broken=true)
+            run_testcases(
+                Val(:type_stability);
+                adtype=adtype,
+                jacobian_broken=adtype isa AutoMooncakeForward,
+            )
         end
     end
 

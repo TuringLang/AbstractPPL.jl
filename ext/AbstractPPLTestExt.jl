@@ -1,13 +1,18 @@
 module AbstractPPLTestExt
 
 using AbstractPPL: AbstractPPL, generate_testcases, run_testcases
-using Test: @test, @test_throws, @testset
+using Test: @inferred, @test, @test_broken, @test_throws, @testset
 
 struct QuadraticProblem end
 (::QuadraticProblem)(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
 
 struct VectorValuedProblem end
 (::VectorValuedProblem)(x::AbstractVector{<:Real}) = [x[1] * x[2], x[2] + x[3]]
+
+# Allocation-free vector-output problem for the `:allocations` group:
+# `VectorValuedProblem` allocates its result vector, masking AD-path allocations.
+struct IdentityProblem end
+(::IdentityProblem)(x::AbstractVector{<:Real}) = x
 
 struct ValueCase
     name::String
@@ -325,6 +330,82 @@ function AbstractPPL.run_testcases(
             val, jac = AbstractPPL.value_and_jacobian!!(prepared, x)
             @test val ≈ value atol = atol rtol = rtol
             @test jac ≈ jacobian atol = atol rtol = rtol
+        end
+    end
+    return nothing
+end
+
+# Helpers for the `:type_stability` group: `@inferred` is a syntactic macro, so wrap
+# each AD entry in a tiny named function that returns `true` on success — that
+# value lets `@test` / `@test_broken` evaluate the call uniformly.
+function _inferred_gradient(prepared, x)
+    (@inferred AbstractPPL.value_and_gradient!!(prepared, x); true)
+end
+function _inferred_jacobian(prepared, x)
+    (@inferred AbstractPPL.value_and_jacobian!!(prepared, x); true)
+end
+function _inferred_hessian(prepared, x)
+    (@inferred AbstractPPL.value_gradient_and_hessian!!(prepared, x); true)
+end
+
+# Backends with known broken paths (e.g. Mooncake's forward-mode Jacobian)
+# pass `*_broken=true` to mark the assertion as broken instead of failing.
+function AbstractPPL.run_testcases(
+    ::Val{:allocations},
+    prepare_fn=AbstractPPL.prepare;
+    adtype,
+    gradient_broken::Bool=false,
+    jacobian_broken::Bool=false,
+)
+    x = [1.0, 2.0, 3.0]
+    @testset "scalar gradient" begin
+        prepared = prepare_fn(adtype, QuadraticProblem(), zeros(3); check_dims=false)
+        AbstractPPL.value_and_gradient!!(prepared, x)  # warm up
+        allocs = @allocated AbstractPPL.value_and_gradient!!(prepared, x)
+        gradient_broken ? (@test_broken allocs == 0) : (@test allocs == 0)
+    end
+    @testset "vector jacobian" begin
+        prepared = prepare_fn(adtype, IdentityProblem(), zeros(3); check_dims=false)
+        AbstractPPL.value_and_jacobian!!(prepared, x)
+        allocs = @allocated AbstractPPL.value_and_jacobian!!(prepared, x)
+        jacobian_broken ? (@test_broken allocs == 0) : (@test allocs == 0)
+    end
+    return nothing
+end
+
+function AbstractPPL.run_testcases(
+    ::Val{:type_stability},
+    prepare_fn=AbstractPPL.prepare;
+    adtype,
+    gradient_broken::Bool=false,
+    jacobian_broken::Bool=false,
+    hessian_broken::Bool=false,
+)
+    x = [1.0, 2.0, 3.0]
+    @testset "scalar gradient" begin
+        prepared = prepare_fn(adtype, QuadraticProblem(), zeros(3); check_dims=false)
+        if gradient_broken
+            (@test_broken _inferred_gradient(prepared, x))
+        else
+            (@test _inferred_gradient(prepared, x))
+        end
+    end
+    @testset "vector jacobian" begin
+        prepared = prepare_fn(adtype, IdentityProblem(), zeros(3); check_dims=false)
+        if jacobian_broken
+            (@test_broken _inferred_jacobian(prepared, x))
+        else
+            (@test _inferred_jacobian(prepared, x))
+        end
+    end
+    @testset "hessian" begin
+        prepared = prepare_fn(
+            adtype, QuadraticProblem(), zeros(3); check_dims=false, order=2
+        )
+        if hessian_broken
+            (@test_broken _inferred_hessian(prepared, x))
+        else
+            (@test _inferred_hessian(prepared, x))
         end
     end
     return nothing

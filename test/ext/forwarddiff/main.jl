@@ -14,6 +14,8 @@ using Test
         run_testcases(Val(:hessian); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         run_testcases(Val(:cache_reuse); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         run_testcases(Val(:edge); adtype=AutoForwardDiff())
+        run_testcases(Val(:allocations); adtype=AutoForwardDiff())
+        run_testcases(Val(:type_stability); adtype=AutoForwardDiff())
     end
 
     @testset "ForwardDiff (explicit chunk)" begin
