@@ -344,8 +344,11 @@ function AbstractPPL.run_testcase(case::TestCase; kwargs...)
     return nothing
 end
 
+# `:vector` and `:context` share a runner — `case.context` defaults to `()` so
+# threading it through `prepare` is a no-op on `:vector` cases that don't set
+# it.
 function _run(
-    ::Val{:vector},
+    ::Union{Val{:vector},Val{:context}},
     case;
     adtype,
     prepare_fn=AbstractPPL.prepare,
@@ -355,7 +358,7 @@ function _run(
     type_stability::Symbol=:skip,
     allocations::Symbol=:skip,
 )
-    prepared = prepare_fn(adtype, case.f, case.x_proto; check_dims)
+    prepared = prepare_fn(adtype, case.f, case.x_proto; check_dims, context=case.context)
     @test AbstractPPL.order(prepared) == 1
     @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
 
@@ -382,32 +385,6 @@ function _run(
             type_stability, AbstractPPL.value_and_jacobian!!, prepared, case.x
         )
     end
-    return nothing
-end
-
-function _run(
-    ::Val{:context},
-    case;
-    adtype,
-    prepare_fn=AbstractPPL.prepare,
-    atol=0,
-    rtol=1e-10,
-    check_dims::Bool=true,
-    type_stability::Symbol=:skip,
-    allocations::Symbol=:skip,
-)
-    prepared = prepare_fn(adtype, case.f, case.x_proto; check_dims, context=case.context)
-    @test AbstractPPL.order(prepared) == 1
-    @test prepared(case.x) ≈ case.value atol = atol rtol = rtol
-    val, grad = AbstractPPL.value_and_gradient!!(prepared, case.x)
-    @test val ≈ case.value atol = atol rtol = rtol
-    @test grad ≈ case.gradient atol = atol rtol = rtol
-    _maybe_check_alloc!(
-        case, allocations, AbstractPPL.value_and_gradient!!, prepared, case.x
-    )
-    _maybe_check_inferred!(
-        type_stability, AbstractPPL.value_and_gradient!!, prepared, case.x
-    )
     return nothing
 end
 
