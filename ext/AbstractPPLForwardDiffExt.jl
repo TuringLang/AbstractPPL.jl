@@ -103,6 +103,12 @@ end
 # config captured at prep time.
 @inline _fd_call(x, e::VectorEvaluator) = e.f(x, e.context...)
 
+# `Val(false)` on every hot-path call below skips `ForwardDiff.checktag`. A
+# user-supplied `adtype.tag` (e.g. DynamicPPL's `DynamicPPLTag` sentinel for
+# nested AD) has a tag-type parameter that does not equal `typeof(target)`, so
+# the default check would error. The tag's role is only to label the outer
+# Dual scope; the config we built at prep time already encodes the right tag.
+
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{
         <:AutoForwardDiff,
@@ -121,7 +127,7 @@ end
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.gradient!(
-        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config
+        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config, Val(false)
     )
     return (DiffResults.value(p.cache.result), DiffResults.gradient(p.cache.result))
 end
@@ -138,6 +144,7 @@ end
         Base.Fix2(_fd_call, p.evaluator),
         x,
         p.cache.gradient_config,
+        Val(false),
     )
     return (
         DiffResults.value(p.cache.gradient_result),
@@ -178,7 +185,7 @@ end
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.jacobian!(
-        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config
+        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config, Val(false)
     )
     return (DiffResults.value(p.cache.result), DiffResults.jacobian(p.cache.result))
 end
@@ -206,7 +213,7 @@ end
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.hessian!(
-        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config
+        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config, Val(false)
     )
     return (
         DiffResults.value(p.cache.result),

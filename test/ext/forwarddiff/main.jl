@@ -39,13 +39,19 @@ using Test
         run_testcases(Val(:context); adtype=AutoForwardDiff(), atol=1e-10, rtol=1e-10)
     end
 
-    # `AutoForwardDiff(; tag=...)` exists for nested differentiation. Check the
-    # user-supplied tag is threaded into the ForwardDiff config (the inner
-    # `*Config` carries the tag in its first type parameter).
+    # `AutoForwardDiff(; tag=...)` exists for nested differentiation. The tag's
+    # type parameter is a sentinel chosen by the caller (e.g. DynamicPPL's
+    # `DynamicPPLTag`); it intentionally does not equal `typeof(target)`, so
+    # the hot path must skip `ForwardDiff.checktag` to avoid a false error.
     @testset "custom AutoForwardDiff tag" begin
         struct OuterTag end
         custom = ForwardDiff.Tag{OuterTag,Float64}()
-        prep = prepare(AutoForwardDiff(; tag=custom), x -> sum(abs2, x), [1.0, 2.0])
+        x = [1.0, 2.0]
+        prep = prepare(AutoForwardDiff(; tag=custom), x -> sum(abs2, x), x)
         @test typeof(prep.cache.config).parameters[1] === typeof(custom)
+        # The actual AD call must succeed despite the sentinel tag.
+        val, grad = value_and_gradient!!(prep, x)
+        @test val ≈ 5.0
+        @test grad ≈ [2.0, 4.0]
     end
 end
