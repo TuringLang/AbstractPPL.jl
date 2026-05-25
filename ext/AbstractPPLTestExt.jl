@@ -348,8 +348,9 @@ function _inferred_hessian(prepared, x)
     (@inferred AbstractPPL.value_gradient_and_hessian!!(prepared, x); true)
 end
 
-# Backends with known broken paths (e.g. Mooncake's forward-mode Jacobian)
-# pass `*_broken=true` to mark the assertion as broken instead of failing.
+# Backends with known regressions (e.g. Mooncake's allocating
+# `value_and_jacobian!!`, or its forward-mode Jacobian inference) pass
+# `*_broken=true` to mark the assertion as broken instead of failing.
 function AbstractPPL.run_testcases(
     ::Val{:allocations},
     prepare_fn=AbstractPPL.prepare;
@@ -362,13 +363,21 @@ function AbstractPPL.run_testcases(
         prepared = prepare_fn(adtype, QuadraticProblem(), zeros(3); check_dims=false)
         AbstractPPL.value_and_gradient!!(prepared, x)  # warm up
         allocs = @allocated AbstractPPL.value_and_gradient!!(prepared, x)
-        gradient_broken ? (@test_broken allocs == 0) : (@test allocs == 0)
+        if gradient_broken
+            @test_broken allocs == 0
+        else
+            @test allocs == 0
+        end
     end
     @testset "vector jacobian" begin
         prepared = prepare_fn(adtype, IdentityProblem(), zeros(3); check_dims=false)
         AbstractPPL.value_and_jacobian!!(prepared, x)
         allocs = @allocated AbstractPPL.value_and_jacobian!!(prepared, x)
-        jacobian_broken ? (@test_broken allocs == 0) : (@test allocs == 0)
+        if jacobian_broken
+            @test_broken allocs == 0
+        else
+            @test allocs == 0
+        end
     end
     return nothing
 end
@@ -385,17 +394,17 @@ function AbstractPPL.run_testcases(
     @testset "scalar gradient" begin
         prepared = prepare_fn(adtype, QuadraticProblem(), zeros(3); check_dims=false)
         if gradient_broken
-            (@test_broken _inferred_gradient(prepared, x))
+            @test_broken _inferred_gradient(prepared, x)
         else
-            (@test _inferred_gradient(prepared, x))
+            @test _inferred_gradient(prepared, x)
         end
     end
     @testset "vector jacobian" begin
         prepared = prepare_fn(adtype, IdentityProblem(), zeros(3); check_dims=false)
         if jacobian_broken
-            (@test_broken _inferred_jacobian(prepared, x))
+            @test_broken _inferred_jacobian(prepared, x)
         else
-            (@test _inferred_jacobian(prepared, x))
+            @test _inferred_jacobian(prepared, x)
         end
     end
     @testset "hessian" begin
@@ -403,9 +412,9 @@ function AbstractPPL.run_testcases(
             adtype, QuadraticProblem(), zeros(3); check_dims=false, order=2
         )
         if hessian_broken
-            (@test_broken _inferred_hessian(prepared, x))
+            @test_broken _inferred_hessian(prepared, x)
         else
-            (@test _inferred_hessian(prepared, x))
+            @test _inferred_hessian(prepared, x)
         end
     end
     return nothing
