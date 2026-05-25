@@ -11,6 +11,12 @@ using DiffResults: DiffResults
 _fd_chunk(::AutoForwardDiff{nothing}, x) = ForwardDiff.Chunk(x)
 _fd_chunk(::AutoForwardDiff{CS}, _) where {CS} = ForwardDiff.Chunk{CS}()
 
+# A user-supplied `adtype.tag` (for nested differentiation) is threaded into the
+# `*Config` constructors; `nothing` (the ADTypes default) reproduces
+# ForwardDiff's per-constructor default of `Tag(target, eltype(x))`.
+@inline _fd_tag(adtype::AutoForwardDiff, target, x) =
+    adtype.tag === nothing ? ForwardDiff.Tag(target, eltype(x)) : adtype.tag
+
 # `A::Symbol` ∈ `(:scalar, :vector, :hessian)` encodes both output arity
 # (order=1) and order (order=2 ≡ `:hessian`), so dispatch resolves the hot path
 # and the arity-mismatch failure modes at compile time without a runtime branch.
@@ -50,8 +56,14 @@ function AbstractPPL.prepare(
 )
     Evaluators._validate_ad_order(order)
     evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
-    arity = _ad_output_arity(evaluator(x))
+    # Probe the output once: the value classifies arity, and the vector branch
+    # reuses it as the Jacobian-result prototype. The base `prepare` contract
+    # promises one prep-time call into `problem`.
+    y_probe = evaluator(x)
+    arity = _ad_output_arity(y_probe)
     chunk = _fd_chunk(adtype, x)
+    target = _fd_target(evaluator)
+    tag = _fd_tag(adtype, target, x)
 
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
@@ -64,11 +76,9 @@ function AbstractPPL.prepare(
         hess_result = DiffResults.MutableDiffResult(
             zero(eltype(x)), (similar(x), similar(x, length(x), length(x)))
         )
-        hess_config = ForwardDiff.HessianConfig(
-            _fd_target(evaluator), hess_result, x, chunk
-        )
+        hess_config = ForwardDiff.HessianConfig(target, hess_result, x, chunk, tag)
         grad_result = DiffResults.MutableDiffResult(zero(eltype(x)), (similar(x),))
-        grad_config = ForwardDiff.GradientConfig(_fd_target(evaluator), x, chunk)
+        grad_config = ForwardDiff.GradientConfig(target, x, chunk, tag)
         cache = FDCache{:hessian}(hess_result, hess_config, grad_result, grad_config)
         return Prepared(adtype, evaluator, cache, Val(2))
     end
@@ -77,16 +87,15 @@ function AbstractPPL.prepare(
         length(x) == 0 &&
             return Prepared(adtype, evaluator, FDCache{:scalar}(nothing, nothing))
         result = DiffResults.MutableDiffResult(zero(eltype(x)), (similar(x),))
-        config = ForwardDiff.GradientConfig(_fd_target(evaluator), x, chunk)
+        config = ForwardDiff.GradientConfig(target, x, chunk, tag)
         return Prepared(adtype, evaluator, FDCache{:scalar}(result, config))
     else
         length(x) == 0 &&
             return Prepared(adtype, evaluator, FDCache{:vector}(nothing, nothing))
-        y = evaluator(x)
         result = DiffResults.MutableDiffResult(
-            similar(y), (similar(y, length(y), length(x)),)
+            similar(y_probe), (similar(y_probe, length(y_probe), length(x)),)
         )
-        config = ForwardDiff.JacobianConfig(_fd_target(evaluator), x, chunk)
+        config = ForwardDiff.JacobianConfig(target, x, chunk, tag)
         return Prepared(adtype, evaluator, FDCache{:vector}(result, config))
     end
 end

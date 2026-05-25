@@ -40,4 +40,14 @@ using Test
         @test val ≈ raw_logdensity(x, 0.1)
         @test grad ≈ [-(x[1] - 0.1)] atol = 1e-10
     end
+
+    # `AutoForwardDiff(; tag=...)` exists for nested differentiation. Check the
+    # user-supplied tag is threaded into the ForwardDiff config (the inner
+    # `*Config` carries the tag in its first type parameter).
+    @testset "custom AutoForwardDiff tag" begin
+        struct OuterTag end
+        custom = ForwardDiff.Tag{OuterTag,Float64}()
+        prep = prepare(AutoForwardDiff(; tag=custom), x -> sum(abs2, x), [1.0, 2.0])
+        @test typeof(prep.cache.config).parameters[1] === typeof(custom)
+    end
 end
