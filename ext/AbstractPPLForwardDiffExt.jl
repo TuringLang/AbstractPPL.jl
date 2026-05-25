@@ -67,12 +67,8 @@ function AbstractPPL.prepare(
 
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
-        length(x) == 0 && return Prepared(
-            adtype,
-            evaluator,
-            FDCache{:hessian}(nothing, nothing, nothing, nothing),
-            Val(2),
-        )
+        length(x) == 0 &&
+            return Prepared(adtype, evaluator, FDCache{:hessian}(nothing, nothing), Val(2))
         hess_result = DiffResults.MutableDiffResult(
             zero(eltype(x)), (similar(x), similar(x, length(x), length(x)))
         )
@@ -163,8 +159,8 @@ end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:vector,Nothing}},
-    x::AbstractVector{T},
-) where {T<:Real}
+    x::AbstractVector{<:Real},
+)
     Evaluators._check_ad_input(p.evaluator, x)
     val = p.evaluator(x)
     return (val, similar(x, length(val), 0))
