@@ -433,7 +433,7 @@ function AbstractPPL.run_testcases(
         @test prepared(x) ≈ f(x, c) atol = atol rtol = rtol
         val, grad = AbstractPPL.value_and_gradient!!(prepared, x)
         @test val ≈ f(x, c) atol = atol rtol = rtol
-        @test grad ≈ [-(x[1] - c)] atol = 1e-10 rtol = rtol
+        @test grad ≈ [-(x[1] - c)] atol = atol rtol = rtol
     end
     return nothing
 end
