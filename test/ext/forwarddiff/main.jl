@@ -25,8 +25,12 @@ using Test
     end
 
     @testset "ForwardDiff (explicit chunk)" begin
-        run_testcases(Val(:vector); adtype=AutoForwardDiff(; chunksize=2), atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:cache_reuse); adtype=AutoForwardDiff(; chunksize=2), atol=1e-6, rtol=1e-6)
+        run_testcases(
+            Val(:vector); adtype=AutoForwardDiff(; chunksize=2), atol=1e-6, rtol=1e-6
+        )
+        run_testcases(
+            Val(:cache_reuse); adtype=AutoForwardDiff(; chunksize=2), atol=1e-6, rtol=1e-6
+        )
     end
 
     @testset "context-lowered gradient" begin

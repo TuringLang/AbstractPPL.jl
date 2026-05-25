@@ -41,13 +41,15 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
     # The DI cache types' `Mode` parameter is either `:closure` (compiled-tape
     # ReverseDiff) or the integer context length on the constants path. The
     # constants-path integer also documents how many `DI.Constant`s the AD
-    # call passes.
+    # call passes. `AutoReverseDiff()` (non-compiled) is used here because the
+    # direct `AbstractPPLForwardDiffExt` path takes precedence over DI for
+    # `AutoForwardDiff` when both extensions are loaded.
     @testset "DI cache encodes the call mode as a type parameter" begin
         x = [1.0, 2.0, 3.0]
-        prep_noctx = prepare(AutoForwardDiff(), quadratic, x)
+        prep_noctx = prepare(AutoReverseDiff(), quadratic, x)
         prep_closure = prepare(AutoReverseDiff(; compile=true), quadratic, x)
         affine(y, a, b) = a * sum(abs2, y) + b
-        prep_ctx = prepare(AutoForwardDiff(), affine, x; context=(2.0, 1.0))
+        prep_ctx = prepare(AutoReverseDiff(), affine, x; context=(2.0, 1.0))
 
         @test prep_noctx.cache isa DIExt.DIGradientCache{0}
         @test prep_closure.cache isa DIExt.DIGradientCache{:closure}

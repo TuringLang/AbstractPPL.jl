@@ -1,8 +1,7 @@
 module AbstractPPLForwardDiffExt
 
 using AbstractPPL: AbstractPPL
-using AbstractPPL.Evaluators:
-    Evaluators, Prepared, VectorEvaluator, _ad_output_arity
+using AbstractPPL.Evaluators: Evaluators, Prepared, VectorEvaluator, _ad_output_arity
 using ADTypes: AutoForwardDiff
 using ForwardDiff: ForwardDiff
 using DiffResults: DiffResults
@@ -62,7 +61,10 @@ function AbstractPPL.prepare(
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
         length(x) == 0 && return Prepared(
-            adtype, evaluator, FDHessianCache(nothing, nothing, nothing, nothing), Val(2)
+            adtype,
+            evaluator,
+            FDHessianCache(nothing, nothing, nothing, nothing),
+            Val(2),
         )
         # Hessian cache: DiffResults buffer for value + gradient + hessian.
         hess_result = DiffResults.MutableDiffResult(
@@ -80,18 +82,18 @@ function AbstractPPL.prepare(
     end
 
     if arity === :scalar
-        length(x) == 0 && return Prepared(
-            adtype, evaluator, FDGradientCache(nothing, nothing)
-        )
+        length(x) == 0 &&
+            return Prepared(adtype, evaluator, FDGradientCache(nothing, nothing))
         result = DiffResults.MutableDiffResult(zero(eltype(x)), (similar(x),))
         config = ForwardDiff.GradientConfig(_fd_target(evaluator), x, chunk)
         return Prepared(adtype, evaluator, FDGradientCache(result, config))
     else
-        length(x) == 0 && return Prepared(
-            adtype, evaluator, FDJacobianCache(nothing, nothing)
-        )
+        length(x) == 0 &&
+            return Prepared(adtype, evaluator, FDJacobianCache(nothing, nothing))
         y = evaluator(x)
-        result = DiffResults.MutableDiffResult(similar(y), (similar(y, length(y), length(x)),))
+        result = DiffResults.MutableDiffResult(
+            similar(y), (similar(y, length(y), length(x)),)
+        )
         config = ForwardDiff.JacobianConfig(_fd_target(evaluator), x, chunk)
         return Prepared(adtype, evaluator, FDJacobianCache(result, config))
     end
@@ -189,7 +191,9 @@ end
 
 # Order=1 prep rejected for Hessian.
 @inline function AbstractPPL.value_gradient_and_hessian!!(
-    ::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:Union{FDGradientCache,FDJacobianCache}},
+    ::Prepared{
+        <:AutoForwardDiff,<:VectorEvaluator,<:Union{FDGradientCache,FDJacobianCache}
+    },
     ::AbstractVector{<:Real},
 )
     return Evaluators._throw_hessian_needs_order_2_prep()
