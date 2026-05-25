@@ -23,7 +23,7 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
 
 @testset "AbstractPPLDifferentiationInterfaceExt" begin
     @testset "ForwardDiff" begin
-        for case in generate_testcases()
+        for case in generate_testcases(Val(:vector))
             run_testcase(case; adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         end
     end
@@ -34,7 +34,7 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
     # (compiled tape doesn't support `prepare_hessian`).
     @testset "ReverseDiff (compiled tape)" begin
         adtype = AutoReverseDiff(; compile=true)
-        for case in generate_testcases()
+        for case in generate_testcases(Val(:vector))
             case.tag === :hessian && continue
             run_testcase(case; adtype, atol=1e-6, rtol=1e-6)
         end

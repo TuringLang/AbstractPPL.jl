@@ -1,8 +1,80 @@
 module AbstractPPLTestExt
 
-using AbstractPPL:
-    AbstractPPL, generate_testcases, generate_namedtuple_testcases, run_testcase, TestCase
+using AbstractPPL: AbstractPPL, generate_testcases, run_testcase
 using Test: @inferred, @test, @test_broken, @test_throws, @testset
+
+"""
+    TestCase(name, tag, f, x_proto; x, value, gradient, jacobian, hessian,
+             context=(), op, exception, inputs, allocations_safe=true)
+
+Single tagged case for AD conformance testing. The `tag::Symbol` selects how
+the case is run; the kwargs populate only the fields the tag uses.
+
+Reserved tags (recognised by [`run_testcase`](@ref)):
+
+  - `:vector`      — vector input, scalar output (`gradient`) or vector output
+                     (`jacobian`).
+  - `:hessian`     — order=2 round-trip on scalar output.
+  - `:context`     — scalar-output gradient with a non-empty `context::Tuple`
+                     passed to `prepare`.
+  - `:edge`        — error case; `op(prepared, x)` must throw `exception`.
+  - `:cache_reuse` — multiple inputs against a single prepared evaluator
+                     (`inputs::Vector{<:NamedTuple}`, with `(x=, value=,
+                     gradient=)` or `(x=, value=, jacobian=)` per row).
+  - `:namedtuple`  — NamedTuple input and gradient; Mooncake-only.
+
+`allocations_safe=false` opts the case out of the alloc check
+(cases with an allocating primal or empty-input shortcuts that allocate).
+"""
+struct TestCase
+    name::String
+    tag::Symbol
+    f::Any
+    x_proto::Any
+    x::Any
+    value::Any
+    gradient::Any
+    jacobian::Any
+    hessian::Any
+    context::Tuple
+    op::Any
+    exception::Any
+    inputs::Any
+    allocations_safe::Bool
+end
+function TestCase(
+    name,
+    tag::Symbol,
+    f,
+    x_proto;
+    x=nothing,
+    value=nothing,
+    gradient=nothing,
+    jacobian=nothing,
+    hessian=nothing,
+    context::Tuple=(),
+    op=nothing,
+    exception=nothing,
+    inputs=nothing,
+    allocations_safe::Bool=true,
+)
+    return TestCase(
+        name,
+        tag,
+        f,
+        x_proto,
+        x,
+        value,
+        gradient,
+        jacobian,
+        hessian,
+        context,
+        op,
+        exception,
+        inputs,
+        allocations_safe,
+    )
+end
 
 struct QuadraticProblem end
 (::QuadraticProblem)(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
@@ -12,7 +84,7 @@ struct VectorValuedProblem end
 
 _context_problem(y::AbstractVector{<:Real}, offset) = -0.5 * (y[1] - offset)^2
 
-function AbstractPPL.generate_testcases()
+function AbstractPPL.generate_testcases(::Val{:vector})
     return (
         TestCase(
             "quadratic (scalar output)",
@@ -213,7 +285,7 @@ function AbstractPPL.generate_testcases()
     )
 end
 
-function AbstractPPL.generate_namedtuple_testcases()
+function AbstractPPL.generate_testcases(::Val{:namedtuple})
     return (
         TestCase(
             "scalar output over (x::Real, y::Vector)",

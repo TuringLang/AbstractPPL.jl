@@ -4,12 +4,7 @@ Pkg.develop(; path=joinpath(@__DIR__, "..", "..", ".."))
 Pkg.instantiate()
 
 using AbstractPPL:
-    AbstractPPL,
-    prepare,
-    generate_testcases,
-    generate_namedtuple_testcases,
-    run_testcase,
-    value_and_gradient!!
+    AbstractPPL, prepare, generate_testcases, run_testcase, value_and_gradient!!
 using ADTypes: AutoMooncake, AutoMooncakeForward
 using Mooncake
 using Test
@@ -50,7 +45,7 @@ end
         ("Mooncake (forward)", AutoMooncakeForward()),
     )
         @testset "$label" begin
-            for case in generate_testcases()
+            for case in generate_testcases(Val(:vector))
                 run_testcase(
                     case;
                     adtype,
@@ -60,7 +55,7 @@ end
                     type_stability=_mooncake_inferred(case, adtype),
                 )
             end
-            for case in generate_namedtuple_testcases()
+            for case in generate_testcases(Val(:namedtuple))
                 run_testcase(case; adtype, atol=1e-6, rtol=1e-6)
             end
         end

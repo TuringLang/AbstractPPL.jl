@@ -15,7 +15,7 @@ using Test
     alloc_state = VERSION < v"1.11" ? :broken : :test
 
     @testset "ForwardDiff (default chunk)" begin
-        for case in generate_testcases()
+        for case in generate_testcases(Val(:vector))
             run_testcase(
                 case;
                 adtype=AutoForwardDiff(),
@@ -31,7 +31,7 @@ using Test
     # case (x of length 1) and `:edge` cases (chunk doesn't apply).
     @testset "ForwardDiff (explicit chunk)" begin
         ad = AutoForwardDiff(; chunksize=2)
-        for case in generate_testcases()
+        for case in generate_testcases(Val(:vector))
             case.tag ∈ (:vector, :cache_reuse, :hessian) || continue
             run_testcase(case; adtype=ad, atol=1e-6, rtol=1e-6)
         end

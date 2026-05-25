@@ -15,99 +15,20 @@ using .Evaluators:
     prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, order
 
 """
-    TestCase(name, tag, f, x_proto; x, value, gradient, jacobian, hessian,
-             context=(), op, exception, inputs)
+    generate_testcases(::Val{group})
 
-Single tagged case for AD conformance testing. The `tag::Symbol` selects how
-the case is run; the kwargs populate only the fields the tag uses.
-
-Reserved tags (recognised by [`run_testcase`](@ref)):
-
-  - `:vector`      — vector input, scalar output (`gradient`) or vector output
-                     (`jacobian`).
-  - `:hessian`     — order=2 round-trip on scalar output.
-  - `:context`     — scalar-output gradient with a non-empty `context::Tuple`
-                     passed to `prepare`.
-  - `:edge`        — error case; `op(prepared, x)` must throw `exception`.
-  - `:cache_reuse` — multiple inputs against a single prepared evaluator
-                     (`inputs::Vector{<:NamedTuple}`, with `(x=, value=,
-                     gradient=)` or `(x=, value=, jacobian=)` per row).
-  - `:namedtuple`  — NamedTuple input and gradient; Mooncake-only.
-"""
-struct TestCase
-    name::String
-    tag::Symbol
-    f::Any
-    x_proto::Any
-    x::Any
-    value::Any
-    gradient::Any
-    jacobian::Any
-    hessian::Any
-    context::Tuple
-    op::Any
-    exception::Any
-    inputs::Any
-    # Cases with an allocating primal (vector-output result vectors, the
-    # empty-input shortcut's `T[]`) or shapes the original `:allocations` group
-    # never covered (hessian, cache-reuse, edge) set this to `false` — the
-    # runner then skips the `allocations=` check regardless of caller intent.
-    allocations_safe::Bool
-end
-function TestCase(
-    name,
-    tag::Symbol,
-    f,
-    x_proto;
-    x=nothing,
-    value=nothing,
-    gradient=nothing,
-    jacobian=nothing,
-    hessian=nothing,
-    context::Tuple=(),
-    op=nothing,
-    exception=nothing,
-    inputs=nothing,
-    allocations_safe::Bool=true,
-)
-    return TestCase(
-        name,
-        tag,
-        f,
-        x_proto,
-        x,
-        value,
-        gradient,
-        jacobian,
-        hessian,
-        context,
-        op,
-        exception,
-        inputs,
-        allocations_safe,
-    )
-end
-
-"""
-    generate_testcases()
-
-Return a tuple of conformance [`TestCase`](@ref)s for vector-input AD
-backends. Iterate and pass each to [`run_testcase`](@ref).
+Return a tuple of AD conformance test cases for the input-shape `group`.
+Reserved groups: `:vector` (vector input) and `:namedtuple` (NamedTuple
+input; Mooncake-only). Iterate and pass each to [`run_testcase`](@ref).
+Implemented by the `Test` extension (`AbstractPPLTestExt`).
 """
 function generate_testcases end
-
-"""
-    generate_namedtuple_testcases()
-
-Like [`generate_testcases`](@ref) but for evaluators with `NamedTuple` input.
-"""
-function generate_namedtuple_testcases end
 
 """
     run_testcase(case; adtype, prepare_fn=AbstractPPL.prepare, atol=0, rtol=1e-10,
                  check_dims=true, type_stability=:skip, allocations=:skip)
 
-Run a single [`TestCase`](@ref) against an AD backend. `type_stability` and
+Run a single conformance case against an AD backend. `type_stability` and
 `allocations` accept `:skip` / `:test` / `:broken` — `:test` asserts the
 invariant, `:broken` marks it `@test_broken` (use for backends with known
 regressions). Implemented by the `Test` extension.
@@ -119,7 +40,7 @@ function run_testcase end
         Meta.parse(
             "public prepare, value_and_gradient!!, value_and_jacobian!!, " *
             "value_gradient_and_hessian!!, order, " *
-            "generate_testcases, generate_namedtuple_testcases, run_testcase, TestCase",
+            "generate_testcases, run_testcase",
         ),
     )
 end
