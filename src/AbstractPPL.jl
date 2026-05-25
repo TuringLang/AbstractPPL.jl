@@ -15,37 +15,111 @@ using .Evaluators:
     prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, order
 
 """
-    generate_testcases(::Val{group})
+    TestCase(name, tag, f, x_proto; x, value, gradient, jacobian, hessian,
+             context=(), op, exception, inputs)
 
-Return a tuple of test cases for the conformance `group`. Implemented by the
-`Test` extension (`AbstractPPLTestExt`). Reserved group keys (extensions must
-not redefine these): `:vector` for value/gradient/jacobian round-trips on
-vector-input evaluators; `:hessian` for `order=2` value/gradient/Hessian
-round-trips on vector-input scalar-output evaluators; `:namedtuple` for
-`NamedTuple`-input evaluators; `:edge` for error-path cases; `:cache_reuse`
-for repeated calls against a single prepared evaluator; `:allocations` and
-`:type_stability` for `@allocated == 0` and `@inferred` checks on the AD hot paths
-(both accept `gradient_broken`, `jacobian_broken`, and (`:type_stability` only)
-`hessian_broken` kwargs for backends with known broken paths); `:context` for
-the `prepare(adtype, f, x; context=(c,))` lowering on a scalar gradient.
-Downstream packages may add other keys.
+Single tagged case for AD conformance testing. The `tag::Symbol` selects how
+the case is run; the kwargs populate only the fields the tag uses.
+
+Reserved tags (recognised by [`run_testcase`](@ref)):
+
+  - `:vector`      — vector input, scalar output (`gradient`) or vector output
+                     (`jacobian`).
+  - `:hessian`     — order=2 round-trip on scalar output.
+  - `:context`     — scalar-output gradient with a non-empty `context::Tuple`
+                     passed to `prepare`.
+  - `:edge`        — error case; `op(prepared, x)` must throw `exception`.
+  - `:cache_reuse` — multiple inputs against a single prepared evaluator
+                     (`inputs::Vector{<:NamedTuple}`, with `(x=, value=,
+                     gradient=)` or `(x=, value=, jacobian=)` per row).
+  - `:namedtuple`  — NamedTuple input and gradient; Mooncake-only.
+"""
+struct TestCase
+    name::String
+    tag::Symbol
+    f::Any
+    x_proto::Any
+    x::Any
+    value::Any
+    gradient::Any
+    jacobian::Any
+    hessian::Any
+    context::Tuple
+    op::Any
+    exception::Any
+    inputs::Any
+    # Cases with an allocating primal (vector-output result vectors, the
+    # empty-input shortcut's `T[]`) or shapes the original `:allocations` group
+    # never covered (hessian, cache-reuse, edge) set this to `false` — the
+    # runner then skips the `allocations=` check regardless of caller intent.
+    allocations_safe::Bool
+end
+function TestCase(
+    name,
+    tag::Symbol,
+    f,
+    x_proto;
+    x=nothing,
+    value=nothing,
+    gradient=nothing,
+    jacobian=nothing,
+    hessian=nothing,
+    context::Tuple=(),
+    op=nothing,
+    exception=nothing,
+    inputs=nothing,
+    allocations_safe::Bool=true,
+)
+    return TestCase(
+        name,
+        tag,
+        f,
+        x_proto,
+        x,
+        value,
+        gradient,
+        jacobian,
+        hessian,
+        context,
+        op,
+        exception,
+        inputs,
+        allocations_safe,
+    )
+end
+
+"""
+    generate_testcases()
+
+Return a tuple of conformance [`TestCase`](@ref)s for vector-input AD
+backends. Iterate and pass each to [`run_testcase`](@ref).
 """
 function generate_testcases end
 
 """
-    run_testcases(::Val{group}, prepare_fn=AbstractPPL.prepare; adtype, kwargs...)
+    generate_namedtuple_testcases()
 
-Run the test cases produced by [`generate_testcases`](@ref) against an AD
-backend, using `prepare_fn` (default `AbstractPPL.prepare`) to construct each
-prepared evaluator. Implemented by the `Test` extension. See
-[`generate_testcases`](@ref) for reserved group keys.
+Like [`generate_testcases`](@ref) but for evaluators with `NamedTuple` input.
 """
-function run_testcases end
+function generate_namedtuple_testcases end
+
+"""
+    run_testcase(case; adtype, prepare_fn=AbstractPPL.prepare, atol=0, rtol=1e-10,
+                 check_dims=true, type_stability=:skip, allocations=:skip)
+
+Run a single [`TestCase`](@ref) against an AD backend. `type_stability` and
+`allocations` accept `:skip` / `:test` / `:broken` — `:test` asserts the
+invariant, `:broken` marks it `@test_broken` (use for backends with known
+regressions). Implemented by the `Test` extension.
+"""
+function run_testcase end
 
 @static if VERSION >= v"1.11.0"
     eval(
         Meta.parse(
-            "public prepare, value_and_gradient!!, value_and_jacobian!!, value_gradient_and_hessian!!, order, generate_testcases, run_testcases",
+            "public prepare, value_and_gradient!!, value_and_jacobian!!, " *
+            "value_gradient_and_hessian!!, order, " *
+            "generate_testcases, generate_namedtuple_testcases, run_testcase, TestCase",
         ),
     )
 end

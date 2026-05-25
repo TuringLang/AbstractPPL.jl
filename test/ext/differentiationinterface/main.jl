@@ -6,7 +6,8 @@ Pkg.instantiate()
 using AbstractPPL:
     AbstractPPL,
     prepare,
-    run_testcases,
+    generate_testcases,
+    run_testcase,
     value_and_gradient!!,
     value_gradient_and_hessian!!,
     order
@@ -22,20 +23,21 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
 
 @testset "AbstractPPLDifferentiationInterfaceExt" begin
     @testset "ForwardDiff" begin
-        run_testcases(Val(:vector); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:hessian); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:cache_reuse); adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:edge); adtype=AutoForwardDiff())
+        for case in generate_testcases()
+            run_testcase(case; adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
+        end
     end
 
-    # Compiled-tape ReverseDiff goes through the `_di_call_shape(::AutoReverseDiff{true}, …)`
-    # specialisation that closes the evaluator into a `Base.Fix2` target — the
-    # `:cache_reuse` group exercises that path across multiple inputs.
+    # Compiled-tape ReverseDiff closes the evaluator into a `Base.Fix2` target
+    # via `_di_call_shape(::AutoReverseDiff{true}, …)`; the `:cache_reuse`
+    # cases exercise that path across multiple inputs. Skip `:hessian`
+    # (compiled tape doesn't support `prepare_hessian`).
     @testset "ReverseDiff (compiled tape)" begin
         adtype = AutoReverseDiff(; compile=true)
-        run_testcases(Val(:vector); adtype=adtype, atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:cache_reuse); adtype=adtype, atol=1e-6, rtol=1e-6)
-        run_testcases(Val(:edge); adtype=adtype)
+        for case in generate_testcases()
+            case.tag === :hessian && continue
+            run_testcase(case; adtype, atol=1e-6, rtol=1e-6)
+        end
     end
 
     # The DI cache types' `Mode` parameter is either `:closure` (compiled-tape
