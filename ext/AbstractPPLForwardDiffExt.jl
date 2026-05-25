@@ -62,7 +62,7 @@ function AbstractPPL.prepare(
     y_probe = evaluator(x)
     arity = _ad_output_arity(y_probe)
     chunk = _fd_chunk(adtype, x)
-    target = _fd_target(evaluator)
+    target = Base.Fix2(_fd_call, evaluator)
     tag = _fd_tag(adtype, target, x)
 
     if order == 2
@@ -96,10 +96,11 @@ function AbstractPPL.prepare(
     end
 end
 
-# ForwardDiff's `*Config` keys its `Tag` on the *type* of the target, so
-# constructing a fresh `Fix2` per hot-path call is free — the type matches the
-# one captured in the config at prep time.
-@inline _fd_target(e::VectorEvaluator) = Base.Fix2(_fd_call, e)
+# Top-level so `typeof(_fd_call)` is stable across `prepare` and the hot paths.
+# ForwardDiff's `*Config` keys its `Tag` on the target type; a closure built
+# inside one method would have a different type from one built inside another,
+# desyncing the per-call `Base.Fix2(_fd_call, evaluator)` target from the
+# config captured at prep time.
 @inline _fd_call(x, e::VectorEvaluator) = e.f(x, e.context...)
 
 @inline function AbstractPPL.value_and_gradient!!(
@@ -119,7 +120,9 @@ end
     x::AbstractVector{<:Real},
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    ForwardDiff.gradient!(p.cache.result, _fd_target(p.evaluator), x, p.cache.config)
+    ForwardDiff.gradient!(
+        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config
+    )
     return (DiffResults.value(p.cache.result), DiffResults.gradient(p.cache.result))
 end
 
@@ -131,7 +134,10 @@ end
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.gradient!(
-        p.cache.gradient_result, _fd_target(p.evaluator), x, p.cache.gradient_config
+        p.cache.gradient_result,
+        Base.Fix2(_fd_call, p.evaluator),
+        x,
+        p.cache.gradient_config,
     )
     return (
         DiffResults.value(p.cache.gradient_result),
@@ -171,7 +177,9 @@ end
     x::AbstractVector{<:Real},
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    ForwardDiff.jacobian!(p.cache.result, _fd_target(p.evaluator), x, p.cache.config)
+    ForwardDiff.jacobian!(
+        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config
+    )
     return (DiffResults.value(p.cache.result), DiffResults.jacobian(p.cache.result))
 end
 
@@ -197,7 +205,9 @@ end
     x::AbstractVector{<:Real},
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    ForwardDiff.hessian!(p.cache.result, _fd_target(p.evaluator), x, p.cache.config)
+    ForwardDiff.hessian!(
+        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config
+    )
     return (
         DiffResults.value(p.cache.result),
         DiffResults.gradient(p.cache.result),
