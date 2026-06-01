@@ -95,4 +95,18 @@ export AbstractOptic,
 using Accessors: set
 export set
 
+# "of" type system (migrated from JuliaBUGS.jl)
+include("of.jl")
+export of, @of
+@static if VERSION >= v"1.11.0"
+    eval(
+        Meta.parse(
+            "public OfType, OfReal, OfInt, OfArray, OfNamedTuple, OfConstantWrapper, " *
+            "SymbolicRef, SymbolicExpr, flatten, unflatten, has_symbolic_dims, " *
+            "get_unresolved_symbols, is_leaf, validate_bounds, get_lower, get_upper, " *
+            "get_element_type, get_ndims, get_dims, get_names, get_types, get_wrapped_type",
+        ),
+    )
+end
+
 end # module
