@@ -10,7 +10,7 @@
 # Migrated from JuliaBUGS.jl (originally added there in TuringLang/JuliaBUGS.jl#331).
 # ========================================================================
 
-using Random: randexp
+using Random: AbstractRNG, default_rng, randexp
 
 # ========================================================================
 # Core Type Definitions
@@ -230,24 +230,36 @@ get_names(::Type{OfNamedTuple{Names,Types}}) where {Names,Types} = Names
 get_types(::Type{OfNamedTuple{Names,Types}}) where {Names,Types} = Types
 get_wrapped_type(::Type{OfConstantWrapper{T}}) where {T} = T
 
+# A dimension is symbolic when it is a bare field symbol or a `SymbolicExpr` parameter.
+_is_symbolic_dim(d) = d isa Symbol || (d isa Type && d <: SymbolicExpr)
+# A bound is symbolic when it is a `SymbolicRef` or `SymbolicExpr` parameter.
+_is_symbolic_bound(b) = b isa Type && (b <: SymbolicRef || b <: SymbolicExpr)
+
+# Fail fast (with a clear message) before a symbolic bound reaches arithmetic/comparison.
+function _assert_concrete_bounds(::Type{T}) where {T<:OfType}
+    if _is_symbolic_bound(get_lower(T)) || _is_symbolic_bound(get_upper(T))
+        error(
+            "Cannot instantiate a type with symbolic bounds. Resolve them with of(T; name=value) first.",
+        )
+    end
+    return nothing
+end
+
 # ========================================================================
 # Type Classification and Conversion Utilities
 # ========================================================================
 
-# Check if a type is a leaf
 is_leaf(::Type{<:OfArray}) = true
 is_leaf(::Type{<:OfReal}) = true
 is_leaf(::Type{<:OfInt}) = true
 is_leaf(::Type{<:OfNamedTuple}) = false
 is_leaf(::Type{<:OfConstantWrapper}) = true
 
-# Convert bounds to type parameters
 bound_to_type(::Nothing) = Nothing
 bound_to_type(x::Real) = x
 bound_to_type(s::Symbol) = SymbolicRef{s}
 bound_to_type(s::QuoteNode) = SymbolicRef{s.value}
 
-# Extract value from type parameter
 type_to_bound(::Type{Nothing}) = nothing
 type_to_bound(::Type{x}) where {x<:Real} = x  # Extract numeric type parameter
 type_to_bound(::Type{SymbolicRef{S}}) where {S} = S
@@ -290,16 +302,12 @@ function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
     elseif op == :*
         return prod(args)
     elseif op == :/
-        if length(args) != 2
-            error("Division requires exactly 2 arguments")
-        end
+        length(args) == 2 || error("Division requires exactly 2 arguments")
         result = args[1] / args[2]
-        # For array dimensions, ensure the result is an integer
-        if isinteger(args[1]) && !isinteger(result)
-            error(
-                "Division $(args[1]) / $(args[2]) = $result is not an integer. Array dimensions must be integers.",
-            )
-        end
+        # Array dimensions must be integers; guard the result itself, not just the dividend.
+        isinteger(result) || error(
+            "Division $(args[1]) / $(args[2]) = $result is not an integer. Array dimensions must be integers.",
+        )
         return Int(result)
     end
 end
@@ -344,18 +352,9 @@ end
 # Helper Functions for Constructors
 # ========================================================================
 
-# Process array dimensions into a proper tuple type
 function process_array_dimensions(dims)
-    processed_dims = map(dims) do d
-        if d isa QuoteNode
-            d.value
-        elseif d isa Type
-            # Keep type parameters as-is (e.g., SymbolicExpr{...})
-            d
-        else
-            d
-        end
-    end
+    # Unwrap quoted field references; keep everything else (including SymbolicExpr{...}) as-is.
+    processed_dims = map(d -> d isa QuoteNode ? d.value : d, dims)
     # Ensure we have a tuple of dimensions
     if length(processed_dims) == 1
         Tuple{processed_dims[1]}
@@ -364,7 +363,6 @@ function process_array_dimensions(dims)
     end
 end
 
-# Process bounds for Int/Real types
 function process_bounds(lower, upper)
     L = if lower isa Type
         lower
@@ -565,7 +563,6 @@ end
 # Helper Functions for Type Concretization
 # ========================================================================
 
-# Resolve bounds in a bounded type (OfReal or OfInt)
 function resolve_bounded_type(::Type{T}, replacements::NamedTuple) where {T<:OfType}
     if !(T <: OfReal || T <: OfInt)
         return T
@@ -707,7 +704,6 @@ function _process_field_for_concretization(
 end
 
 function of(::Type{OfNamedTuple{Names,Types}}, replacements::NamedTuple) where {Names,Types}
-    # Process each field and collect the results
     processed_fields = []
 
     for i in 1:length(Names)
@@ -771,7 +767,7 @@ function _create_with_default(::Type{OfReal{T,L,U}}, default_value) where {T,L,U
     val = convert(T, default_value)
     lower = type_to_bound(L)
     upper = type_to_bound(U)
-    validate_bounds(val, lower, upper, "Real")
+    validate_bounds(val, lower, upper; kind="Real value")
     return val
 end
 
@@ -788,7 +784,7 @@ function _create_with_default(::Type{OfInt{L,U}}, default_value) where {L,U}
     end
     lower = type_to_bound(L)
     upper = type_to_bound(U)
-    validate_bounds(val, lower, upper, "Int")
+    validate_bounds(val, lower, upper; kind="Int value")
     return val
 end
 
@@ -812,15 +808,10 @@ end
 # ========================================================================
 function _create_instance_impl(
     ::Type{T}, value_generator::Function, kwargs
-) where {T<:OfType}
-    if !(T <: OfNamedTuple)
-        error("Instance creation is only supported for OfNamedTuple types, not $(T)")
-    end
-
+) where {T<:OfNamedTuple}
     names = get_names(T)
     types = get_types(T)
 
-    # Separate constants from values
     constants = Dict{Symbol,Any}()
     values = Dict{Symbol,Any}()
 
@@ -833,7 +824,6 @@ function _create_instance_impl(
         end
     end
 
-    # Check that all constants are provided
     for (idx, name) in enumerate(names)
         if types.parameters[idx] <: OfConstantWrapper && !haskey(constants, name)
             error("Constant `$name` is required but not provided")
@@ -880,17 +870,18 @@ end
 # ========================================================================
 
 """
-    (::Type{T})(; kwargs...) where {T<:OfType}
-    (::Type{T})(default_value; kwargs...) where {T<:OfType}
+    (::Type{T})(; kwargs...) where {T<:OfNamedTuple}
+    (::Type{T})(default_value; kwargs...) where {T<:OfNamedTuple}
 
 Create an instance of an `OfNamedTuple` type with specified constant values.
 
-This constructor creates actual values (instances) from `OfType` specifications.
+This constructor creates actual values (instances) from an `OfNamedTuple` specification.
 It requires all constants to be provided and initializes non-constant fields
-to zero or a specified default value.
+to zero or a specified default value. Only `OfNamedTuple` types are constructible this
+way; the leaf types (`OfReal`, `OfInt`, …) are specifications, not instantiable objects.
 
 # Arguments
-- `T<:OfType`: Must be an `OfNamedTuple` type
+- `T<:OfNamedTuple`: The named-tuple specification to instantiate
 - `default_value`: Optional value to initialize all non-constant fields (default: appropriate zero)
 - `kwargs...`: Constant values and optionally non-constant field values
 
@@ -925,17 +916,16 @@ instance = T(; n=5, mu=2.5, data=rand(5, 2))
 
 # Errors
 - Throws error if required constants are not provided
-- Throws error if this is called on non-NamedTuple types
 
 # See also
 [`of`](@ref), [`@of`](@ref)
 """
-function (::Type{T})(; kwargs...) where {T<:OfType}
+function (::Type{T})(; kwargs...) where {T<:OfNamedTuple}
     return _create_instance_impl(T, zero, kwargs)
 end
 
 # Constructor with default_value as positional argument
-function (::Type{T})(default_value; kwargs...) where {T<:OfType}
+function (::Type{T})(default_value; kwargs...) where {T<:OfNamedTuple}
     return _create_instance_impl(
         T, field_type -> _create_with_default(field_type, default_value), kwargs
     )
@@ -985,14 +975,16 @@ T = @of(
     doubled = of(Array, 2*n, n)
 )
 
-# Nested structures
-T = @of(
-    dims = @of(
-        rows = of(Int; constant=true),
-        cols = of(Int; constant=true)
-    ),
-    matrix = of(Array, dims.rows, dims.cols)
+# Nested structures: field references resolve within the @of that declares them, so keep
+# a dimension's constants in the same block (cross-level paths like `dims.rows` are not
+# supported), then concretize the whole tree at once.
+Inner = @of(
+    rows = of(Int; constant=true),
+    cols = of(Int; constant=true),
+    matrix = of(Array, rows, cols)
 )
+T = @of(block = Inner)
+CT = of(T; rows=3, cols=4)
 ```
 
 # See also
@@ -1019,7 +1011,6 @@ macro of(args...)
         end
     end
 
-    # Process each field specification, converting references to symbols
     processed_fields = Dict{Symbol,Any}()
 
     for (field_name, spec) in fields
@@ -1027,13 +1018,11 @@ macro of(args...)
         processed_fields[field_name] = processed_spec
     end
 
-    # Build the named tuple expression
     nt_expr = Expr(:tuple)
     for field_name in field_order
         push!(nt_expr.args, Expr(:(=), field_name, processed_fields[field_name]))
     end
 
-    # Return the of call
     return esc(:(of($nt_expr)))
 end
 
@@ -1061,7 +1050,6 @@ function process_of_spec(spec::Expr, available_fields::Vector{Symbol})
                     # Handle individual keyword argument
                     push!(kw_args, arg)
                 else
-                    # Positional argument
                     push!(pos_args, arg)
                 end
             end
@@ -1072,7 +1060,6 @@ function process_of_spec(spec::Expr, available_fields::Vector{Symbol})
                 push!(new_args, processed_arg)
             end
 
-            # Add keyword arguments as-is
             if !isempty(kw_args)
                 params_expr = Expr(:parameters, kw_args...)
                 insert!(new_args, 2, params_expr)
@@ -1098,26 +1085,25 @@ function process_dimension_arg(arg, available_fields::Vector{Symbol})
         # Convert field reference to symbol
         return QuoteNode(arg)
     elseif arg isa Expr
-        # Check for expressions containing field references
         return process_expression_refs(arg, available_fields)
     else
-        # Leave other values as-is
         return arg
     end
 end
 
-# Check if a processed expression is a SymbolicExpr type
+# Check if a processed expression is a `SymbolicExpr{...}` type. The head may be the bare
+# symbol or the `GlobalRef` the macro emits for hygiene, so accept both.
 function _is_symbolic_expr_type(expr::Expr)
-    return expr.head == :curly && length(expr.args) >= 2 && expr.args[1] == :SymbolicExpr
+    (expr.head == :curly && length(expr.args) >= 2) || return false
+    head = expr.args[1]
+    return head === :SymbolicExpr || (head isa GlobalRef && head.name === :SymbolicExpr)
 end
 
 # Process a single argument in an arithmetic expression
 function _process_arithmetic_arg(arg, available_fields::Vector{Symbol})
     if arg isa Symbol && arg in available_fields
-        # Field reference - convert to quoted symbol
         return (QuoteNode(arg), true)
     elseif arg isa Expr
-        # Recursively process sub-expressions
         processed = process_expression_refs(arg, available_fields)
         if _is_symbolic_expr_type(processed)
             # Extract the tuple from SymbolicExpr{...}
@@ -1126,7 +1112,6 @@ function _process_arithmetic_arg(arg, available_fields::Vector{Symbol})
             return (processed, false)
         end
     else
-        # Literal value - keep as-is
         return (arg, false)
     end
 end
@@ -1139,7 +1124,6 @@ function _process_arithmetic_expr(expr::Expr, available_fields::Vector{Symbol})
     tuple_args = Any[QuoteNode(op)]
     has_field_ref = false
 
-    # Process each argument
     for arg in expr.args[2:end]
         processed_arg, has_ref = _process_arithmetic_arg(arg, available_fields)
         push!(tuple_args, processed_arg)
@@ -1147,11 +1131,11 @@ function _process_arithmetic_expr(expr::Expr, available_fields::Vector{Symbol})
     end
 
     if has_field_ref
-        # Create SymbolicExpr type with tuple
+        # Emit a fully-qualified `SymbolicExpr` so the escaped `@of` expansion resolves
+        # even when the caller only does `using AbstractPPL` (the name is `public`, not exported).
         tuple_expr = Expr(:tuple, tuple_args...)
-        return :(SymbolicExpr{$tuple_expr})
+        return :($(GlobalRef(@__MODULE__, :SymbolicExpr)){$tuple_expr})
     else
-        # No field references - return original expression
         return expr
     end
 end
@@ -1166,7 +1150,6 @@ function process_expression_refs(expr::Expr, available_fields::Vector{Symbol})
         end
     end
 
-    # Not a supported arithmetic expression - return as-is
     return expr
 end
 
@@ -1175,106 +1158,108 @@ end
 # ========================================================================
 
 """
-    rand(::Type{T}) where T<:OfType
+    rand([rng::AbstractRNG], ::Type{T}) where T<:OfType
 
 Generate random values matching the type specification.
 
 Creates random instances that satisfy the constraints encoded in the `OfType`.
-Arrays are filled with random values, bounded types respect their bounds,
-and named tuples recursively generate random values for all fields.
+Arrays are filled with random values, named tuples recurse over their fields, and
+bounded scalars respect their bounds. Pass an `rng` for reproducible draws; the
+method without one uses `Random.default_rng()`.
 
-# Supported Types
-- `OfReal`: Generates values within bounds (uniform for bounded, normal for unbounded)
-- `OfInt`: Generates integers within bounds  
-- `OfArray`: Generates arrays with random elements
-- `OfNamedTuple`: Recursively generates random values for all fields
-- `OfConstantWrapper`: Not supported (throws error)
+The bounded/unbounded distributions are deliberate but unspecified conveniences:
+
+- `OfReal`: uniform on `[lower, upper]`; for a single bound, a (reflected) shifted
+  exponential; standard normal when unbounded.
+- `OfInt`: uniform on `lower:upper`; for a single bound, an arbitrary 100-wide window
+  anchored at it; `-100:100` when unbounded.
+- `OfArray`: each element drawn as for its element type.
+- `OfNamedTuple`: each field drawn recursively.
+- `OfConstantWrapper`: not supported (throws).
 
 # Examples
 ```julia
-# Bounded real
-T1 = of(Float64, 0, 1)
-rand(T1)  # Random Float64 in [0, 1]
+using Random
 
-# Array 
-T2 = of(Array, 3, 4)
-rand(T2)  # 3×4 matrix of random Float64s
+rand(of(Float64, 0, 1))                       # a Float64 in [0, 1]
+rand(of(Array, 3, 4))                         # a 3×4 Matrix{Float64}
+rand(StableRNG(1), @of(x=of(Real, 0, 1)))     # reproducible NamedTuple draw
 
-# Named tuple
-T3 = @of(x=of(Real, 0, 1), y=of(Array, 2, 2))
-rand(T3)  # (x=0.7, y=[0.3 0.8; 0.2 0.5])
-
-# With resolved constants
-T4 = @of(n=of(Int; constant=true), data=of(Array, n, 2))
-rand(of(T4; n=5))  # (data = 5×2 random array)
+T = @of(n=of(Int; constant=true), data=of(Array, n, 2))
+rand(of(T; n=5))                              # (data = <random 5×2 array>,)
 ```
 
 # Errors
-- Throws error for types with unresolved symbolic dimensions
-- Throws error for constant wrapper types
+- Throws for types with unresolved symbolic dimensions or bounds.
+- Throws for constant wrapper types.
 
 # See also
 [`zero`](@ref), [`of`](@ref)
 """
-function Base.rand(::Type{OfArray{T,N,D}}) where {T,N,D}
+# Each type gets an explicit-RNG method (the contract downstream samplers rely on); the
+# convenience method without an RNG forwards to `Random.default_rng()`.
+function Base.rand(rng::AbstractRNG, ::Type{OfArray{T,N,D}}) where {T,N,D}
     dims = get_dims(OfArray{T,N,D})
-    if any(d -> d isa Symbol || (d isa Type && d <: SymbolicExpr), dims)
-        error(
-            "Cannot generate random array with symbolic dimensions. Use rand(T; kwargs...) with dimension values.",
-        )
-    end
-    return rand(T, dims...)
+    any(_is_symbolic_dim, dims) && error(
+        "Cannot generate random array with symbolic dimensions. Resolve them with of(T; name=value) first.",
+    )
+    return rand(rng, T, dims...)
 end
+Base.rand(::Type{OfArray{T,N,D}}) where {T,N,D} = rand(default_rng(), OfArray{T,N,D})
 
-function Base.rand(::Type{OfReal{T,L,U}}) where {T,L,U}
-    val = rand()
+function Base.rand(rng::AbstractRNG, ::Type{OfReal{T,L,U}}) where {T,L,U}
+    _assert_concrete_bounds(OfReal{T,L,U})
     lower = type_to_bound(L)
     upper = type_to_bound(U)
-
     if !isnothing(lower) && !isnothing(upper)
-        return T(lower + val * (upper - lower))
+        return T(lower + rand(rng) * (upper - lower))
     elseif !isnothing(lower)
-        # For lower bound only, generate values in [lower, ∞)
-        # Using exponential distribution shifted by lower
-        return T(lower + randexp())
+        # Lower bound only: draw from a shifted exponential on [lower, ∞).
+        return T(lower + randexp(rng))
     elseif !isnothing(upper)
-        # For upper bound only, generate values in (-∞, upper]
-        # Using negative exponential distribution shifted by upper
-        return T(upper - randexp())
+        # Upper bound only: draw from a reflected shifted exponential on (-∞, upper].
+        return T(upper - randexp(rng))
     else
-        return T(randn())  # Use normal distribution for unbounded
+        return T(randn(rng))
     end
 end
+Base.rand(::Type{OfReal{T,L,U}}) where {T,L,U} = rand(default_rng(), OfReal{T,L,U})
 
-function Base.rand(::Type{OfInt{L,U}}) where {L,U}
+function Base.rand(rng::AbstractRNG, ::Type{OfInt{L,U}}) where {L,U}
+    _assert_concrete_bounds(OfInt{L,U})
     lower = type_to_bound(L)
     upper = type_to_bound(U)
-
     if !isnothing(lower) && !isnothing(upper)
-        # Generate random integer in [lower, upper]
-        return rand(lower:upper)
+        return rand(rng, lower:upper)
     elseif !isnothing(lower)
-        # For lower bound only, generate values in [lower, lower+100]
-        # This is arbitrary but provides reasonable default behavior
-        return rand(lower:(lower + 100))
+        # Lower bound only: an arbitrary but reasonable [lower, lower+100] window.
+        return rand(rng, lower:(lower + 100))
     elseif !isnothing(upper)
-        # For upper bound only, generate values in [upper-100, upper]
-        return rand((upper - 100):upper)
+        return rand(rng, (upper - 100):upper)
     else
-        # Unbounded integer - generate in reasonable range
-        return rand(-100:100)
+        return rand(rng, -100:100)
     end
 end
+Base.rand(::Type{OfInt{L,U}}) where {L,U} = rand(default_rng(), OfInt{L,U})
 
+# `@generated` so the per-field draws unroll and the NamedTuple eltypes stay inferable.
+@generated function Base.rand(
+    rng::AbstractRNG, ::Type{OfNamedTuple{Names,Types}}
+) where {Names,Types}
+    draws = [:(rand(rng, $P)) for P in Types.parameters]
+    return :(NamedTuple{Names}(($(draws...),)))
+end
 function Base.rand(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
-    values = Tuple(rand(T) for T in Types.parameters)
-    return NamedTuple{Names}(values)
+    return rand(default_rng(), OfNamedTuple{Names,Types})
 end
 
-function Base.rand(::Type{OfConstantWrapper{T}}) where {T}
+function Base.rand(::AbstractRNG, ::Type{OfConstantWrapper{T}}) where {T}
     return error(
         "Cannot generate random values for constants. Use rand(of(T; const_name=value)) after providing the constant value.",
     )
+end
+function Base.rand(::Type{OfConstantWrapper{T}}) where {T}
+    return rand(default_rng(), OfConstantWrapper{T})
 end
 
 # ========================================================================
@@ -1326,18 +1311,16 @@ zero(of(T; n=3))  # (data = 3×3 zero matrix)
 """
 function Base.zero(::Type{OfArray{T,N,D}}) where {T,N,D}
     dims = get_dims(OfArray{T,N,D})
-    if any(d -> d isa Symbol || (d isa Type && d <: SymbolicExpr), dims)
-        error(
-            "Cannot create zero array with symbolic dimensions. Use zero(T; kwargs...) with dimension values.",
-        )
-    end
+    any(_is_symbolic_dim, dims) && error(
+        "Cannot create zero array with symbolic dimensions. Resolve them with of(T; name=value) first.",
+    )
     return zeros(T, dims...)
 end
 
 function Base.zero(::Type{OfReal{T,L,U}}) where {T,L,U}
+    _assert_concrete_bounds(OfReal{T,L,U})
     lower = type_to_bound(L)
     upper = type_to_bound(U)
-
     if !isnothing(lower) && lower > 0
         return T(lower)
     elseif !isnothing(upper) && upper < 0
@@ -1348,9 +1331,9 @@ function Base.zero(::Type{OfReal{T,L,U}}) where {T,L,U}
 end
 
 function Base.zero(::Type{OfInt{L,U}}) where {L,U}
+    _assert_concrete_bounds(OfInt{L,U})
     lower = type_to_bound(L)
     upper = type_to_bound(U)
-
     if !isnothing(lower) && lower > 0
         return lower
     elseif !isnothing(upper) && upper < 0
@@ -1360,25 +1343,15 @@ function Base.zero(::Type{OfInt{L,U}}) where {L,U}
     end
 end
 
-function Base.zero(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
-    values = Tuple(zero(T) for T in Types.parameters)
-    return NamedTuple{Names}(values)
+@generated function Base.zero(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
+    zeros_ = [:(zero($P)) for P in Types.parameters]
+    return :(NamedTuple{Names}(($(zeros_...),)))
 end
 
 function Base.zero(::Type{OfConstantWrapper{T}}) where {T}
     return error(
         "Cannot generate zero values for constants. Use zero(of(T; const_name=value)) after providing the constant value.",
     )
-end
-
-# Unflatten with missing - documented in main unflatten docstring
-function unflatten(::Type{T}, ::Missing) where {T<:OfType}
-    if has_symbolic_dims(T)
-        error(
-            "Cannot unflatten type with symbolic dimensions or constants. Use unflatten(T, missing; kwargs...) with constant values.",
-        )
-    end
-    return _unflatten_impl(T, missing)
 end
 
 # ========================================================================
@@ -1418,26 +1391,16 @@ size(T)                      # (x=(), y=(2, 3))
 """
 function Base.size(::Type{OfArray{T,N,D}}) where {T,N,D}
     dims = get_dims(OfArray{T,N,D})
-    if any(d -> d isa Symbol || (d isa Type && d <: SymbolicExpr), dims)
+    any(_is_symbolic_dim, dims) &&
         error("Cannot get size of array with symbolic dimensions.")
-    end
     return dims
 end
 
-function Base.size(::Type{OfReal{T,L,U}}) where {T,L,U}
-    return ()  # Scalar has empty dimensions
-end
-
-function Base.size(::Type{OfInt{L,U}}) where {L,U}
-    return ()  # Scalar has empty dimensions
-end
+Base.size(::Type{OfReal{T,L,U}}) where {T,L,U} = ()
+Base.size(::Type{OfInt{L,U}}) where {L,U} = ()
 
 function Base.size(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
-    # Return a named tuple with dimensions of each field
-    dims = map(Names) do name
-        idx = findfirst(==(name), Names)
-        size(Types.parameters[idx])
-    end
+    dims = ntuple(i -> size(Types.parameters[i]), length(Names))
     return NamedTuple{Names}(dims)
 end
 
@@ -1471,10 +1434,10 @@ length(of(Int, 0, 10))       # 1
 T = @of(x=of(Real), y=of(Array, 2, 3))
 length(T)                    # 7 (1 + 6)
 
-# Constants don't count
+# Constants contribute 0; concrete fields still count
 T2 = @of(n=of(Int; constant=true), data=of(Array, 3, 3))
-length(T2)                   # 0 (constant excluded)
-length(of(T2; n=5))          # 9 (after resolving constant)
+length(T2)                   # 9 (n contributes 0, data contributes 9)
+length(of(T2; n=5))          # 9 (n removed; data unchanged)
 ```
 
 # Errors
@@ -1485,23 +1448,19 @@ length(of(T2; n=5))          # 9 (after resolving constant)
 """
 function Base.length(::Type{OfArray{T,N,D}}) where {T,N,D}
     dims = get_dims(OfArray{T,N,D})
-    if any(d -> d isa Symbol || (d isa Type && d <: SymbolicExpr), dims)
+    any(_is_symbolic_dim, dims) &&
         error("Cannot get length of array with symbolic dimensions.")
-    end
-    return prod(dims)
+    return prod(dims)::Int
 end
 
-function Base.length(::Type{OfReal{T,L,U}}) where {T,L,U}
-    return 1
-end
+Base.length(::Type{OfReal{T,L,U}}) where {T,L,U} = 1
+Base.length(::Type{OfInt{L,U}}) where {L,U} = 1
 
-function Base.length(::Type{OfInt{L,U}}) where {L,U}
-    return 1
-end
-
-function Base.length(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
-    # Sum lengths of all fields
-    return sum(length(Types.parameters[i]) for i in 1:length(Names))
+# `@generated` so the total folds to a compile-time constant; a plain recursive `sum`
+# widens to `Any` once nesting/field-count grows (poisoning the flatten/unflatten path).
+@generated function Base.length(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
+    total = sum(Int[length(P) for P in Types.parameters]; init=0)
+    return :($total)
 end
 
 function Base.length(::Type{OfConstantWrapper{T}}) where {T}
@@ -1512,18 +1471,19 @@ end
 # Symbolic Dimension Checking and Symbol Collection
 # ========================================================================
 
-# Check if a type has symbolic dimensions or constants
+# Check if a type still carries unresolved symbols: symbolic array dimensions, symbolic
+# bounds, or constants (an `OfConstantWrapper`, whether nested or at the top level).
 function has_symbolic_dims(::Type{T}) where {T<:OfType}
     if T <: OfArray
-        dims = get_dims(T)
-        return any(d -> d isa Symbol || (d isa Type && d <: SymbolicExpr), dims)
+        return any(_is_symbolic_dim, get_dims(T))
+    elseif T <: Union{OfReal,OfInt}
+        return _is_symbolic_bound(get_lower(T)) || _is_symbolic_bound(get_upper(T))
+    elseif T <: OfConstantWrapper
+        return true
     elseif T <: OfNamedTuple
         types = get_types(T)
         for i in 1:length(types.parameters)
-            field_type = types.parameters[i]
-            if field_type <: OfConstantWrapper || has_symbolic_dims(field_type)
-                return true
-            end
+            has_symbolic_dims(types.parameters[i]) && return true
         end
         return false
     else
@@ -1542,11 +1502,19 @@ function get_unresolved_symbols(::Type{T}) where {T<:OfType}
                 if d isa Symbol
                     push!(symbols, d)
                 elseif d isa Type && d <: SymbolicExpr
-                    # Extract symbols from expression
-                    expr = d.parameters[1]
-                    extract_symbols_from_expr(expr)
+                    extract_symbols_from_expr(d.parameters[1])
                 end
             end
+        elseif oft_type <: Union{OfReal,OfInt}
+            for b in (get_lower(oft_type), get_upper(oft_type))
+                if b isa Type && b <: SymbolicRef
+                    push!(symbols, type_to_bound(b))
+                elseif b isa Type && b <: SymbolicExpr
+                    extract_symbols_from_expr(b.parameters[1])
+                end
+            end
+        elseif oft_type <: OfConstantWrapper
+            collect_symbols(get_wrapped_type(oft_type), path)
         elseif oft_type <: OfNamedTuple
             names = get_names(oft_type)
             types = get_types(oft_type)
@@ -1580,13 +1548,13 @@ end
 # Validation Helper Functions
 # ========================================================================
 
-# Validate that a value is within bounds
-function validate_bounds(value, lower, upper, type_name)
+# Validate that a value is within bounds. `kind` only labels the error message.
+function validate_bounds(value, lower, upper; kind::AbstractString="value")
     if !isnothing(lower) && value < lower
-        error("$type_name value $value is below lower bound $lower")
+        error("$kind $value is below lower bound $lower")
     end
     if !isnothing(upper) && value > upper
-        error("$type_name value $value is above upper bound $upper")
+        error("$kind $value is above upper bound $upper")
     end
 end
 
@@ -1626,7 +1594,7 @@ function _validate_leaf(::Type{OfReal{T,L,U}}, value) where {T,L,U}
         val = convert(T, value)
         lower = type_to_bound(L)
         upper = type_to_bound(U)
-        validate_bounds(val, lower, upper, "Real")
+        validate_bounds(val, lower, upper; kind="Real value")
         return val
     else
         error("Expected Real for OfReal, got $(typeof(value))")
@@ -1638,7 +1606,7 @@ function _validate_leaf(::Type{OfInt{L,U}}, value) where {L,U}
         val = convert(Int, value)
         lower = type_to_bound(L)
         upper = type_to_bound(U)
-        validate_bounds(val, lower, upper, "Int")
+        validate_bounds(val, lower, upper; kind="Int value")
         return val
     elseif value isa Real
         # Allow conversion from Real to Int if it's a whole number
@@ -1684,227 +1652,171 @@ end
 """
     flatten(::Type{T}, values) where T<:OfType
 
-Convert structured values to a flat vector of numerical values.
+Convert structured values to a flat numeric vector.
 
-Takes values matching an `OfType` specification and extracts all numerical 
-values into a flat vector. This is useful for optimization routines that 
-require a flat parameter vector. Arrays are vectorized, scalars are included
-as single values, and named tuples are recursively flattened. Constants
-(wrapped in `OfConstantWrapper`) are excluded.
-
-# Arguments
-- `T<:OfType`: The type specification
-- `values`: Values matching the type specification
+Walks `values` in field order, vectorising arrays (column-major) and recursing into
+named tuples, and returns a flat vector whose element type is the promotion of the
+declared leaf element types (so a pure-`Int` structure stays `Vector{Int}`, while any
+float field widens the whole vector). This is the form an optimiser or sampler wants.
+Constants are excluded by construction, since a flattenable type has none.
 
 # Returns
-A `Vector{Real}` containing all numerical values in order.
+A `Vector{V}` where `V` is `promote_type` of the declared leaf element types.
 
 # Examples
 ```julia
-# Simple types
-flatten(of(Float64), 3.14)           # [3.14]
-flatten(of(Array, 2, 2), [1 2; 3 4]) # [1.0, 3.0, 2.0, 4.0]
+flatten(of(Float64), 3.14)            # [3.14]            (Vector{Float64})
+flatten(of(Array, 2, 2), [1 2; 3 4])  # [1.0, 3.0, 2.0, 4.0]
 
-# Named tuples
 T = @of(x=of(Real), y=of(Array, 2, 2))
-values = (x=1.5, y=[1 2; 3 4])
-flatten(T, values)  # [1.5, 1.0, 3.0, 2.0, 4.0]
-
-# Constants excluded
-T2 = @of(n=of(Int; constant=true), data=of(Array, 2, 2))
-ConcreteT = of(T2; n=3)
-flatten(ConcreteT, (data=[1 2; 3 4]))  # [1.0, 3.0, 2.0, 4.0]
+flatten(T, (x=1.5, y=[1 2; 3 4]))     # [1.5, 1.0, 3.0, 2.0, 4.0]
 ```
 
 # Errors
-- Throws error if values don't match the type specification
-- Throws error for types with unresolved symbolic dimensions
+- Throws if `values` do not match the specification (shape or bounds).
+- Throws for types with unresolved symbolic dimensions, bounds, or constants.
 
 # See also
 [`unflatten`](@ref), [`length`](@ref)
 """
 function flatten(::Type{T}, values) where {T<:OfType}
-    return _flatten_impl(T, values)
+    has_symbolic_dims(T) && error(
+        "Cannot flatten a type with symbolic dimensions, symbolic bounds, or constants. Resolve them with of(T; name=value) first.",
+    )
+    validated = _validate(T, values)
+    out = Vector{_flat_eltype(T)}(undef, length(T))
+    _fill_flat!(out, 1, T, validated)
+    return out
 end
 
-# Internal implementation for flatten
-function _flatten_impl(::Type{T}, values) where {T<:OfType}
-    # Check for symbolic dimensions
-    if has_symbolic_dims(T)
-        error(
-            "Cannot flatten type with symbolic dimensions or constants. Use flatten(T, values; kwargs...) with constant values.",
-        )
+# Element type of the flat vector: promotion of the declared leaf element types.
+_flat_eltype(::Type{OfReal{T,L,U}}) where {T,L,U} = T
+_flat_eltype(::Type{<:OfInt}) = Int
+_flat_eltype(::Type{OfArray{T,N,D}}) where {T,N,D} = T
+function _flat_eltype(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
+    return promote_type(map(_flat_eltype, (Types.parameters...,))...)
+end
+
+# Write a leaf/subtree into `out` starting at index `i`; return the next free index.
+_fill_flat!(out, i, ::Type{<:OfReal}, x) = (out[i] = x; i + 1)
+_fill_flat!(out, i, ::Type{<:OfInt}, x) = (out[i] = x; i + 1)
+function _fill_flat!(out, i, ::Type{<:OfArray}, a)
+    copyto!(out, i, vec(a), 1, length(a))
+    return i + length(a)
+end
+# `@generated` so the per-field recursion unrolls and stays type-stable on the AD path.
+@generated function _fill_flat!(
+    out, i0, ::Type{OfNamedTuple{Names,Types}}, nt
+) where {Names,Types}
+    body = quote
+        i = i0
     end
-
-    # First validate the values match the specification
-    validated = _validate(T, values)
-
-    # Extract all numerical values in order
-    numerical_values = Real[]
-
-    function walk_tree(oft_type::Type, val_node)
-        if is_leaf(oft_type)
-            if oft_type <: OfArray
-                append!(numerical_values, vec(val_node))
-            elseif oft_type <: OfReal
-                push!(numerical_values, val_node)
-            elseif oft_type <: OfInt
-                push!(numerical_values, Float64(val_node))  # Convert to Float64 for flattening
-            end
-        elseif oft_type <: OfNamedTuple
-            names = get_names(oft_type)
-            types = get_types(oft_type)
-            for (i, name) in enumerate(names)
-                walk_tree(types.parameters[i], getproperty(val_node, name))
-            end
-        end
+    for (k, P) in enumerate(Types.parameters)
+        push!(body.args, :(i = _fill_flat!(out, i, $P, nt[$k])))
     end
-
-    walk_tree(T, validated)
-    return numerical_values
+    push!(body.args, :(return i))
+    return body
 end
 
 """
-    unflatten(::Type{T}, flat_values::Vector{<:Real}) where T<:OfType
+    unflatten(::Type{T}, flat_values::AbstractVector{<:Real}) where T<:OfType
     unflatten(::Type{T}, ::Missing) where T<:OfType
 
-Reconstruct structured values from a flat vector of numerical values.
+Reconstruct structured values from a flat numeric vector (the inverse of [`flatten`](@ref)).
 
-Takes a flat vector produced by `flatten` and reconstructs the original 
-structured values according to the type specification. This is the inverse
-operation of `flatten`. Arrays are reshaped, scalars are extracted, and 
-named tuples are recursively reconstructed. Bounds are validated during
-reconstruction.
+Arrays are reshaped, named tuples are rebuilt in field order, and bounds are validated.
+Floating-point leaves take `promote_type(declared, eltype(flat_values))`: the declared float
+type acts as a precision floor, while wider numbers in `flat_values` — AD numbers
+(`ForwardDiff.Dual`), `BigFloat` — flow through unchanged. Integer leaves are rounded to `Int`.
 
-The second method with `missing` creates a structure with all values 
-initialized to `missing`.
-
-# Arguments
-- `T<:OfType`: The type specification
-- `flat_values`: Vector of numerical values in flattened order
-- `missing`: Create structure with missing values
-
-# Returns
-Values matching the type specification structure.
+The `missing` method builds a structure with every element set to `missing`.
 
 # Examples
 ```julia
-# Simple types
-unflatten(of(Float64), [3.14])           # 3.14
-unflatten(of(Array, 2, 2), [1, 3, 2, 4]) # [1 2; 3 4]
+unflatten(of(Float64), [3.14])            # 3.14
+unflatten(of(Array, 2, 2), [1, 3, 2, 4])  # [1.0 2.0; 3.0 4.0]
 
-# Named tuples
 T = @of(x=of(Real), y=of(Array, 2, 2))
-flat = [1.5, 1.0, 3.0, 2.0, 4.0]
-unflatten(T, flat)  # (x=1.5, y=[1.0 2.0; 3.0 4.0])
+unflatten(T, [1.5, 1.0, 3.0, 2.0, 4.0])   # (x=1.5, y=[1.0 2.0; 3.0 4.0])
 
-# With bounds validation
-T2 = of(Real, 0, 1)
-unflatten(T2, [0.5])  # 0.5
-# unflatten(T2, [2.0])  # Error: value above upper bound
-
-# Missing values
-unflatten(T, missing)  # (x=missing, y=[missing missing; missing missing])
+unflatten(T, missing)                     # (x=missing, y=[missing missing; missing missing])
 ```
 
 # Errors
-- Throws error if wrong number of values provided
-- Throws error if values violate bounds
-- Throws error for types with unresolved symbolic dimensions
+- Throws if `length(flat_values)` differs from `length(T)`.
+- Throws if values violate bounds.
+- Throws for types with unresolved symbolic dimensions, bounds, or constants.
 
 # See also
 [`flatten`](@ref), [`length`](@ref)
 """
-function unflatten(::Type{T}, flat_values::Vector{<:Real}) where {T<:OfType}
-    return _unflatten_impl(T, flat_values)
+function unflatten(::Type{T}, flat_values::AbstractVector{<:Real}) where {T<:OfType}
+    has_symbolic_dims(T) && error(
+        "Cannot unflatten a type with symbolic dimensions, symbolic bounds, or constants. Resolve them with of(T; name=value) first.",
+    )
+    n = length(T)
+    length(flat_values) == n ||
+        error("Length mismatch: type expects $n values, got $(length(flat_values)).")
+    value, _ = _unflat(T, flat_values, 1)
+    return value
 end
 
-# Internal implementation for unflatten
-function _unflatten_impl(::Type{T}, flat_values::Vector{<:Real}) where {T<:OfType}
-    # Check for symbolic dimensions
-    if has_symbolic_dims(T)
-        error(
-            "Cannot unflatten type with symbolic dimensions or constants. Use unflatten(T, flat_values; kwargs...) with constant values.",
-        )
+# Reconstruct one leaf/subtree from `v` starting at index `i`; return (value, next index).
+# Float leaves take `promote_type(declared, eltype(v))`, so the declared type is a precision
+# floor while AD numbers (`Dual`), `BigFloat`, etc. in `v` flow through.
+function _unflat(::Type{OfReal{T,L,U}}, v, i) where {T,L,U}
+    x = convert(promote_type(T, eltype(v)), v[i])
+    validate_bounds(x, type_to_bound(L), type_to_bound(U); kind="Real value")
+    return x, i + 1
+end
+function _unflat(::Type{OfInt{L,U}}, v, i) where {L,U}
+    x = round(Int, v[i])
+    validate_bounds(x, type_to_bound(L), type_to_bound(U); kind="Int value")
+    return x, i + 1
+end
+function _unflat(::Type{OfArray{T,N,D}}, v, i) where {T,N,D}
+    dims = get_dims(OfArray{T,N,D})
+    n = prod(dims)
+    arr = _to_array(T, @view(v[i:(i + n - 1)]), dims)
+    return arr, i + n
+end
+@generated function _unflat(::Type{OfNamedTuple{Names,Types}}, v, i0) where {Names,Types}
+    body = quote
+        i = i0
     end
-
-    pos = Ref(1)
-
-    function reconstruct_node(oft_type::Type)
-        if is_leaf(oft_type)
-            if oft_type <: OfArray
-                dims = size(oft_type)
-                elem_type = get_element_type(oft_type)
-                n_elements = prod(dims)
-                if pos[] + n_elements - 1 > length(flat_values)
-                    error("Not enough values in flat array")
-                end
-                values = flat_values[pos[]:(pos[] + n_elements - 1)]
-                pos[] += n_elements
-                # Convert to proper array type
-                typed_array = Array{elem_type}(reshape(values, dims))
-                return typed_array
-            elseif oft_type <: OfReal
-                if pos[] > length(flat_values)
-                    error("Not enough values in flat array")
-                end
-                val = flat_values[pos[]]
-                pos[] += 1
-
-                # Apply bounds validation
-                lower = type_to_bound(get_lower(oft_type))
-                upper = type_to_bound(get_upper(oft_type))
-                validate_bounds(val, lower, upper, "Real")
-                return val
-            elseif oft_type <: OfInt
-                if pos[] > length(flat_values)
-                    error("Not enough values in flat array")
-                end
-                val = flat_values[pos[]]
-                pos[] += 1
-
-                # Convert back to Int and apply bounds validation
-                int_val = round(Int, val)
-                lower = type_to_bound(get_lower(oft_type))
-                upper = type_to_bound(get_upper(oft_type))
-                validate_bounds(int_val, lower, upper, "Int")
-                return int_val
-            end
-        elseif oft_type <: OfNamedTuple
-            names = get_names(oft_type)
-            types = get_types(oft_type)
-            values = Tuple(reconstruct_node(types.parameters[i]) for i in 1:length(names))
-            return NamedTuple{names}(values)
-        end
+    syms = Symbol[]
+    for (k, P) in enumerate(Types.parameters)
+        s = Symbol(:val_, k)
+        push!(syms, s)
+        push!(body.args, :(($s, i) = _unflat($P, v, i)))
     end
-
-    reconstructed = reconstruct_node(T)
-
-    if pos[] - 1 != length(flat_values)
-        error("Unused values in flat array")
-    end
-
-    return reconstructed
+    push!(body.args, :(return NamedTuple{Names}(($(syms...),)), i))
+    return body
 end
 
-# Internal implementation for unflatten with missing
-function _unflatten_impl(::Type{T}, ::Missing) where {T<:OfType}
-    function reconstruct_node(oft_type::Type)
-        if is_leaf(oft_type)
-            if oft_type <: OfArray
-                dims = size(oft_type)
-                return fill(missing, dims...)
-            elseif oft_type <: OfReal || oft_type <: OfInt
-                return missing
-            end
-        elseif oft_type <: OfNamedTuple
-            names = get_names(oft_type)
-            types = get_types(oft_type)
-            values = Tuple(reconstruct_node(types.parameters[i]) for i in 1:length(names))
-            return NamedTuple{names}(values)
-        end
-    end
-    return reconstruct_node(T)
+# Integer element types round to that type; otherwise promote the declared element type with
+# the flat vector's eltype (honour the declaration, but let AD/wider numbers through). `collect`
+# copies, so the result never aliases the input vector.
+_to_array(::Type{ET}, slice, dims) where {ET<:Integer} = reshape(round.(ET, slice), dims)
+function _to_array(::Type{ET}, slice, dims) where {ET}
+    return reshape(collect(promote_type(ET, eltype(slice)), slice), dims)
+end
+
+function unflatten(::Type{T}, ::Missing) where {T<:OfType}
+    has_symbolic_dims(T) && error(
+        "Cannot unflatten a type with symbolic dimensions, symbolic bounds, or constants. Resolve them with of(T; name=value) first.",
+    )
+    return _unflat_missing(T)
+end
+
+_unflat_missing(::Type{<:OfReal}) = missing
+_unflat_missing(::Type{<:OfInt}) = missing
+function _unflat_missing(::Type{OfArray{T,N,D}}) where {T,N,D}
+    return fill(missing, get_dims(OfArray{T,N,D})...)
+end
+@generated function _unflat_missing(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
+    vals = [:(_unflat_missing($P)) for P in Types.parameters]
+    return :(NamedTuple{Names}(($(vals...),)))
 end
 
 # ========================================================================
@@ -2011,7 +1923,6 @@ function expr_tuple_to_string(expr::Tuple)
 
     op = expr[1]
     if op in (:+, :-, :*, :/) && length(expr) == 3
-        # Format arguments
         arg1_str = format_expr_arg(expr[2])
         arg2_str = format_expr_arg(expr[3])
 
@@ -2040,9 +1951,11 @@ function format_expr_arg(arg)
     end
 end
 
-# Show implementations
-function Base.show(io::IO, ::Type{OfArray{T,N,D}}) where {T,N,D}
-    # Check if we're in a context where we can highlight symbolic references
+# Show implementations. Each guards against non-concrete types (free TypeVars, e.g. when a
+# method signature or stacktrace frame is rendered): touching the static params there throws
+# UndefVarError, which is fatal mid-backtrace, so fall back to Base's generic Type printer.
+function Base.show(io::IO, t::Type{OfArray{T,N,D}}) where {T,N,D}
+    isconcretetype(t) || return invoke(show, Tuple{IO,Type}, io, t)
     use_color = get(io, :color, false)
     constant_fields = get(io, :constant_fields, Symbol[])
 
@@ -2091,14 +2004,12 @@ function Base.show(io::IO, ::Type{OfArray{T,N,D}}) where {T,N,D}
         return nothing
     end
 
-    # Non-color version
-    # D is a Tuple type, so we need to access its parameters
+    # Non-color version.
     dims_list = get_dims(OfArray{T,N,D})
     dims_str = join(
         map(dims_list) do d
             if d isa Type && d <: SymbolicExpr
-                expr = d.parameters[1]
-                expr_tuple_to_string(expr)
+                expr_tuple_to_string(d.parameters[1])
             else
                 string(d)
             end
@@ -2106,20 +2017,18 @@ function Base.show(io::IO, ::Type{OfArray{T,N,D}}) where {T,N,D}
         ", ",
     )
 
-    if T === Float64
-        print(io, "of(Array, ", dims_str, ")")
-    else
-        print(io, "of(Array, ", T, ", ", dims_str, ")")
-    end
+    prefix = T === Float64 ? "of(Array" : "of(Array, $T"
+    # Append dims only when present, so a 0-dim array prints `of(Array)` not `of(Array, )`.
+    return print(io, isempty(dims_str) ? "$prefix)" : "$prefix, $dims_str)")
 end
 
-function Base.show(io::IO, ::Type{OfReal{T,L,U}}) where {T,L,U}
-    # Show the specific float type instead of generic "Real"
-    type_name = string(T)
-    return show_bounded_type(io, type_name, L, U)
+function Base.show(io::IO, t::Type{OfReal{T,L,U}}) where {T,L,U}
+    isconcretetype(t) || return invoke(show, Tuple{IO,Type}, io, t)
+    return show_bounded_type(io, string(T), L, U)
 end
 
-function Base.show(io::IO, ::Type{OfInt{L,U}}) where {L,U}
+function Base.show(io::IO, t::Type{OfInt{L,U}}) where {L,U}
+    isconcretetype(t) || return invoke(show, Tuple{IO,Type}, io, t)
     return show_bounded_type(io, "Int", L, U)
 end
 
@@ -2191,12 +2100,12 @@ function _print_namedtuple_field(
     return _show_field_type(io, T, is_constant)
 end
 
-function Base.show(io::IO, ::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
+function Base.show(io::IO, t::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
+    isconcretetype(t) || return invoke(show, Tuple{IO,Type}, io, t)
     # Collect constant fields to pass to child types
     constant_fields = _collect_constant_fields(Names, Types)
     io_with_constants = IOContext(io, :constant_fields => constant_fields)
 
-    # Determine if we should use multi-line format
     compact = get(io, :compact, false)
     multiline = !compact && length(Names) > 3
 
@@ -2235,7 +2144,8 @@ function Base.show(io::IO, ::Type{OfNamedTuple{Names,Types}}) where {Names,Types
     end
 end
 
-function Base.show(io::IO, ::Type{OfConstantWrapper{T}}) where {T}
+function Base.show(io::IO, t::Type{OfConstantWrapper{T}}) where {T}
+    isconcretetype(t) || return invoke(show, Tuple{IO,Type}, io, t)
     # Show the wrapped type with constant=true
     if T <: OfReal
         elem_type = get_element_type(T)

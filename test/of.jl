@@ -15,11 +15,14 @@ using AbstractPPL:
     flatten,
     unflatten,
     has_symbolic_dims,
+    get_unresolved_symbols,
     get_dims,
     get_element_type,
     get_ndims,
     get_lower,
     get_upper
+
+using Random: MersenneTwister
 
 @testset "Basic type creation" begin
     @testset "Simple type creation" begin
@@ -142,14 +145,11 @@ end
     end
 
     @testset "@of with expressions" begin
-        # Test with expression in dimension - currently not supported
-        # The macro passes expressions as-is to of(), which doesn't handle them
-        # This would require enhancing the of() function to handle expressions
-        @test_skip begin
-            T = @of(n = of(Int; constant=true), data = of(Array, n + 1, 2 * n))
-
-            T <: OfNamedTuple
-        end
+        # Arithmetic expressions in dimensions are supported and encode as SymbolicExpr.
+        T = @of(n = of(Int; constant=true), data = of(Array, n + 1, 2 * n))
+        @test T <: OfNamedTuple
+        CT = of(T; n=5)
+        @test get_dims(get_types(CT).parameters[1]) == (6, 10)
     end
 
     @testset "@of with float types" begin
@@ -353,24 +353,20 @@ end
     end
 
     @testset "Validation with symbolic bounds" begin
-        # This is a forward-looking test - validation with runtime resolution
-        @test_skip begin
-            Schema = @of(
-                threshold = of(Real, 0, nothing; constant=true),
-                value = of(Real, 0, threshold)
-            )
+        # A symbolic bound is resolved from the constant during construction, then the
+        # provided value is validated against the resolved bound.
+        Schema = @of(
+            threshold = of(Real, 0, nothing; constant=true), value = of(Real, 0, threshold)
+        )
 
-            # Create concrete type first
-            ConcreteSchema = Schema(; threshold=10.0)
+        instance = Schema(; threshold=10.0, value=5.0)
+        @test keys(instance) == (:value,)  # the constant is eliminated
+        @test instance.value == 5.0
 
-            # Now create instances with the concrete type
-            instance = ConcreteSchema(; threshold=10.0, value=5.0)
-            @test instance.value == 5.0
-            @test instance.threshold == 10.0
-
-            # Should throw because value > threshold
-            @test_throws ErrorException ConcreteSchema(threshold=10.0, value=15.0)
-        end
+        # value above the resolved upper bound (threshold) must throw
+        @test_throws ErrorException Schema(; threshold=10.0, value=15.0)
+        # value below the lower bound must throw
+        @test_throws ErrorException Schema(; threshold=10.0, value=-1.0)
     end
 end
 
@@ -590,8 +586,11 @@ end
         @test length(flat) == length(T)
     end
 
-    @testset "flatten/unflatten with float types" begin
-        # Test that float types are preserved through flatten/unflatten
+    @testset "flatten promotes mixed element types" begin
+        # A flat vector has a single element type: the promotion of the declared leaf types.
+        # Mixing Float32 and Float64 fields therefore yields a Float64 vector, and unflatten
+        # reconstructs every float leaf at that promoted precision (the declared type is a
+        # floor, not a forced down-conversion — see the AD round-trip test below).
         T = @of(
             f64 = of(Float64, 0.0, 1.0),
             f32 = of(Float32, -1.0f0, 1.0f0),
@@ -604,19 +603,34 @@ end
         )
 
         flat = flatten(T, original)
+        @test flat isa Vector{Float64}  # concrete promoted eltype, not Vector{Real}
+
         reconstructed = unflatten(T, flat)
-
-        # Check types are preserved
         @test reconstructed.f64 isa Float64
-        @test reconstructed.f32 isa Float32
+        @test reconstructed.f32 isa Float64       # promoted to the flat vector's eltype
         @test reconstructed.f64_vec isa Vector{Float64}
-        @test reconstructed.f32_mat isa Matrix{Float32}
+        @test reconstructed.f32_mat isa Matrix{Float64}
 
-        # Check values
         @test reconstructed.f64 ≈ original.f64
         @test reconstructed.f32 ≈ original.f32
         @test reconstructed.f64_vec ≈ original.f64_vec
         @test reconstructed.f32_mat ≈ original.f32_mat
+    end
+
+    @testset "flatten preserves a uniform element type" begin
+        # When every leaf shares an element type, flatten/unflatten round-trip it exactly.
+        T32 = @of(a = of(Float32), v = of(Array, Float32, 2))
+        flat32 = flatten(T32, (a=0.5f0, v=Float32[1, 2]))
+        @test flat32 isa Vector{Float32}
+        r32 = unflatten(T32, flat32)
+        @test r32.a isa Float32
+        @test r32.v isa Vector{Float32}
+
+        # A pure-integer structure stays integer-typed (no gratuitous Float64 coercion).
+        Tint = @of(i = of(Int), w = of(Array, Int, 2))
+        flatint = flatten(Tint, (i=3, w=[4, 5]))
+        @test flatint isa Vector{Int}
+        @test flatint == [3, 4, 5]
     end
 end
 
@@ -917,4 +931,153 @@ end
     ConcreteT3 = of(T3; n=9)
     types3 = get_types(ConcreteT3)
     @test get_dims(types3.parameters[1]) == (3,)
+end
+
+# A submodule that does ONLY `using AbstractPPL`, with no access to internal names. This is
+# the real downstream scope; the testsets above import `SymbolicExpr` and so cannot catch a
+# macro that emits an unqualified reference to it.
+module DownstreamScope
+using AbstractPPL
+using Test
+
+@testset "@of expands in a using-only scope" begin
+    # Plain symbolic dimensions (resolved at runtime, no injected type name).
+    Tsym = @of(n = of(Int; constant=true), data = of(Array, n, 2))
+    @test of(Tsym; n=4) isa Type
+
+    # Arithmetic dimensions inject `SymbolicExpr`, which must be emitted fully qualified so
+    # it resolves even though it is only `public`, not exported.
+    Texpr = @of(
+        n = of(Int; constant=true),
+        a = of(Array, n + 1),
+        b = of(Array, 2 * n, n),
+        c = of(Array, (n + 1) * 2)
+    )
+    CT = of(Texpr; n=5)
+    @test size(rand(CT).a) == (6,)
+    @test size(rand(CT).b) == (10, 5)
+    @test size(rand(CT).c) == (12,)
+
+    # Symbolic bounds likewise resolve in a using-only scope.
+    Tbound = @of(lo = of(Real; constant=true), x = of(Real, lo, nothing))
+    @test of(Tbound; lo=0.0) isa Type
+end
+end # module DownstreamScope
+
+@testset "show is safe for non-concrete types" begin
+    # Rendering a free-typevar `of`-type (method signatures, stacktraces, Documenter) must not
+    # touch the static params; previously this threw UndefVarError, fatal mid-backtrace.
+    @test sprint(show, Tuple{Type{OfArray{T,N,D}}} where {T,N,D}) isa String
+    @test sprint(show, Tuple{Type{OfReal{T,L,U}}} where {T,L,U}) isa String
+    @test sprint(show, Tuple{Type{OfInt{L,U}}} where {L,U}) isa String
+    @test sprint(show, Tuple{Type{OfNamedTuple{Names,Types}}} where {Names,Types}) isa
+        String
+    # Listing the methods of a function with `of`-typed signatures must not crash.
+    @test sprint(show, methods(rand)) isa String
+
+    # Concrete types still print in the pretty `of(...)` form.
+    @test string(of(Array, 2, 3)) == "of(Array, 2, 3)"
+    @test string(of(Array, Int)) == "of(Array, Int64)"  # 0-dim: no trailing comma
+end
+
+@testset "flatten/unflatten numeric contract" begin
+    @testset "concrete, promoted element type" begin
+        @test flatten(of(Int), 3) isa Vector{Int}
+        @test flatten(of(Float64), 1.5) isa Vector{Float64}
+        T = @of(i = of(Int), x = of(Real))
+        @test flatten(T, (i=2, x=1.5)) isa Vector{Float64}  # promote(Int, Float64)
+    end
+
+    @testset "AD/wide eltypes flow through unflatten" begin
+        # BigFloat stands in for ForwardDiff.Dual: any `<:Real` wider than the declared type
+        # must survive unflatten without being coerced back to Float64.
+        T = @of(x = of(Real), data = of(Array, 2, 2))
+        flat = BigFloat[big"1.0", big"2.0", big"3.0", big"4.0", big"5.0"]
+        r = unflatten(T, flat)
+        @test r.x isa BigFloat
+        @test r.data isa Matrix{BigFloat}
+        @test r.data == BigFloat[2 4; 3 5]
+    end
+
+    @testset "declared type is a precision floor" begin
+        # Narrow input widens up to the declared float type.
+        @test unflatten(of(Array, 2, 2), [1, 3, 2, 4]) isa Matrix{Float64}
+        @test unflatten(of(Float64), Float32[0.5]) isa Float64
+        # Integer leaves round to Int regardless of input eltype.
+        @test unflatten(of(Int), [2.0]) === 2
+    end
+
+    @testset "type stability on the sampler path" begin
+        T = @of(
+            x = of(Real),
+            n = of(Int),
+            data = of(Array, 2, 2),
+            inner = @of(a = of(Real), v = of(Array, 3))
+        )
+        v = collect(1.0:10.0)
+        nt = @inferred unflatten(T, v)
+        @inferred flatten(T, nt)
+        @inferred length(T)
+        @inferred size(T)
+        @test flatten(T, unflatten(T, v)) == v
+    end
+
+    @testset "length / count errors" begin
+        T = @of(x = of(Real), data = of(Array, 2, 2))
+        @test length(T) == 5
+        @test_throws ErrorException unflatten(T, [1.0, 2.0])           # too few
+        @test_throws ErrorException unflatten(T, collect(1.0:6.0))     # too many
+    end
+end
+
+@testset "rand threads an explicit RNG" begin
+    T = @of(
+        x = of(Real, 0, 1), n = of(Int, 1, 10), v = of(Array, 3), inner = @of(a = of(Real))
+    )
+    @test rand(MersenneTwister(42), T) == rand(MersenneTwister(42), T)
+    @test rand(MersenneTwister(1), of(Float64, 0, 1)) ==
+        rand(MersenneTwister(1), of(Float64, 0, 1))
+    @test rand(MersenneTwister(1), of(Array, 2, 2)) ==
+        rand(MersenneTwister(1), of(Array, 2, 2))
+    # The RNG-accepting method is what downstream samplers dispatch on.
+    @test hasmethod(rand, Tuple{MersenneTwister,Type{OfReal{Float64,Nothing,Nothing}}})
+    @test (@inferred rand(MersenneTwister(1), T)) isa NamedTuple
+end
+
+@testset "symbolic bounds are detected" begin
+    # has_symbolic_dims / get_unresolved_symbols must see symbolic *bounds*, not just dims,
+    # so zero/rand/flatten fail with a clean message instead of a raw MethodError.
+    T = @of(lo = of(Real), x = of(Real, lo, nothing))
+    @test has_symbolic_dims(T)
+    @test :lo in get_unresolved_symbols(T)
+    @test_throws ErrorException zero(T)
+    @test_throws ErrorException rand(T)
+    @test_throws ErrorException flatten(T, (lo=0.0, x=1.0))
+
+    # Expression bounds too.
+    T2 = @of(base = of(Int; constant=true), x = of(Int, base, base * 2))
+    @test has_symbolic_dims(T2)
+    @test :base in get_unresolved_symbols(T2)
+end
+
+@testset "top-level constants are rejected, never silent" begin
+    # A bare OfConstantWrapper is not flattenable; both ops must throw, not return `nothing`.
+    @test has_symbolic_dims(of(Int; constant=true))
+    @test_throws ErrorException flatten(of(Int; constant=true), 5)
+    @test_throws ErrorException unflatten(of(Int; constant=true), Float64[])
+    @test_throws ErrorException unflatten(of(Int; constant=true), missing)
+end
+
+@testset "symbolic division guards the result" begin
+    T = @of(n = of(Int; constant=true), data = of(Array, n / 2))
+    @test get_dims(get_types(of(T; n=10)).parameters[1]) == (5,)
+    # A non-integer quotient raises the dedicated error, not a raw InexactError.
+    err = try
+        of(T; n=11)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ErrorException
+    @test occursin("not an integer", err.msg)
 end

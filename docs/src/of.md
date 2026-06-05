@@ -46,17 +46,21 @@ The system encodes extra useful information into type parameters:
 
 ### 3. Operations on Types
 
-  - `T(; kwargs...)` where `T<:OfType` — Create instances with specified constants (returns values, not types). Uses `zero()` as the default for missing values.
+  - `T(; kwargs...)` where `T<:OfNamedTuple` — Create instances with specified constants (returns values, not types). Uses `zero()` as the default for missing values.
 
-  - `T(default_value; kwargs...)` where `T<:OfType` — Create instances with specified constants and initialise all element values to `default_value`, e.g. `T(missing; kwargs...)` initialises all element values to `missing`. `T(...)` returns instances, not types.
+  - `T(default_value; kwargs...)` where `T<:OfNamedTuple` — Create instances with specified constants and initialise all element values to `default_value`, e.g. `T(missing; kwargs...)` initialises all element values to `missing`. `T(...)` returns instances, not types.
   - `of(T; kwargs...)` where `T<:OfType` — Create concrete types by resolving constants
-  - `rand(T::Type{<:OfType})` — Generate random values matching the type specification
+  - `rand([rng], T::Type{<:OfType})` — Generate random values matching the type specification (pass an `AbstractRNG` for reproducible draws)
   - `zero(T::Type{<:OfType})` — Generate zero/default values
   - `size(T::Type{<:OfType})` — Get the dimensions/shape of the type
   - `length(T::Type{<:OfType})` — Get the total number of elements when flattened
-  - `flatten(T::Type{<:OfType}, values)` — Convert structured values to a flat vector
-  - `unflatten(T::Type{<:OfType}, vec)` — Reconstruct structured values from a flat vector
+  - `flatten(T::Type{<:OfType}, values)` — Convert structured values to a flat vector (element type is the promotion of the declared leaf types)
+  - `unflatten(T::Type{<:OfType}, vec)` — Reconstruct structured values from a flat vector (float leaves take `promote_type(declared, eltype(vec))`, so AD numbers flow through)
   - `unflatten(T::Type{<:OfType}, missing)` — Create instances where element values are initialised to `missing`
+
+Only `of` and `@of` are exported. `flatten`, `unflatten`, the `OfType` subtypes, and the
+inspection helpers are `public` but not exported, so qualify them (`AbstractPPL.flatten`) or
+bring them into scope with `using AbstractPPL: flatten, unflatten`.
 
 ### 4. The `@of` Macro
 
@@ -105,9 +109,9 @@ instance = MatrixType(missing; rows=3, cols=4)
 instance = MatrixType(; rows=3, cols=4, data=rand(3, 4))
 # instance = (data = <provided 3×4 matrix>,)
 
-# Create concrete type for flatten/unflatten
-flat = flatten(ConcreteType, instance)
-reconstructed = unflatten(ConcreteType, flat)
+# Create concrete type for flatten/unflatten (flatten/unflatten are public, not exported)
+flat = AbstractPPL.flatten(ConcreteType, instance)
+reconstructed = AbstractPPL.unflatten(ConcreteType, flat)
 
 # rand and zero with concrete types
 rand(of(MatrixType; rows=3, cols=4))  # generates random instance
@@ -148,6 +152,8 @@ instance = ExpandedMatrixType(1.0; n=10)
 example, an optimiser or a sampler) while keeping a structured view of the parameters:
 
 ```julia
+using AbstractPPL: flatten, unflatten
+
 Params = @of(mu = of(Real), sigma = of(Real, 0, nothing), beta = of(Array, Float64, 3),)
 
 values = (mu=0.5, sigma=1.2, beta=[0.1, 0.2, 0.3])
@@ -155,6 +161,12 @@ values = (mu=0.5, sigma=1.2, beta=[0.1, 0.2, 0.3])
 flat = flatten(Params, values)          # length(Params) == 5
 reconstructed = unflatten(Params, flat) # back to the (mu, sigma, beta) NamedTuple
 ```
+
+`flatten` returns a vector whose element type is the promotion of the declared leaf types,
+and `unflatten` is automatic-differentiation transparent: floating-point leaves take
+`promote_type(declared, eltype(flat))`, so `ForwardDiff.Dual` (or `BigFloat`, …) numbers in
+the flat vector flow through to the reconstructed structure. This makes the pair suitable for
+gradient-based samplers and optimisers that differentiate through `unflatten`.
 
 Constants (fields wrapped with `constant=true`) are excluded from the flattened
 representation and must be resolved with `of(T; kwargs...)` before flattening.
