@@ -994,3 +994,199 @@ end
     @test err isa ErrorException
     @test occursin("not an integer", err.msg)
 end
+
+@testset "leaf types are specifications, not instantiable" begin
+    @test_throws ErrorException OfReal{Float64,Nothing,Nothing}()
+    @test_throws ErrorException OfInt{Nothing,Nothing}()
+    @test_throws ErrorException OfArray{Float64,1,Tuple{3}}()
+    @test_throws ErrorException OfConstantWrapper{OfInt{Nothing,Nothing}}()
+end
+
+@testset "eval_symbolic_expr operations and errors" begin
+    eval_expr = AbstractPPL.eval_symbolic_expr
+    @test eval_expr((:+, (:*, :n, 2), 1), (n=3,)) == 7   # nested
+    @test eval_expr((:-, :n), (n=3,)) == -3              # unary minus
+    @test eval_expr((:-, :n, 1), (n=3,)) == 2            # binary minus
+    @test eval_expr((:*, :n, 2), (n=3,)) == 6
+    @test eval_expr((:/, :n, 2), (n=6,)) == 3            # exact division
+    @test_throws ErrorException eval_expr((:+,), (n=3,))            # too few elements
+    @test_throws ErrorException eval_expr((:^, :n, 2), (n=3,))      # unsupported op
+    @test_throws ErrorException eval_expr((:+, :m, 1), (n=3,))      # unknown symbol
+    @test_throws ErrorException eval_expr((:/, :n, 2), (n=5,))      # non-integer quotient
+    @test_throws ErrorException eval_expr((:/, :n, 2, 1), (n=6,))   # division needs 2 args
+end
+
+@testset "rand covers single-sided and unbounded branches" begin
+    rng = MersenneTwister(0)
+    @test rand(rng, of(Real, 0.0, nothing)) >= 0.0   # lower-only: shifted exponential
+    @test rand(rng, of(Real, nothing, 1.0)) <= 1.0   # upper-only
+    @test rand(rng, of(Int, 5, nothing)) >= 5        # lower-only
+    @test rand(rng, of(Int, nothing, 5)) <= 5        # upper-only
+    @test rand(rng, of(Int)) isa Int                 # unbounded
+end
+
+@testset "zero respects the far bound" begin
+    @test zero(of(Real, nothing, -1.0)) == -1.0   # upper < 0
+    @test zero(of(Real, 2.0, 5.0)) == 2.0         # lower > 0
+    @test zero(of(Int, 5, 10)) == 5               # lower > 0
+    @test zero(of(Int, nothing, -3)) == -3        # upper < 0
+end
+
+@testset "value validation rejects mismatches" begin
+    @test_throws ErrorException (@of(x=of(Real)))(; x="not real")
+    @test_throws ErrorException (@of(i=of(Int)))(; i=3.5)   # non-integer Real
+    @test_throws ErrorException (@of(i=of(Int)))(; i="x")   # non-Real
+    @test (@of(i=of(Int)))(; i=3.0).i === 3                  # whole-number Real converts
+    @test_throws ErrorException flatten(@of(x=of(Real), y=of(Real)), (x=1.0,))  # missing field
+    @test_throws ErrorException of(@of(n=of(Int; constant=true)); n=3)          # all fields constant
+    @test_throws ErrorException (@of(n=of(Int; constant=true), d=of(Array, n)))()  # missing constant
+    @test_throws ErrorException AbstractPPL._create_with_default(
+        OfConstantWrapper{OfInt{Nothing,Nothing}}, 0
+    )
+end
+
+@testset "default_value initialises non-constant fields" begin
+    T = @of(n=of(Int; constant=true), x=of(Real), arr=of(Array, n))
+    inst = T(missing; n=2)
+    @test inst.x === missing
+    @test all(ismissing, inst.arr)
+end
+
+@testset "symbol collection across dims and bounds" begin
+    T = @of(
+        n = of(Int; constant=true),
+        s = of(Real; constant=true),
+        lo = of(Real, 0.0, 1.0),
+        bnd = of(Real, n, nothing),   # symbolic bound
+        a = of(Array, n, 2 * n),      # symbolic + arithmetic dims
+    )
+    syms = get_unresolved_symbols(T)
+    @test :n in syms
+    @test :s in syms
+    @test has_symbolic_dims(T)
+    @test !has_symbolic_dims(@of(x=of(Real), y=of(Array, 2, 2)))
+    @test get_unresolved_symbols(of(Int; constant=true)) isa Vector{Symbol}
+end
+
+@testset "symbolic bounds resolve under concretization" begin
+    TR = @of(n=of(Int; constant=true), r=of(Real, n, nothing))
+    @test get_lower(get_types(of(TR; n=2)).parameters[1]) == 2
+    TI = @of(m=of(Int; constant=true), k=of(Int, m, nothing))
+    @test get_lower(get_types(of(TI; m=4)).parameters[1]) == 4
+    TE = @of(n=of(Int; constant=true), e=of(Real, n + 1, nothing))
+    @test get_lower(get_types(of(TE; n=5)).parameters[1]) == 6
+    @test has_symbolic_dims(of(TR))   # nothing resolved -> reference is retained
+end
+
+@testset "unflatten with missing builds a missing-filled structure" begin
+    P = @of(x=of(Real), a=of(Array, 2, 2))
+    um = unflatten(P, missing)
+    @test um.x === missing
+    @test all(ismissing, um.a)
+end
+
+@testset "expression formatting for display" begin
+    fmt = AbstractPPL.expr_tuple_to_string
+    @test fmt((:*, (:+, :n, 1), 2)) == "(n + 1) * 2"
+    @test fmt((:/, 2, (:+, :n, 1))) == "2 / (n + 1)"
+    @test fmt((:+, :n, 1)) == "n + 1"
+    @test fmt((:+,)) isa String          # too short
+    @test fmt((:+, 1, 2, 3)) isa String  # not a binary op
+    @test fmt((:%, :n, 2)) isa String    # unsupported op
+end
+
+@testset "show covers colored, symbolic, and fallback paths" begin
+    # Non-color array with symbolic and arithmetic dimensions.
+    s = sprint(show, @of(n=of(Int; constant=true), a=of(Array, n, n + 1)))
+    @test occursin("n", s)
+    @test occursin("n + 1", s)
+
+    # A colored render of a rich spec exercises the highlighting branches.
+    Tc = @of(
+        n = of(Int; constant=true),         # constant Int
+        s = of(Real; constant=true),        # constant Real
+        bc = of(Int, 1, 9; constant=true),  # bounded constant
+        lo = of(Real, 0.0, 1.0),
+        bnd = of(Real, n, nothing),         # symbolic bound referencing a constant
+        a = of(Array, n, 2 * n),            # symbolic + arithmetic dims
+    )
+    cs = sprint(show, Tc; context=(:color => true))
+    @test occursin("@of(", cs)
+    @test occursin("constant=true", cs)
+
+    # Colored bounded scalars and constants.
+    @test occursin("Int", sprint(show, of(Int, 0, 10); context=(:color => true)))
+    @test occursin(
+        "constant", sprint(show, of(Int, 0, 10; constant=true); context=(:color => true))
+    )
+    @test occursin(
+        "constant", sprint(show, of(Int; constant=true); context=(:color => true))
+    )
+    @test occursin(
+        "constant", sprint(show, of(Real; constant=true); context=(:color => true))
+    )
+
+    # Constant-wrapper show fallbacks for shapes the public API never produces.
+    @test occursin(
+        "OfConstantWrapper", sprint(show, OfConstantWrapper{OfArray{Float64,1,Tuple{3}}})
+    )
+    @test occursin(
+        "OfConstantWrapper",
+        sprint(
+            show,
+            OfConstantWrapper{OfNamedTuple{(:x,),Tuple{OfReal{Float64,Nothing,Nothing}}}},
+        ),
+    )
+
+    # Colored symbolic bounds: constant-wrapped (both ends) and a symbolic-expression bound.
+    Tb = @of(
+        n = of(Int; constant=true),
+        cc = of(Real, n, n; constant=true),  # constant field, both bounds symbolic
+        be = of(Real, n + 1, nothing),       # symbolic-expression bound
+    )
+    @test occursin("of(", sprint(show, Tb; context=(:color => true)))
+    # A symbolic bound whose symbol is not a known constant still renders.
+    @test occursin("foo", sprint(show, of(Real, :foo, nothing); context=(:color => true)))
+end
+
+@testset "type inference from NamedTuple of values" begin
+    T = of((a=1, b=2.0, c=[1.0, 2.0]))
+    @test T <: OfNamedTuple
+    @test get_names(T) == (:a, :b, :c)
+    @test get_types(T).parameters[1] == OfInt{Nothing,Nothing}
+    @test get_types(T).parameters[2] == OfReal{Float64,Nothing,Nothing}
+end
+
+@testset "missing default fills integer fields too" begin
+    T = @of(n=of(Int; constant=true), i=of(Int), arr=of(Array, n))
+    inst = T(missing; n=2)
+    @test inst.i === missing
+    @test all(ismissing, inst.arr)
+end
+
+@testset "@of rejects malformed field specifications" begin
+    # `@of` errors during macro expansion for non-`field = spec` arguments.
+    @test (
+        try
+            macroexpand(@__MODULE__, :(@of(of(Real))))
+            false
+        catch
+            true
+        end
+    )
+    # A non-symbol field name is rejected.
+    @test (
+        try
+            macroexpand(@__MODULE__, :(@of(a.b = of(Real))))
+            false
+        catch
+            true
+        end
+    )
+end
+
+@testset "nested arithmetic dimensions collect inner symbols" begin
+    T = @of(n=of(Int; constant=true), m=of(Array, (n + 1) * 2))
+    @test :n in get_unresolved_symbols(T)
+    @test get_dims(get_types(of(T; n=3)).parameters[1]) == (8,)
+end
