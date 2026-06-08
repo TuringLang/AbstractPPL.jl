@@ -14,6 +14,22 @@ It lives in AbstractPPL so that downstream packages can share a common vocabular
 describing the shape, element type, and support of model variables. JuliaBUGS, for
 example, uses it for `@model` parameter annotations.
 
+The examples on this page are executed when the documentation is built. The imports are
+brought into scope here; later examples reuse them.
+
+```@setup of
+using AbstractPPL
+using AbstractPPL: flatten, unflatten
+using Random
+```
+
+```@example of
+using AbstractPPL
+using AbstractPPL: flatten, unflatten
+using Random
+nothing # hide
+```
+
 ## Core Concepts
 
 ### 1. Type-Based Design
@@ -32,6 +48,20 @@ The `of` function returns types with specifications encoded in type parameters:
   - `of(Int, lower, upper)` → `OfInt{lower, upper}` - Bounded integers
   - `@of(field1=..., field2=...)` → `OfNamedTuple{(:field1, :field2), Tuple{Type1, Type2}}` - Named tuples (use `@of` macro)
   - `of(...; constant=true)` → `OfConstantWrapper{T}` - Marks a type as constant/hyperparameter (supported for float types and `Int`)
+
+A few `of(...)` calls and the concrete types they return:
+
+```@example of
+of(Float64, 0, 1)
+```
+
+```@example of
+of(Array, 3, 4)
+```
+
+```@example of
+of(Int; constant=true)
+```
 
 ### 2. Type Parameter Encoding
 
@@ -64,9 +94,10 @@ bring them into scope with `using AbstractPPL: flatten, unflatten`.
 
 ### 4. The `@of` Macro
 
-The `@of` macro provides cleaner syntax by automatically converting field references to symbols:
+The `@of` macro provides cleaner syntax by automatically converting field references to
+symbols. Here `n` in the array dimension is automatically converted to the symbol `:n`:
 
-```julia
+```@example of
 T = @of(
     n = of(Int; constant=true),
     data = of(Array, n, 2)  # 'n' is automatically converted to :n
@@ -75,56 +106,110 @@ T = @of(
 
 ### 5. Symbolic Dimensions and Bounds
 
-For cases where dimensions need to be specified at runtime:
+For cases where dimensions need to be specified at runtime, declare the dimensions as
+constants and reference them in the array specifications:
 
-```julia
-# Define type with symbolic dimensions using @of macro
+```@example of
 MatrixType = @of(
     rows = of(Int; constant=true),
     cols = of(Int; constant=true),
     data = of(Array, rows, cols),
 )
-
-# Create concrete type by resolving constants
-ConcreteType = of(MatrixType; rows=3, cols=4)
-# ConcreteType is @of(data=of(Array, 3, 4))
-
-# Use concrete type with rand and zero
-rand(ConcreteType)  # generates random 3×4 matrix wrapped in NamedTuple
-zero(ConcreteType)  # generates zero 3×4 matrix wrapped in NamedTuple
-
-# Partial concretization (semiconcretized)
-SemiConcreteType = of(MatrixType; rows=3)
-# SemiConcreteType is @of(cols=of(Int; constant=true), data=of(Array, 3, :cols))
-
-# Create instance by providing all constants (default to zero for data)
-instance = MatrixType(; rows=3, cols=4)
-# instance = (data = zeros(3, 4),)
-
-# Create instance with missing values
-instance = MatrixType(missing; rows=3, cols=4)
-# instance = (data = (3×4 matrix of `missing`s),)
-
-# Create instance with specific data
-instance = MatrixType(; rows=3, cols=4, data=rand(3, 4))
-# instance = (data = <provided 3×4 matrix>,)
-
-# Create concrete type for flatten/unflatten (flatten/unflatten are public, not exported)
-flat = AbstractPPL.flatten(ConcreteType, instance)
-reconstructed = AbstractPPL.unflatten(ConcreteType, flat)
-
-# rand and zero with concrete types
-rand(of(MatrixType; rows=3, cols=4))  # generates random instance
-zero(of(MatrixType; rows=10, cols=5)) # generates zero instance
-
-# Missing constants will error
-MatrixType(; rows=3) # Error: Constant `cols` is required but not provided
-rand(MatrixType)     # Error: Cannot generate random values for types with symbolic dimensions
 ```
 
-Arithmetic expressions in dimensions are also supported:
+Resolving the constants with `of(MatrixType; ...)` produces a concrete type with the
+symbolic dimensions filled in:
 
-```julia
+```@example of
+ConcreteType = of(MatrixType; rows=3, cols=4)
+```
+
+The concrete type works with [`rand`](@ref) and [`zero`](@ref). The draw uses a seeded RNG
+so the rendered output is reproducible:
+
+```@example of
+rand(MersenneTwister(0), ConcreteType)  # random 3×4 matrix wrapped in a NamedTuple
+```
+
+```@example of
+zero(ConcreteType)  # zero 3×4 matrix wrapped in a NamedTuple
+```
+
+Concretization can be partial. Resolving only `rows` leaves `cols` symbolic
+(semiconcretized):
+
+```@example of
+SemiConcreteType = of(MatrixType; rows=3)
+```
+
+Calling the type as a constructor builds an instance. With all constants provided, the
+non-constant `data` field defaults to zeros:
+
+```@example of
+MatrixType(; rows=3, cols=4)
+```
+
+Passing `missing` initialises element values to `missing`:
+
+```@example of
+MatrixType(missing; rows=3, cols=4)
+```
+
+Specific data can be provided directly for non-constant fields:
+
+```@example of
+MatrixType(; rows=3, cols=4, data=ones(3, 4))
+```
+
+A concrete type can be flattened and reconstructed. Here we flatten a `3×4` instance and
+recover it (`flatten`/`unflatten` are public, not exported):
+
+```@example of
+instance = MatrixType(; rows=3, cols=4)
+flat = flatten(ConcreteType, instance)
+```
+
+```@example of
+reconstructed = unflatten(ConcreteType, flat)
+```
+
+`rand` and `zero` also work directly on a concretized type:
+
+```@example of
+rand(MersenneTwister(0), of(MatrixType; rows=3, cols=4))  # random instance
+```
+
+```@example of
+zero(of(MatrixType; rows=10, cols=5))  # zero instance
+```
+
+Operations that still need unresolved information error. Constructing with a missing
+constant throws, so we catch and display the message:
+
+```@example of
+try
+    MatrixType(; rows=3)  # `cols` is required but not provided
+catch err
+    showerror(stdout, err)
+end
+```
+
+Likewise, drawing from a type with unresolved symbolic dimensions throws:
+
+```@example of
+try
+    rand(MatrixType)  # symbolic dimensions are unresolved
+catch err
+    showerror(stdout, err)
+end
+```
+
+#### Arithmetic expressions in dimensions
+
+Dimensions may be arithmetic expressions of constant fields. Division operations must
+result in integers for array dimensions:
+
+```@example of
 ExpandedMatrixType = @of(
     n = of(Int; constant=true),
     original = of(Array, n, n),
@@ -132,34 +217,62 @@ ExpandedMatrixType = @of(
     doubled = of(Array, 2 * n, n),
     halved = of(Array, n / 2, n),
 )
+```
 
-# Create instance - all non-constant fields default to zero
+Creating an instance with `n=10` evaluates each expression: `original` is `10×10`,
+`padded` is `11×11`, `doubled` is `20×10`, and `halved` is `5×10`. Non-constant fields
+default to zero. We display each field's shape:
+
+```@example of
 instance = ExpandedMatrixType(; n=10)
-# This creates an instance with:
-# - original: 10×10 zero matrix
-# - padded: 11×11 zero matrix
-# - doubled: 20×10 zero matrix
-# - halved: 5×10 zero matrix  (n/2 must result in an integer, error if not)
+map(size, instance)
+```
 
-# Create instance with custom default value
+A custom default value fills every matrix instead of using zeros:
+
+```@example of
 instance = ExpandedMatrixType(1.0; n=10)
-# This creates an instance with all matrices filled with 1.0
+instance.original
+```
+
+If a division does not yield an integer dimension, instantiation throws. With `n=9`,
+`n / 2 = 4.5` is not an integer:
+
+```@example of
+try
+    ExpandedMatrixType(; n=9)  # n / 2 = 4.5 is not an integer
+catch err
+    showerror(stdout, err)
+end
 ```
 
 ## Flattening parameters
 
 `flatten`/`unflatten` are useful for code that needs a flat parameter vector (for
-example, an optimiser or a sampler) while keeping a structured view of the parameters:
+example, an optimiser or a sampler) while keeping a structured view of the parameters.
+We define a small parameter specification:
 
-```julia
-using AbstractPPL: flatten, unflatten
+```@example of
+Params = @of(mu = of(Real), sigma = of(Real, 0, nothing), beta = of(Array, Float64, 3))
+```
 
-Params = @of(mu = of(Real), sigma = of(Real, 0, nothing), beta = of(Array, Float64, 3),)
+The total flattened length is `length(Params)`:
 
+```@example of
+length(Params)
+```
+
+Flattening a structured value produces a flat vector:
+
+```@example of
 values = (mu=0.5, sigma=1.2, beta=[0.1, 0.2, 0.3])
+flat = flatten(Params, values)
+```
 
-flat = flatten(Params, values)          # length(Params) == 5
-reconstructed = unflatten(Params, flat) # back to the (mu, sigma, beta) NamedTuple
+`unflatten` reconstructs the original `(mu, sigma, beta)` NamedTuple:
+
+```@example of
+reconstructed = unflatten(Params, flat)
 ```
 
 `flatten` returns a vector whose element type is the promotion of the declared leaf types,
@@ -184,6 +297,12 @@ integration.
 ```@docs
 of
 @of
+AbstractPPL.flatten
+AbstractPPL.unflatten
+Base.rand(::Random.AbstractRNG, ::Type{<:AbstractPPL.OfType})
+Base.zero
+Base.size
+Base.length
 AbstractPPL.OfType
 AbstractPPL.OfReal
 AbstractPPL.OfInt

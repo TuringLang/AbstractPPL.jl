@@ -1,5 +1,6 @@
 using Documenter
 using AbstractPPL
+using Random  # for the `Base.rand(::Random.AbstractRNG, ...)` signature in of.md's @docs block
 # trigger DistributionsExt loading
 using Distributions, LinearAlgebra
 

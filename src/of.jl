@@ -1116,6 +1116,8 @@ rand(of(T; n=5))                              # (data = <random 5×2 array>,)
 # See also
 [`zero`](@ref), [`of`](@ref)
 """
+Base.rand(::AbstractRNG, ::Type{<:OfType})
+
 # Each type gets an explicit-RNG method (the contract downstream samplers rely on); the
 # convenience method without an RNG forwards to `Random.default_rng()`.
 function Base.rand(rng::AbstractRNG, ::Type{OfArray{T,N,D}}) where {T,N,D}
