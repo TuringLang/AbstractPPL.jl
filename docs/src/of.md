@@ -11,8 +11,8 @@ system that:
   - Provides utilities for parameter manipulation (`rand`, `zero`, `flatten`, `unflatten`)
 
 It lives in AbstractPPL so that downstream packages can share a common vocabulary for
-describing the shape, element type, and support of model variables. (It was originally
-developed in JuliaBUGS, which uses it for `@model` parameter annotations.)
+describing the shape, element type, and support of model variables. JuliaBUGS, for
+example, uses it for `@model` parameter annotations.
 
 ## Core Concepts
 

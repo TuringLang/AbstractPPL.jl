@@ -1,20 +1,4 @@
-# ========================================================================
-# The `of` type system
-#
-# A declarative way to specify the shape, element type, and support of model
-# variables. Construct specifications with `of(...)` or the `@of` macro; the
-# resulting `OfType` subtypes support `rand`/`zero`/`size`/`length` and
-# `flatten`/`unflatten`. Symbolic dimensions and bounds introduced with `@of`
-# are resolved to concrete types via `of(T; name=value)`.
-#
-# Migrated from JuliaBUGS.jl (originally added there in TuringLang/JuliaBUGS.jl#331).
-# ========================================================================
-
 using Random: AbstractRNG, default_rng, randexp
-
-# ========================================================================
-# Core Type Definitions
-# ========================================================================
 
 """
     OfType
@@ -213,9 +197,6 @@ struct OfConstantWrapper{T<:OfType} <: OfType
     end
 end
 
-# ========================================================================
-# Type Parameter Extraction Helpers
-# ========================================================================
 get_lower(::Type{OfReal{T,L,U}}) where {T,L,U} = L
 get_upper(::Type{OfReal{T,L,U}}) where {T,L,U} = U
 get_element_type(::Type{OfReal{T,L,U}}) where {T,L,U} = T
@@ -245,10 +226,6 @@ function _assert_concrete_bounds(::Type{T}) where {T<:OfType}
     return nothing
 end
 
-# ========================================================================
-# Type Classification and Conversion Utilities
-# ========================================================================
-
 is_leaf(::Type{<:OfArray}) = true
 is_leaf(::Type{<:OfReal}) = true
 is_leaf(::Type{<:OfInt}) = true
@@ -261,14 +238,11 @@ bound_to_type(s::Symbol) = SymbolicRef{s}
 bound_to_type(s::QuoteNode) = SymbolicRef{s.value}
 
 type_to_bound(::Type{Nothing}) = nothing
-type_to_bound(::Type{x}) where {x<:Real} = x  # Extract numeric type parameter
+type_to_bound(::Type{x}) where {x<:Real} = x
 type_to_bound(::Type{SymbolicRef{S}}) where {S} = S
 type_to_bound(s::Symbol) = s
-type_to_bound(x::Real) = x  # Pass through numeric values
+type_to_bound(x::Real) = x
 
-# ========================================================================
-# Symbolic Expression Evaluation
-# ========================================================================
 function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
     if length(expr) < 2
         error("Invalid expression format: $expr")
@@ -279,7 +253,6 @@ function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
         error("Unsupported operation: $op. Only +, -, *, / are supported.")
     end
 
-    # Evaluate arguments recursively
     args = map(expr[2:end]) do arg
         if arg isa Symbol
             if haskey(bindings, arg)
@@ -294,7 +267,6 @@ function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
         end
     end
 
-    # Apply operation
     if op == :+
         return sum(args)
     elseif op == :-
@@ -311,10 +283,6 @@ function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
         return Int(result)
     end
 end
-
-# ========================================================================
-# Type Concretization and Resolution
-# ========================================================================
 
 # Resolve bound references during type concretization
 function resolve_bound(::Type{Nothing}, replacements::NamedTuple)
@@ -334,7 +302,6 @@ function resolve_bound(::Type{SymbolicRef{S}}, replacements::NamedTuple) where {
 end
 
 function resolve_bound(::Type{SymbolicExpr{E}}, replacements::NamedTuple) where {E}
-    # Evaluate the expression with current replacements
     evaluated = eval_symbolic_expr(E, replacements)
     return bound_to_type(evaluated)
 end
@@ -343,19 +310,13 @@ function resolve_bound(T::Type, ::NamedTuple)
     return T
 end
 
-# Handle numeric bounds
 function resolve_bound(x::Real, ::NamedTuple)
     return x
 end
 
-# ========================================================================
-# Helper Functions for Constructors
-# ========================================================================
-
 function process_array_dimensions(dims)
     # Unwrap quoted field references; keep everything else (including SymbolicExpr{...}) as-is.
     processed_dims = map(d -> d isa QuoteNode ? d.value : d, dims)
-    # Ensure we have a tuple of dimensions
     if length(processed_dims) == 1
         Tuple{processed_dims[1]}
     else
@@ -376,10 +337,6 @@ function process_bounds(lower, upper)
     end
     return L, U
 end
-
-# ========================================================================
-# Constructor Functions
-# ========================================================================
 
 """
     of(T, args...; constant::Bool=false)
@@ -539,7 +496,7 @@ end
 
 # Fallback for other Real types
 function of(value::Real)
-    return of(Float64)  # Non-float Real types use Float64
+    return of(Float64)
 end
 
 function of(value::AbstractArray{T,N}) where {T,N}
@@ -559,10 +516,6 @@ function of(value::NamedTuple{names}) where {names}
     end
 end
 
-# ========================================================================
-# Helper Functions for Type Concretization
-# ========================================================================
-
 function resolve_bounded_type(::Type{T}, replacements::NamedTuple) where {T<:OfType}
     if !(T <: OfReal || T <: OfInt)
         return T
@@ -574,7 +527,6 @@ function resolve_bounded_type(::Type{T}, replacements::NamedTuple) where {T<:OfT
     new_upper = resolve_bound(upper, replacements)
 
     if new_lower !== lower || new_upper !== upper
-        # Create new type with resolved bounds
         if T <: OfReal
             elem_type = get_element_type(T)
             return OfReal{elem_type,new_lower,new_upper}
@@ -585,10 +537,6 @@ function resolve_bounded_type(::Type{T}, replacements::NamedTuple) where {T<:OfT
         return T
     end
 end
-
-# ========================================================================
-# Type Concretization with Replacements
-# ========================================================================
 
 """
     of(::Type{T}, replacements::NamedTuple) where T<:OfType
@@ -639,7 +587,6 @@ function of(::Type{T}; kwargs...) where {T<:OfType}
     return of(T, NamedTuple(kwargs))
 end
 
-# Helper function to resolve dimensions with replacements
 function _resolve_dimensions(dims, replacements::NamedTuple)
     return map(dims) do d
         if d isa Symbol && haskey(replacements, d)
@@ -654,7 +601,6 @@ function _resolve_dimensions(dims, replacements::NamedTuple)
     end
 end
 
-# Helper function to process a single field for concretization
 function _process_field_for_concretization(
     name::Symbol, field_type::Type, replacements::NamedTuple
 )
@@ -669,7 +615,6 @@ function _process_field_for_concretization(
         new_dims = _resolve_dimensions(dims, replacements)
 
         if new_dims != dims
-            # Create new array type with concrete dimensions
             T = get_element_type(field_type)
             return (name, of(Array, T, new_dims...))
         else
@@ -741,9 +686,6 @@ function of(::Type{T}, replacements::NamedTuple) where {T<:OfType}
     return T
 end
 
-# ========================================================================
-# Helper for creating values with default
-# ========================================================================
 function _create_with_default(::Type{OfArray{T,N,D}}, default_value) where {T,N,D}
     dims = get_dims(OfArray{T,N,D})
     if any(d -> d isa Symbol || (d isa Type && d <: SymbolicExpr), dims)
@@ -760,7 +702,6 @@ function _create_with_default(::Type{OfArray{T,N,D}}, default_value) where {T,N,
 end
 
 function _create_with_default(::Type{OfReal{T,L,U}}, default_value) where {T,L,U}
-    # Handle missing separately
     if default_value === missing
         return missing
     end
@@ -772,7 +713,6 @@ function _create_with_default(::Type{OfReal{T,L,U}}, default_value) where {T,L,U
 end
 
 function _create_with_default(::Type{OfInt{L,U}}, default_value) where {L,U}
-    # Handle missing separately
     if default_value === missing
         return missing
     end
@@ -803,9 +743,6 @@ function _create_with_default(::Type{OfConstantWrapper{T}}, default_value) where
     )
 end
 
-# ========================================================================
-# Helper function for instance creation
-# ========================================================================
 function _create_instance_impl(
     ::Type{T}, value_generator::Function, kwargs
 ) where {T<:OfNamedTuple}
@@ -833,7 +770,6 @@ function _create_instance_impl(
     # First concretize with constants
     concrete_type = of(T, NamedTuple(constants))
 
-    # Check if all constants are resolved
     if has_symbolic_dims(concrete_type)
         missing_symbols = get_unresolved_symbols(concrete_type)
         error("Missing values for symbolic dimensions: $(join(missing_symbols, ", "))")
@@ -849,25 +785,18 @@ function _create_instance_impl(
         field_type = concrete_types.parameters[idx]
 
         if haskey(values, name)
-            # Validate the provided value
             try
                 push!(result_values, _validate(field_type, values[name]))
             catch e
                 error("Validation failed for field $name: $(e.msg)")
             end
         else
-            # Use the value generator function
             push!(result_values, value_generator(field_type))
         end
     end
 
-    # Return the instance as a NamedTuple
     return NamedTuple{concrete_names}(Tuple(result_values))
 end
-
-# ========================================================================
-# Parameterized Constructor with Validation
-# ========================================================================
 
 """
     (::Type{T})(; kwargs...) where {T<:OfNamedTuple}
@@ -924,16 +853,11 @@ function (::Type{T})(; kwargs...) where {T<:OfNamedTuple}
     return _create_instance_impl(T, zero, kwargs)
 end
 
-# Constructor with default_value as positional argument
 function (::Type{T})(default_value; kwargs...) where {T<:OfNamedTuple}
     return _create_instance_impl(
         T, field_type -> _create_with_default(field_type, default_value), kwargs
     )
 end
-
-# ========================================================================
-# @of Macro and Related Processing Functions
-# ========================================================================
 
 """
     @of(field1=spec1, field2=spec2, ...)
@@ -1153,10 +1077,6 @@ function process_expression_refs(expr::Expr, available_fields::Vector{Symbol})
     return expr
 end
 
-# ========================================================================
-# Random Value Generation
-# ========================================================================
-
 """
     rand([rng::AbstractRNG], ::Type{T}) where T<:OfType
 
@@ -1262,10 +1182,6 @@ function Base.rand(::Type{OfConstantWrapper{T}}) where {T}
     return rand(default_rng(), OfConstantWrapper{T})
 end
 
-# ========================================================================
-# Zero Value Generation
-# ========================================================================
-
 """
     zero(::Type{T}) where T<:OfType
 
@@ -1354,10 +1270,6 @@ function Base.zero(::Type{OfConstantWrapper{T}}) where {T}
     )
 end
 
-# ========================================================================
-# Size and Length Operations
-# ========================================================================
-
 """
     size(::Type{T}) where T<:OfType
 
@@ -1405,7 +1317,7 @@ function Base.size(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
 end
 
 function Base.size(::Type{OfConstantWrapper{T}}) where {T}
-    return size(T)  # Delegate to wrapped type
+    return size(T)
 end
 
 """
@@ -1466,10 +1378,6 @@ end
 function Base.length(::Type{OfConstantWrapper{T}}) where {T}
     return 0  # Constants are not part of the flattened representation
 end
-
-# ========================================================================
-# Symbolic Dimension Checking and Symbol Collection
-# ========================================================================
 
 # Check if a type still carries unresolved symbols: symbolic array dimensions, symbolic
 # bounds, or constants (an `OfConstantWrapper`, whether nested or at the top level).
@@ -1544,10 +1452,6 @@ function get_unresolved_symbols(::Type{T}) where {T<:OfType}
     return unique(symbols)
 end
 
-# ========================================================================
-# Validation Helper Functions
-# ========================================================================
-
 # Validate that a value is within bounds. `kind` only labels the error message.
 function validate_bounds(value, lower, upper; kind::AbstractString="value")
     if !isnothing(lower) && value < lower
@@ -1558,11 +1462,6 @@ function validate_bounds(value, lower, upper; kind::AbstractString="value")
     end
 end
 
-# ========================================================================
-# Validation Functions
-# ========================================================================
-
-# Validation function - separate from type concretization
 function _validate(::Type{T}, value) where {T<:OfType}
     if is_leaf(T)
         return _validate_leaf(T, value)
@@ -1624,7 +1523,6 @@ function _validate_container(::Type{OfNamedTuple{Names,Types}}, value) where {Na
     value isa NamedTuple ||
         error("Expected NamedTuple for OfNamedTuple, got $(typeof(value))")
 
-    # Check that all required fields are present
     value_names = fieldnames(typeof(value))
     for name in Names
         if !(name in value_names)
@@ -1641,13 +1539,8 @@ function _validate_container(::Type{OfNamedTuple{Names,Types}}, value) where {Na
 end
 
 function _validate_leaf(::Type{OfConstantWrapper{T}}, value) where {T}
-    # Validate against the wrapped type
     return _validate_leaf(T, value)
 end
-
-# ========================================================================
-# Flatten and Unflatten Operations  
-# ========================================================================
 
 """
     flatten(::Type{T}, values) where T<:OfType
@@ -1819,10 +1712,6 @@ end
     return :(NamedTuple{Names}(($(vals...),)))
 end
 
-# ========================================================================
-# Display Helper Functions
-# ========================================================================
-
 # Format a bound type for display
 function format_bound(bound_type, constant_fields, use_color)
     if bound_type === Nothing
@@ -1867,14 +1756,12 @@ function show_bounded_type(io::IO, type_name::String, L, U; constant::Bool=false
 
         if constant && use_color
             printstyled(io, "of($type_name, "; color=:cyan)
-            # Handle lower bound
             if L isa Type && L <: SymbolicRef && type_to_bound(L) in constant_fields
                 printstyled(io, string(type_to_bound(L)); color=:cyan)
             else
                 printstyled(io, lower_str; color=:cyan)
             end
             printstyled(io, ", "; color=:cyan)
-            # Handle upper bound
             if U isa Type && U <: SymbolicRef && type_to_bound(U) in constant_fields
                 printstyled(io, string(type_to_bound(U)); color=:cyan)
             else
@@ -1884,7 +1771,6 @@ function show_bounded_type(io::IO, type_name::String, L, U; constant::Bool=false
             printstyled(io, ")"; color=:cyan)
         else
             print(io, "of($type_name, ")
-            # Handle lower bound
             if L isa Type &&
                 L <: SymbolicRef &&
                 type_to_bound(L) in constant_fields &&
@@ -1894,7 +1780,6 @@ function show_bounded_type(io::IO, type_name::String, L, U; constant::Bool=false
                 print(io, lower_str)
             end
             print(io, ", ")
-            # Handle upper bound
             if U isa Type &&
                 U <: SymbolicRef &&
                 type_to_bound(U) in constant_fields &&
@@ -1910,10 +1795,6 @@ function show_bounded_type(io::IO, type_name::String, L, U; constant::Bool=false
         end
     end
 end
-
-# ========================================================================
-# Display and Show Methods
-# ========================================================================
 
 # Helper to convert expression tuple back to string
 function expr_tuple_to_string(expr::Tuple)
@@ -1961,7 +1842,6 @@ function Base.show(io::IO, t::Type{OfArray{T,N,D}}) where {T,N,D}
 
     # Process dimensions, highlighting those that reference constants
     if use_color && !isempty(constant_fields)
-        # We need to manually handle the coloring
         print(io, "of(Array, ")
         if T !== Float64
             print(io, T, ", ")
@@ -1970,7 +1850,6 @@ function Base.show(io::IO, t::Type{OfArray{T,N,D}}) where {T,N,D}
         dims_list = get_dims(OfArray{T,N,D})
         for (i, d) in enumerate(dims_list)
             if d isa Symbol && d in constant_fields
-                # This dimension references a constant field - highlight it
                 printstyled(io, string(d); color=:cyan)
             elseif d isa Type && d <: SymbolicExpr
                 # This is an expression - format it nicely

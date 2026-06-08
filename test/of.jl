@@ -26,58 +26,48 @@ using Random: MersenneTwister
 
 @testset "Basic type creation" begin
     @testset "Simple type creation" begin
-        # Test basic Int and Real types
         @test of(Int) == OfInt{Nothing,Nothing}
         @test of(Int, 0, 10) == OfInt{0,10}
         @test of(Real) == OfReal{Float64,Nothing,Nothing}
         @test of(Real, 0.0, 1.0) == OfReal{Float64,0.0,1.0}
 
-        # Test array types
         @test of(Array, 5) == OfArray{Float64,1,Tuple{5}}
         @test of(Array, 3, 4) == OfArray{Float64,2,Tuple{3,4}}
         @test of(Array, Int, 2, 2) == OfArray{Int,2,Tuple{2,2}}
     end
 
     @testset "Symbolic bounds" begin
-        # Test creating types with symbolic bounds
         T1 = of(Real, :lower, :upper)
         @test T1 == OfReal{Float64,SymbolicRef{:lower},SymbolicRef{:upper}}
 
         T2 = of(Int, 0, :max)
         @test T2 == OfInt{0,SymbolicRef{:max}}
 
-        # Test with constants
         T3 = of(Real, :min, :max; constant=true)
         @test T3 == OfConstantWrapper{OfReal{Float64,SymbolicRef{:min},SymbolicRef{:max}}}
     end
 
     @testset "Explicit float types" begin
-        # Test Float64
         @test of(Float64) == OfReal{Float64,Nothing,Nothing}
         @test of(Float64, 0.0, 1.0) == OfReal{Float64,0.0,1.0}
         @test of(Float64; constant=true) ==
             OfConstantWrapper{OfReal{Float64,Nothing,Nothing}}
 
-        # Test Float32
         @test of(Float32) == OfReal{Float32,Nothing,Nothing}
         @test of(Float32, -1.0f0, 1.0f0) == OfReal{Float32,-1.0f0,1.0f0}
         @test of(Float32; constant=true) ==
             OfConstantWrapper{OfReal{Float32,Nothing,Nothing}}
 
-        # Test that of(Real) defaults to Float64
         @test of(Real) == OfReal{Float64,Nothing,Nothing}
 
-        # Test rand returns correct types
         @test rand(of(Float64)) isa Float64
         @test rand(of(Float32)) isa Float32
-        @test rand(of(Real)) isa Float64  # defaults to Float64
+        @test rand(of(Real)) isa Float64
 
-        # Test zero returns correct types
         @test zero(of(Float64)) isa Float64
         @test zero(of(Float32)) isa Float32
         @test zero(of(Real)) isa Float64
 
-        # Test with bounds
         val64 = rand(of(Float64, 0.0, 1.0))
         @test val64 isa Float64
         @test 0.0 <= val64 <= 1.0
@@ -90,30 +80,25 @@ end
 
 @testset "@of macro tests" begin
     @testset "Basic constant syntax" begin
-        # Test Int constant
         T1 = of(Int; constant=true)
         @test T1 == OfConstantWrapper{OfInt{Nothing,Nothing}}
         @test string(T1) == "of(Int; constant=true)"
 
-        # Test Real constant
         T2 = of(Real; constant=true)
         @test T2 == OfConstantWrapper{OfReal{Float64,Nothing,Nothing}}
         @test string(T2) == "of(Real; constant=true)"
 
-        # Test non-constant versions
         T3 = of(Int)
         @test T3 == OfInt{Nothing,Nothing}
 
         T4 = of(Real, 0, 10)
         @test T4 == OfReal{Float64,0,10}
 
-        # Test that constant=true is not allowed for Array
         @test_throws ErrorException of(Array, 10; constant=true)
         @test_throws ErrorException of(Array, Float64, 5, 5; constant=true)
     end
 
     @testset "Simple @of macro" begin
-        # Test basic usage
         T = @of(mu = of(Real), sigma = of(Real, 0, nothing), data = of(Array, 10))
 
         @test T <: OfNamedTuple
@@ -127,7 +112,6 @@ end
     end
 
     @testset "@of with constants and references" begin
-        # Test with constant dimensions
         T = @of(
             rows = of(Int; constant=true),
             cols = of(Int; constant=true),
@@ -153,7 +137,6 @@ end
     end
 
     @testset "@of with float types" begin
-        # Test using explicit float types in @of macro
         T = @of(
             f64_val = of(Float64),
             f32_val = of(Float32, 0.0f0, 1.0f0),
@@ -169,7 +152,6 @@ end
         @test types.parameters[4] == OfArray{Float64,1,Tuple{3}}
         @test types.parameters[5] == OfArray{Float32,2,Tuple{2,2}}
 
-        # Test instance creation preserves types
         instance = T(; real_val=5.0)
         @test instance.f64_val isa Float64
         @test instance.f32_val isa Float32
@@ -178,40 +160,33 @@ end
     end
 
     @testset "Concrete instance creation" begin
-        # Define type with symbolic dimensions
         MatrixType = @of(
             rows = of(Int; constant=true),
             cols = of(Int; constant=true),
             data = of(Array, rows, cols)
         )
 
-        # Create instance with constants provided
         instance = MatrixType(; rows=3, cols=4)
 
-        # Check that we get an instance with only data field (constants eliminated)
         @test instance isa NamedTuple
         @test keys(instance) == (:data,)
         @test instance.data isa Matrix{Float64}
         @test size(instance.data) == (3, 4)
-        @test all(instance.data .== 0.0)  # Should default to zero
+        @test all(instance.data .== 0.0)
 
-        # Create instance with data provided
         test_data = rand(3, 4)
         instance2 = MatrixType(; rows=3, cols=4, data=test_data)
         @test instance2.data ≈ test_data
     end
 
     @testset "rand and zero with constants" begin
-        # Define type with constants
         T = @of(n = of(Int; constant=true), data = of(Array, n))
 
-        # Test rand with concrete type
         CT = of(T; n=5)
         val = rand(CT)
         @test haskey(val, :data)
         @test size(val.data) == (5,)
 
-        # Test zero with concrete type
         CT2 = of(T; n=3)
         val = zero(CT2)
         @test haskey(val, :data)
@@ -220,7 +195,6 @@ end
     end
 
     @testset "flatten/unflatten preserves array types" begin
-        # Test that array element types are preserved
         T = @of(
             rows = of(Int; constant=true),
             cols = of(Int; constant=true),
@@ -228,21 +202,17 @@ end
         )
         ConcreteType = of(T; rows=2, cols=3)
 
-        # Create test data - only data field since constants are eliminated
         original = (data=rand(Float64, 2, 3),)
 
-        # Flatten and unflatten
         flat = flatten(ConcreteType, original)
         reconstructed = unflatten(ConcreteType, flat)
 
-        # Check that data field is preserved
         @test typeof(reconstructed.data) == typeof(original.data)
         @test typeof(reconstructed.data) == Matrix{Float64}
         @test reconstructed.data ≈ original.data
     end
 
     @testset "flatten/unflatten with concrete types" begin
-        # Test flatten/unflatten with concrete types
         T = @of(
             rows = of(Int; constant=true),
             cols = of(Int; constant=true),
@@ -250,25 +220,20 @@ end
             data = of(Array, rows, cols)
         )
 
-        # Create instance
         instance = T(; rows=3, cols=2)
         @test instance isa NamedTuple
         @test keys(instance) == (:scale, :data)
         @test size(instance.data) == (3, 2)
 
-        # Create concrete type first
         CT = of(T; rows=3, cols=2)
 
-        # Flatten using the concrete type
         flat = flatten(CT, instance)
         @test length(flat) == 7  # 1 scale + 6 data elements
 
-        # Unflatten using the concrete type
         reconstructed = unflatten(CT, flat)
         @test reconstructed.scale ≈ instance.scale
         @test reconstructed.data ≈ instance.data
 
-        # Test with different data
         instance2 = (scale=2.5, data=rand(3, 2))
         flat2 = flatten(CT, instance2)
         reconstructed2 = unflatten(CT, flat2)
@@ -279,16 +244,13 @@ end
 
 @testset "Symbolic bounds tests" begin
     @testset "Symbolic references in @of macro" begin
-        # Test that the @of macro properly converts field references to symbolic types
         T = @of(min = of(Real, 0, 10), max = of(Real, 20, 30), value = of(Real, min, max))
 
         types = get_types(T)
-        # The 'value' field should have symbolic references to min and max
         @test types.parameters[3] == OfReal{Float64,SymbolicRef{:min},SymbolicRef{:max}}
     end
 
     @testset "Symbolic bounds in named tuples" begin
-        # Use @of macro instead of of((;...))
         T = @of(
             lower_bound = of(Real, 0, nothing),
             upper_bound = of(Real, lower_bound, nothing),
@@ -303,7 +265,6 @@ end
     end
 
     @testset "@of macro with symbolic bounds" begin
-        # Test that the macro correctly converts field references to symbols
         Schema = @of(
             min_val = of(Real, 0, 10),
             max_val = of(Real, min_val, 100),
@@ -332,22 +293,18 @@ end
     end
 
     @testset "Concrete instance creation with symbolic resolution" begin
-        # Define schema with symbolic bounds
         Schema = @of(
             min_bound = of(Real; constant=true),
             max_bound = of(Real; constant=true),
             value = of(Real, min_bound, max_bound)
         )
 
-        # Create instance by providing constants
         instance = Schema(; min_bound=0.0, max_bound=1.0)
 
-        # The instance should only have the value field (constants eliminated)
         @test instance isa NamedTuple
         @test keys(instance) == (:value,)
-        @test instance.value == 0.0  # Should default to lower bound
+        @test instance.value == 0.0
 
-        # Create instance with explicit value
         instance2 = Schema(; min_bound=0.0, max_bound=1.0, value=0.5)
         @test instance2.value == 0.5
     end
@@ -360,7 +317,7 @@ end
         )
 
         instance = Schema(; threshold=10.0, value=5.0)
-        @test keys(instance) == (:value,)  # the constant is eliminated
+        @test keys(instance) == (:value,)
         @test instance.value == 5.0
 
         # value above the resolved upper bound (threshold) must throw
@@ -371,23 +328,18 @@ end
 end
 
 @testset "Constant Elimination After Concretization" begin
-    # Basic constant elimination
     @testset "Basic elimination" begin
         T = @of(
             n = of(Int; constant=true), m = of(Int; constant=true), data = of(Array, n, m)
         )
 
-        # Concretize with constant values
         CT = of(T; n=3, m=4)
 
-        # Only non-constant fields should remain
         @test get_names(CT) == (:data,)
 
-        # Check the resolved type
         types = get_types(CT)
         @test types.parameters[1] == of(Array, 3, 4)
 
-        # Should be able to create instances
         instance = rand(CT)
         @test instance isa NamedTuple
         @test !haskey(instance, :n)
@@ -395,11 +347,9 @@ end
         @test haskey(instance, :data)
         @test size(instance.data) == (3, 4)
 
-        # Length should only include data field
         @test length(CT) == 12  # 3×4 array
     end
 
-    # Constants with bounds
     @testset "Constants with bounds" begin
         T = @of(
             lower = of(Int, 1, 10; constant=true),
@@ -409,19 +359,16 @@ end
 
         CT = of(T; lower=5, upper=75)
 
-        # Only value field should remain with resolved bounds
         types = get_types(CT)
         @test get_names(CT) == (:value,)
         @test types.parameters[1] == of(Real, 5, 75)
     end
 
-    # Partial concretization
     @testset "Partial concretization" begin
         T = @of(
             a = of(Int; constant=true), b = of(Int; constant=true), data = of(Array, a, b)
         )
 
-        # Only provide value for 'a'
         CT = of(T; a=10)
 
         names = get_names(CT)
@@ -438,7 +385,6 @@ end
         @test types.parameters[data_idx] == of(Array, 10, :b)
     end
 
-    # Nested structures
     @testset "Nested structures" begin
         InnerT = @of(size = of(Int; constant=true), values = of(Array, size))
 
@@ -446,7 +392,6 @@ end
 
         CT = of(OuterT; n=5, size=3)
 
-        # n should be eliminated at outer level
         outer_names = get_names(CT)
         @test :n ∉ outer_names
         @test :inner ∈ outer_names
@@ -454,7 +399,6 @@ end
         outer_types = get_types(CT)
         inner_type = outer_types.parameters[1]
 
-        # size should be eliminated at inner level
         inner_names = get_names(inner_type)
         @test :size ∉ inner_names
         @test :values ∈ inner_names
@@ -463,7 +407,6 @@ end
         @test inner_types.parameters[1] == of(Array, 3)
     end
 
-    # Symbolic dimension checking
     @testset "Symbolic dimension checking" begin
         T = @of(const_field = of(Int; constant=true), regular_field = of(Real, 0, 1))
 
@@ -472,7 +415,6 @@ end
         CT = of(T; const_field=42)
         @test has_symbolic_dims(CT) == false
 
-        # const_field should be eliminated
         @test get_names(CT) == (:regular_field,)
     end
 end
@@ -486,10 +428,8 @@ end
             data = of(Array, c, c)
         )
 
-        # Concretize with all values
         CT = of(T; a=5, b=10, c=15)
 
-        # All constants should be eliminated, only data remains
         @test get_names(CT) == (:data,)
         types = get_types(CT)
         @test types.parameters[1] == of(Array, 15, 15)
@@ -505,7 +445,6 @@ end
 
         CT = of(T; base=3, width=5, height=7)
 
-        # All constants should be eliminated, only volume remains
         @test get_names(CT) == (:volume,)
         types = get_types(CT)
         @test types.parameters[1] == of(Array, 5, 7, 3)
@@ -514,32 +453,27 @@ end
 
 @testset "Type operations" begin
     @testset "length calculation" begin
-        # Test length for basic types
         @test length(of(Int)) == 1
         @test length(of(Real)) == 1
         @test length(of(Array, 5)) == 5
         @test length(of(Array, 3, 4)) == 12
         @test length(of(Array, Int, 2, 3, 4)) == 24
 
-        # Test length for named tuples
         T = @of(a = of(Int), b = of(Real), c = of(Array, 3))
         @test length(T) == 5  # 1 + 1 + 3
 
-        # Test length with constants eliminated
         T2 = @of(n = of(Int; constant=true), data = of(Array, n))
         CT = of(T2; n=10)
         @test length(CT) == 10  # only data field remains (n is eliminated)
     end
 
     @testset "rand generation" begin
-        # Test rand for basic types
         @test rand(of(Int, 1, 10)) isa Int
         @test rand(of(Real, 0.0, 1.0)) isa Float64
         arr = rand(of(Array, 5, 3))
         @test arr isa Matrix{Float64}
         @test size(arr) == (5, 3)
 
-        # Test rand for named tuples
         T = @of(x = of(Real), y = of(Int, 0, 100), z = of(Array, 2, 2))
         instance = rand(T)
         @test instance isa NamedTuple
@@ -549,14 +483,12 @@ end
     end
 
     @testset "zero generation" begin
-        # Test zero for basic types
         @test zero(of(Int)) == 0
         @test zero(of(Real)) == 0.0
         arr = zero(of(Array, 3, 2))
         @test arr isa Matrix{Float64}
         @test all(arr .== 0.0)
 
-        # Test zero for named tuples
         T = @of(a = of(Int), b = of(Real), c = of(Array, 2))
         instance = zero(T)
         @test instance.a == 0
@@ -565,7 +497,6 @@ end
     end
 
     @testset "flatten/unflatten" begin
-        # Test with mixed types
         T = @of(
             int_val = of(Int),
             real_val = of(Real),
@@ -582,7 +513,6 @@ end
         @test reconstructed.vec ≈ original.vec
         @test reconstructed.mat ≈ original.mat
 
-        # Test that flattening is consistent
         @test length(flat) == length(T)
     end
 
@@ -636,19 +566,16 @@ end
 
 @testset "Array type specifications" begin
     @testset "Different element types" begin
-        # Test Int arrays
         T1 = of(Array, Int, 5)
         @test get_element_type(T1) == Int
         @test get_ndims(T1) == 1
         @test get_dims(T1) == (5,)
 
-        # Test Bool arrays
         T2 = of(Array, Bool, 3, 3)
         @test get_element_type(T2) == Bool
         @test get_ndims(T2) == 2
         @test get_dims(T2) == (3, 3)
 
-        # Test that default is Float64
         T3 = of(Array, 10)
         @test get_element_type(T3) == Float64
     end
@@ -668,7 +595,6 @@ end
         tensor_type = types.parameters[4]
         @test get_dims(tensor_type) == (:rows, :cols, 3)
 
-        # Test concretization
         CT = of(T; rows=2, cols=4)
         # rows and cols are eliminated, only matrix and tensor remain
         @test get_names(CT) == (:matrix, :tensor)
@@ -680,7 +606,6 @@ end
 
 @testset "Constructor with default_value" begin
     @testset "Basic default_value usage" begin
-        # Define a simple type
         T = @of(
             rows = of(Int; constant=true),
             cols = of(Int; constant=true),
@@ -688,29 +613,25 @@ end
             data = of(Array, rows, cols)
         )
 
-        # Test using zero() as default (original behavior)
+        # No positional arg: each leaf defaults to zero() (or its lower bound).
         instance1 = T(; rows=3, cols=2)
-        @test instance1.scale == 0.1  # Should default to lower bound
+        @test instance1.scale == 0.1
         @test all(instance1.data .== 0.0)
 
-        # Test using custom default_value
         instance2 = T(1.5; rows=3, cols=2)
         @test instance2.scale == 1.5
         @test all(instance2.data .== 1.5)
 
-        # Test with missing as default_value
         instance3 = T(missing; rows=3, cols=2)
         @test instance3.scale === missing
         @test all(instance3.data .=== missing)
 
-        # Test partial override with default_value
         instance4 = T(2.0; rows=3, cols=2, scale=5.0)
-        @test instance4.scale == 5.0  # Explicitly provided
-        @test all(instance4.data .== 2.0)  # Uses default_value
+        @test instance4.scale == 5.0
+        @test all(instance4.data .== 2.0)
     end
 
     @testset "Default value validation" begin
-        # Type with bounded values
         T = @of(n = of(Int; constant=true), bounded = of(Real, 0, 10), data = of(Array, n))
 
         # Valid default_value within bounds
@@ -732,14 +653,12 @@ end
             mat = of(Array, size, size)
         )
 
-        # Test with integer default
         instance1 = T(42; size=2)
         @test instance1.int_val == 42
         @test instance1.real_val == 42.0
         @test all(instance1.vec .== 42.0)
         @test all(instance1.mat .== 42.0)
 
-        # Test with float default
         instance2 = T(3.14; size=2)
         @test instance2.int_val == 3  # Should round to Int
         @test instance2.real_val ≈ 3.14
@@ -752,7 +671,6 @@ end
         # The inner structure's constants should be handled at the outer level
         OuterT = @of(n = of(Int; constant=true), scale = of(Real), vec = of(Array, n))
 
-        # Test default_value propagation
         instance = OuterT(7.0; n=5)
         @test instance.scale == 7.0
         @test instance.vec isa Vector{Float64}
@@ -795,7 +713,6 @@ end
     end
 
     @testset "Type display" begin
-        # Test string representations
         @test string(of(Int)) == "of(Int)"
         @test string(of(Int, 0, 10)) == "of(Int, 0, 10)"
         @test string(of(Real, 0.0, nothing)) == "of(Float64, 0.0, nothing)"
@@ -819,7 +736,6 @@ end
     end
 
     @testset "Type inference from values" begin
-        # Test that of(value) infers the correct type
         @test of(1.0) == of(Float64)
         @test of(1.0f0) == of(Float32)
         @test of(1) == of(Int)
@@ -834,7 +750,6 @@ end
 end
 
 @testset "Show method for NamedTuple" begin
-    # Test simple display
     T = @of(x = of(Real), y = of(Int, 0, 10))
     str = string(T)
     @test occursin("@of(", str)
@@ -854,7 +769,6 @@ end
 end
 
 @testset "Type concretization" begin
-    # Test simple constant replacement
     T = @of(n = of(Int; constant=true), data = of(Array, n))
 
     ConcreteT = of(T; n=5)
@@ -894,7 +808,6 @@ end
 end
 
 @testset "Expression processing in @of macro" begin
-    # Test arithmetic expressions with field references
     T = @of(
         n = of(Int; constant=true),
         data1 = of(Array, n + 1),

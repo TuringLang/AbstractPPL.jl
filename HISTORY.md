@@ -1,6 +1,6 @@
 ## 0.15.3
 
-Added the `of` type system (migrated from JuliaBUGS.jl): a self-contained, declarative way to specify the shape, element type, and support of model variables. Construct specifications with the exported `of` function or the exported `@of` macro:
+Added the `of` type system: a self-contained, declarative way to specify the shape, element type, and support of model variables. Construct specifications with the exported `of` function or the exported `@of` macro:
 
 ```julia
 using AbstractPPL
