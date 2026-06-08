@@ -244,36 +244,44 @@ end
 
 @testset "Symbolic bounds tests" begin
     @testset "Symbolic references in @of macro" begin
-        T = @of(min = of(Real, 0, 10), max = of(Real, 20, 30), value = of(Real, min, max))
+        T = @of(
+            min = of(Real, 0, 10; constant=true),
+            max = of(Real, 20, 30; constant=true),
+            value = of(Real, min, max),
+        )
 
         types = get_types(T)
+        @test types.parameters[1] == OfConstantWrapper{OfReal{Float64,0,10}}
+        @test types.parameters[2] == OfConstantWrapper{OfReal{Float64,20,30}}
         @test types.parameters[3] == OfReal{Float64,SymbolicRef{:min},SymbolicRef{:max}}
     end
 
     @testset "Symbolic bounds in named tuples" begin
         T = @of(
-            lower_bound = of(Real, 0, nothing),
-            upper_bound = of(Real, lower_bound, nothing),
+            lower_bound = of(Real, 0, nothing; constant=true),
+            upper_bound = of(Real, lower_bound, nothing; constant=true),
             param = of(Real, lower_bound, upper_bound),
         )
 
         types = get_types(T)
-        @test types.parameters[1] == OfReal{Float64,0,Nothing}
-        @test types.parameters[2] == OfReal{Float64,SymbolicRef{:lower_bound},Nothing}
+        @test types.parameters[1] == OfConstantWrapper{OfReal{Float64,0,Nothing}}
+        @test types.parameters[2] ==
+            OfConstantWrapper{OfReal{Float64,SymbolicRef{:lower_bound},Nothing}}
         @test types.parameters[3] ==
             OfReal{Float64,SymbolicRef{:lower_bound},SymbolicRef{:upper_bound}}
     end
 
     @testset "@of macro with symbolic bounds" begin
         Schema = @of(
-            min_val = of(Real, 0, 10),
-            max_val = of(Real, min_val, 100),
+            min_val = of(Real, 0, 10; constant=true),
+            max_val = of(Real, min_val, 100; constant=true),
             param = of(Real, min_val, max_val)
         )
 
         types = get_types(Schema)
-        @test types.parameters[1] == OfReal{Float64,0,10}
-        @test types.parameters[2] == OfReal{Float64,SymbolicRef{:min_val},100}
+        @test types.parameters[1] == OfConstantWrapper{OfReal{Float64,0,10}}
+        @test types.parameters[2] ==
+            OfConstantWrapper{OfReal{Float64,SymbolicRef{:min_val},100}}
         @test types.parameters[3] ==
             OfReal{Float64,SymbolicRef{:min_val},SymbolicRef{:max_val}}
     end
@@ -874,6 +882,12 @@ using Test
     # Symbolic bounds likewise resolve in a using-only scope.
     Tbound = @of(lo = of(Real; constant=true), x = of(Real, lo, nothing))
     @test of(Tbound; lo=0.0) isa Type
+
+    # The generated calls are qualified to AbstractPPL, not captured by caller locals.
+    let of = _ -> error("shadowed")
+        Tshadow = @of(n = of(Int; constant=true), data = of(Array, n))
+        @test AbstractPPL.of(Tshadow; n=2) isa Type
+    end
 end
 end # module DownstreamScope
 
@@ -960,7 +974,7 @@ end
 @testset "symbolic bounds are detected" begin
     # has_symbolic_dims / get_unresolved_symbols must see symbolic *bounds*, not just dims,
     # so zero/rand/flatten fail with a clean message instead of a raw MethodError.
-    T = @of(lo = of(Real), x = of(Real, lo, nothing))
+    T = @of(lo = of(Real; constant=true), x = of(Real, lo, nothing))
     @test has_symbolic_dims(T)
     @test :lo in get_unresolved_symbols(T)
     @test_throws ErrorException zero(T)
@@ -1012,6 +1026,7 @@ end
     @test_throws ErrorException eval_expr((:+,), (n=3,))            # too few elements
     @test_throws ErrorException eval_expr((:^, :n, 2), (n=3,))      # unsupported op
     @test_throws ErrorException eval_expr((:+, :m, 1), (n=3,))      # unknown symbol
+    @test_throws ErrorException eval_expr((:-, :n, 1, 2), (n=3,))   # too many minus args
     @test_throws ErrorException eval_expr((:/, :n, 2), (n=5,))      # non-integer quotient
     @test_throws ErrorException eval_expr((:/, :n, 2, 1), (n=6,))   # division needs 2 args
 end
@@ -1038,10 +1053,68 @@ end
     @test_throws ErrorException (@of(i = of(Int)))(; i="x")   # non-Real
     @test (@of(i = of(Int)))(; i=3.0).i === 3                  # whole-number Real converts
     @test_throws ErrorException flatten(@of(x = of(Real), y = of(Real)), (x=1.0,))  # missing field
+    @test_throws ErrorException flatten(@of(x = of(Real)), (x=1.0, y=2.0))  # extra field
     @test_throws ErrorException of(@of(n = of(Int; constant=true)); n=3)          # all fields constant
     @test_throws ErrorException (@of(n = of(Int; constant=true), d = of(Array, n)))()  # missing constant
+    @test_throws ErrorException (@of(n = of(Int; constant=true), d = of(Array, n)))(;
+        n=3, datta=ones(3)
+    )
     @test_throws ErrorException AbstractPPL._create_with_default(
         OfConstantWrapper{OfInt{Nothing,Nothing}}, 0
+    )
+end
+
+@testset "spec validation and concretization regressions" begin
+    @test_throws ErrorException of(Real, 2.0, 1.0)
+    @test_throws ErrorException of(Int, 5, 3)
+    @test_throws ErrorException of(Array, -1)
+    @test_throws ErrorException of(Array, 2.5)
+    @test_throws ErrorException of(Array, String, 2)
+    @test of(Array, ComplexF64, 2) == OfArray{ComplexF64,1,Tuple{2}}  # any Number element
+
+    T = of(Real, :lo, :hi)
+    @test of(T; lo=0.0, hi=1.0) == of(Real, 0.0, 1.0)
+
+    TI = of(Int, :lo, :hi)
+    @test of(TI; lo=1, hi=3) == of(Int, 1, 3)
+    @test of(TI; lo=1.0, hi=3.0) == of(Int, 1, 3)
+    @test_throws ErrorException of(TI; lo=1.5, hi=3.5)
+
+    TA = @of(
+        a = of(Int; constant=true), b = of(Int; constant=true), data = of(Array, a + 1, b)
+    )
+    CTA = of(TA; b=3)
+    data_type = get_types(CTA).parameters[2]
+    @test has_symbolic_dims(CTA)
+    @test :a in get_unresolved_symbols(CTA)
+    @test get_dims(data_type) == (SymbolicExpr{(:+, :a, 1)}, 3)
+
+    TC = @of(n = of(Int, 1, 5; constant=true), data = of(Array, n))
+    @test_throws ErrorException of(TC; n=100)
+    @test_throws ErrorException TC(; n=100)
+    @test get_dims(get_types(of(TC; n=3)).parameters[1]) == (3,)
+
+    Inner = @of(n = of(Int; constant=true))
+    Outer = @of(inner = Inner, x = of(Real))
+    @test of(Outer; n=2) == @of(x = of(Real))
+end
+
+@testset "@of reference semantics are constant-only and ordered" begin
+    @test_throws ErrorException macroexpand(
+        @__MODULE__, :(@of(lo = of(Real), x = of(Real, lo, nothing)))
+    )
+    @test_throws ErrorException macroexpand(
+        @__MODULE__, :(@of(data = of(Array, n), n = of(Int; constant=true)))
+    )
+    @test_throws ErrorException macroexpand(
+        @__MODULE__, :(@of(lo = of(Real), x = of(Real, :lo, nothing)))
+    )
+    @test_throws ErrorException macroexpand(
+        @__MODULE__, :(@of(data = of(Array, :n), n = of(Int; constant=true)))
+    )
+    @test_throws ErrorException macroexpand(
+        @__MODULE__,
+        :(@of(lo = of(Real; constant=true), x = of(Real, max(lo, 0.0), nothing))),
     )
 end
 

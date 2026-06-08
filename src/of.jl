@@ -7,8 +7,8 @@ Abstract base type for all types in the `of` type system.
 
 The `of` type system provides a declarative way to specify parameter types for 
 probabilistic programming. All `of` types encode their specifications (dimensions, 
-bounds, etc.) in type parameters, allowing them to be used as actual Julia types 
-in type annotations.
+bounds, etc.) in type parameters so downstream libraries can use them as schema
+types in their own annotation systems.
 
 # Subtypes
 - `OfReal{T,Lower,Upper}`: Bounded or unbounded floating-point numbers
@@ -27,8 +27,7 @@ abstract type OfType end
 
 Wrapper type for symbolic references in bounds and dimensions.
 
-Used internally to encode references to other fields when specifying bounds or dimensions 
-that depend on constant fields or other parameters. For example, when using `@of(n=of(Int; constant=true), 
+Used internally to encode references to earlier constant fields when specifying bounds or dimensions. For example, when using `@of(n=of(Int; constant=true), 
 data=of(Array, n, 2))`, the reference to `n` in the array dimension is encoded as 
 `SymbolicRef{:n}`.
 
@@ -45,7 +44,7 @@ struct SymbolicRef{S} end
 
 Wrapper type for symbolic expressions in dimensions.
 
-Used internally to encode arithmetic expressions involving constant fields or other parameters. For example,
+Used internally to encode arithmetic expressions involving earlier constant fields. For example,
 when using `@of(n=of(Int; constant=true), padded=of(Array, n+1, n+1))`, the expression 
 `n+1` is encoded as `SymbolicExpr{(:+, :n, 1)}`.
 
@@ -216,6 +215,47 @@ _is_symbolic_dim(d) = d isa Symbol || (d isa Type && d <: SymbolicExpr)
 # A bound is symbolic when it is a `SymbolicRef` or `SymbolicExpr` parameter.
 _is_symbolic_bound(b) = b isa Type && (b <: SymbolicRef || b <: SymbolicExpr)
 
+_is_symbolic_expr_tuple(x) = x isa Tuple && !isempty(x) && x[1] in (:+, :-, :*, :/)
+
+function _assert_valid_dimension(d)
+    if _is_symbolic_dim(d)
+        return nothing
+    end
+    d isa Integer || error("Array dimension $d must be an integer or symbolic reference.")
+    d >= 0 || error("Array dimension $d must be nonnegative.")
+    return nothing
+end
+
+function _assert_valid_dimensions(dims)
+    foreach(_assert_valid_dimension, dims)
+    return nothing
+end
+
+function _assert_valid_bound_spec(lower, upper; kind::AbstractString="bounds")
+    if !_is_symbolic_bound(lower) && !_is_symbolic_bound(upper)
+        lo = type_to_bound(lower)
+        hi = type_to_bound(upper)
+        if !isnothing(lo) && !isnothing(hi) && lo > hi
+            error("Invalid $kind: lower bound $lo is greater than upper bound $hi.")
+        end
+    end
+    return nothing
+end
+
+function _normalise_int_bound(bound)
+    if bound === Nothing || _is_symbolic_bound(bound)
+        return bound
+    end
+    value = type_to_bound(bound)
+    if value isa Integer
+        return Int(value)
+    elseif value isa Real && isinteger(value)
+        return Int(value)
+    else
+        error("Int bound $value must be an integer or symbolic reference.")
+    end
+end
+
 # Fail fast (with a clear message) before a symbolic bound reaches arithmetic/comparison.
 function _assert_concrete_bounds(::Type{T}) where {T<:OfType}
     if _is_symbolic_bound(get_lower(T)) || _is_symbolic_bound(get_upper(T))
@@ -243,7 +283,26 @@ type_to_bound(::Type{SymbolicRef{S}}) where {S} = S
 type_to_bound(s::Symbol) = s
 type_to_bound(x::Real) = x
 
-function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
+function _eval_symbolic_op(op, args)
+    if op == :+
+        return sum(args)
+    elseif op == :-
+        length(args) in (1, 2) || error("Subtraction requires 1 or 2 arguments")
+        return length(args) == 1 ? -args[1] : args[1] - args[2]
+    elseif op == :*
+        return prod(args)
+    elseif op == :/
+        length(args) == 2 || error("Division requires exactly 2 arguments")
+        result = args[1] / args[2]
+        # Array dimensions must be integers; guard the result itself, not just the dividend.
+        isinteger(result) || error(
+            "Division $(args[1]) / $(args[2]) = $result is not an integer. Array dimensions must be integers.",
+        )
+        return Int(result)
+    end
+end
+
+function _check_symbolic_expr_header(expr::Tuple)
     if length(expr) < 2
         error("Invalid expression format: $expr")
     end
@@ -252,6 +311,11 @@ function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
     if !(op in (:+, :-, :*, :/))
         error("Unsupported operation: $op. Only +, -, *, / are supported.")
     end
+    return op
+end
+
+function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
+    op = _check_symbolic_expr_header(expr)
 
     args = map(expr[2:end]) do arg
         if arg isa Symbol
@@ -267,21 +331,33 @@ function eval_symbolic_expr(expr::Tuple, bindings::NamedTuple)
         end
     end
 
-    if op == :+
-        return sum(args)
-    elseif op == :-
-        return length(args) == 1 ? -args[1] : args[1] - args[2]
-    elseif op == :*
-        return prod(args)
-    elseif op == :/
-        length(args) == 2 || error("Division requires exactly 2 arguments")
-        result = args[1] / args[2]
-        # Array dimensions must be integers; guard the result itself, not just the dividend.
-        isinteger(result) || error(
-            "Division $(args[1]) / $(args[2]) = $result is not an integer. Array dimensions must be integers.",
-        )
-        return Int(result)
+    return _eval_symbolic_op(op, args)
+end
+
+function substitute_symbolic_expr(expr::Tuple, bindings::NamedTuple)
+    op = _check_symbolic_expr_header(expr)
+    unresolved = false
+
+    args = map(expr[2:end]) do arg
+        if arg isa Symbol
+            if haskey(bindings, arg)
+                bindings[arg]
+            else
+                unresolved = true
+                arg
+            end
+        elseif _is_symbolic_expr_tuple(arg)
+            substituted = substitute_symbolic_expr(arg, bindings)
+            if _is_symbolic_expr_tuple(substituted)
+                unresolved = true
+            end
+            substituted
+        else
+            arg
+        end
     end
+
+    return unresolved ? Tuple((op, args...)) : _eval_symbolic_op(op, args)
 end
 
 # Resolve bound references during type concretization
@@ -302,8 +378,12 @@ function resolve_bound(::Type{SymbolicRef{S}}, replacements::NamedTuple) where {
 end
 
 function resolve_bound(::Type{SymbolicExpr{E}}, replacements::NamedTuple) where {E}
-    evaluated = eval_symbolic_expr(E, replacements)
-    return bound_to_type(evaluated)
+    evaluated = substitute_symbolic_expr(E, replacements)
+    return if _is_symbolic_expr_tuple(evaluated)
+        SymbolicExpr{evaluated}
+    else
+        bound_to_type(evaluated)
+    end
 end
 
 function resolve_bound(T::Type, ::NamedTuple)
@@ -317,6 +397,7 @@ end
 function process_array_dimensions(dims)
     # Unwrap quoted field references; keep everything else (including SymbolicExpr{...}) as-is.
     processed_dims = map(d -> d isa QuoteNode ? d.value : d, dims)
+    _assert_valid_dimensions(processed_dims)
     if length(processed_dims) == 1
         Tuple{processed_dims[1]}
     else
@@ -335,6 +416,7 @@ function process_bounds(lower, upper)
     else
         bound_to_type(upper)
     end
+    _assert_valid_bound_spec(L, U)
     return L, U
 end
 
@@ -348,7 +430,7 @@ Create an `OfType` specification from various inputs.
 ## Arrays
 ```julia
 of(Array, dims...)              # Float64 array with given dimensions
-of(Array, T, dims...)           # Array with element type T and given dimensions
+of(Array, T, dims...)           # Array with numeric element type T and given dimensions
 ```
 
 ## Real Numbers
@@ -432,6 +514,7 @@ function of(::Type{Array}, T::Type, dims...; constant::Bool=false)
     if constant
         error("constant=true is only supported for Int and Real types, not Array")
     end
+    T <: Number || error("Array element type must be a subtype of Number, got $T")
     dims_tuple = process_array_dimensions(dims)
     return OfArray{T,length(dims),dims_tuple}
 end
@@ -528,9 +611,13 @@ function resolve_bounded_type(::Type{T}, replacements::NamedTuple) where {T<:OfT
 
     if new_lower !== lower || new_upper !== upper
         if T <: OfReal
+            _assert_valid_bound_spec(new_lower, new_upper)
             elem_type = get_element_type(T)
             return OfReal{elem_type,new_lower,new_upper}
         elseif T <: OfInt
+            new_lower = _normalise_int_bound(new_lower)
+            new_upper = _normalise_int_bound(new_upper)
+            _assert_valid_bound_spec(new_lower, new_upper)
             return OfInt{new_lower,new_upper}
         end
     else
@@ -590,21 +677,48 @@ end
 function _resolve_dimensions(dims, replacements::NamedTuple)
     return map(dims) do d
         if d isa Symbol && haskey(replacements, d)
-            replacements[d]
+            resolved = replacements[d]
+            _assert_valid_dimension(resolved)
+            resolved
         elseif d isa Type && d <: SymbolicExpr
-            # Evaluate the expression
             expr = d.parameters[1]
-            eval_symbolic_expr(expr, replacements)
+            resolved = substitute_symbolic_expr(expr, replacements)
+            if _is_symbolic_expr_tuple(resolved)
+                SymbolicExpr{resolved}
+            else
+                _assert_valid_dimension(resolved)
+                resolved
+            end
         else
             d
         end
     end
 end
 
+function _normalise_constant_replacements(
+    ::Type{OfNamedTuple{Names,Types}}, replacements::NamedTuple
+) where {Names,Types}
+    normalised = (;)
+    for i in 1:length(Names)
+        name = Names[i]
+        field_type = Types.parameters[i]
+        if field_type <: OfConstantWrapper && haskey(replacements, name)
+            wrapped = get_wrapped_type(field_type)
+            resolved = of(wrapped, normalised)
+            has_symbolic_dims(resolved) && error(
+                "Cannot validate constant `$name` while its type still has unresolved symbols.",
+            )
+            value = _validate_leaf(resolved, replacements[name])
+            normalised = merge(normalised, NamedTuple{(name,)}((value,)))
+        end
+    end
+    return merge(replacements, normalised)
+end
+
 function _process_field_for_concretization(
     name::Symbol, field_type::Type, replacements::NamedTuple
 )
-    # Case 1: Constant field that has been resolved - skip it
+    # Case 1: Constant field that has been resolved and validated - skip it
     if field_type <: OfConstantWrapper && haskey(replacements, name)
         return nothing
     end
@@ -624,7 +738,8 @@ function _process_field_for_concretization(
 
     # Case 3: Nested NamedTuple - recursively concretize
     if field_type <: OfNamedTuple
-        return (name, of(field_type, replacements))
+        nested = _concretize_namedtuple(field_type, replacements; allow_empty=true)
+        return isnothing(nested) ? nothing : (name, nested)
     end
 
     # Case 4: Bounded types (Real/Int) with potentially symbolic bounds
@@ -648,7 +763,10 @@ function _process_field_for_concretization(
     return (name, field_type)
 end
 
-function of(::Type{OfNamedTuple{Names,Types}}, replacements::NamedTuple) where {Names,Types}
+function _concretize_namedtuple(
+    ::Type{OfNamedTuple{Names,Types}}, replacements::NamedTuple; allow_empty::Bool=false
+) where {Names,Types}
+    replacements = _normalise_constant_replacements(OfNamedTuple{Names,Types}, replacements)
     processed_fields = []
 
     for i in 1:length(Names)
@@ -664,6 +782,7 @@ function of(::Type{OfNamedTuple{Names,Types}}, replacements::NamedTuple) where {
 
     # Check if any fields remain
     if isempty(processed_fields)
+        allow_empty && return nothing
         error("All fields were constants and have been resolved. No fields remain.")
     end
 
@@ -674,15 +793,31 @@ function of(::Type{OfNamedTuple{Names,Types}}, replacements::NamedTuple) where {
     return OfNamedTuple{Tuple(remaining_names),Tuple{remaining_types...}}
 end
 
+function of(::Type{OfNamedTuple{Names,Types}}, replacements::NamedTuple) where {Names,Types}
+    return _concretize_namedtuple(OfNamedTuple{Names,Types}, replacements)
+end
+
 function of(::Type{OfArray{T,N,D}}, replacements::NamedTuple) where {T,N,D}
     # Replace symbolic dimensions in array types
     dims = get_dims(OfArray{T,N,D})
     new_dims = _resolve_dimensions(dims, replacements)
-    return OfArray{T,N,Tuple{new_dims...}}
+    return of(Array, T, new_dims...)
+end
+
+function of(::Type{OfReal{T,L,U}}, replacements::NamedTuple) where {T,L,U}
+    return resolve_bounded_type(OfReal{T,L,U}, replacements)
+end
+
+function of(::Type{OfInt{L,U}}, replacements::NamedTuple) where {L,U}
+    return resolve_bounded_type(OfInt{L,U}, replacements)
+end
+
+function of(::Type{OfConstantWrapper{T}}, replacements::NamedTuple) where {T}
+    resolved = of(T, replacements)
+    return resolved === T ? OfConstantWrapper{T} : OfConstantWrapper{resolved}
 end
 
 function of(::Type{T}, replacements::NamedTuple) where {T<:OfType}
-    # For other types (OfReal, OfConstantWrapper), just return as-is
     return T
 end
 
@@ -695,9 +830,9 @@ function _create_with_default(::Type{OfArray{T,N,D}}, default_value) where {T,N,
     end
     # Handle missing values specially - create array of Union{T,Missing}
     if default_value === missing
-        return fill(missing, dims...)
+        return fill(missing, dims)
     else
-        return fill(convert(T, default_value), dims...)
+        return fill(convert(T, default_value), dims)
     end
 end
 
@@ -749,6 +884,9 @@ function _create_instance_impl(
     names = get_names(T)
     types = get_types(T)
 
+    unknown = setdiff(collect(keys(kwargs)), collect(names))
+    isempty(unknown) || error("Unknown field(s): $(join(unknown, ", "))")
+
     constants = Dict{Symbol,Any}()
     values = Dict{Symbol,Any}()
 
@@ -788,7 +926,7 @@ function _create_instance_impl(
             try
                 push!(result_values, _validate(field_type, values[name]))
             catch e
-                error("Validation failed for field $name: $(e.msg)")
+                error("Validation failed for field $name: $(sprint(showerror, e))")
             end
         else
             push!(result_values, value_generator(field_type))
@@ -877,10 +1015,10 @@ are automatically converted to symbolic references.
 ```
 
 # Features
-- Direct field references without quoting (e.g., `n` instead of `:n`)
+- Direct references to earlier constant fields without quoting (e.g., `n` instead of `:n`)
 - Support for arithmetic expressions in dimensions (e.g., `n+1`, `2*n`)
 - Automatic conversion to appropriate `OfNamedTuple` type
-- Fields are processed in order, allowing later fields to reference earlier ones
+- Fields are processed in order, allowing later fields to reference earlier constants
 
 # Examples
 ```julia
@@ -936,10 +1074,15 @@ macro of(args...)
     end
 
     processed_fields = Dict{Symbol,Any}()
+    available_constants = Symbol[]
 
-    for (field_name, spec) in fields
-        processed_spec = process_of_spec(spec, field_order)
+    for field_name in field_order
+        spec = fields[field_name]
+        processed_spec = process_of_spec(spec, available_constants, field_order)
         processed_fields[field_name] = processed_spec
+        if is_constant_spec(spec)
+            push!(available_constants, field_name)
+        end
     end
 
     nt_expr = Expr(:tuple)
@@ -947,18 +1090,43 @@ macro of(args...)
         push!(nt_expr.args, Expr(:(=), field_name, processed_fields[field_name]))
     end
 
-    return esc(:(of($nt_expr)))
+    return esc(:($(GlobalRef(@__MODULE__, :of))($nt_expr)))
+end
+
+function is_constant_spec(spec)
+    spec isa Expr || return false
+    spec.head == :call || return false
+    func = spec.args[1]
+    is_of_call = func === :of || (func isa GlobalRef && func.name === :of)
+    is_of_call || return false
+    for arg in spec.args[2:end]
+        if arg isa Expr && arg.head == :parameters
+            any(_is_constant_kw, arg.args) && return true
+        elseif _is_constant_kw(arg)
+            return true
+        end
+    end
+    return false
+end
+
+function _is_constant_kw(arg)
+    return arg isa Expr &&
+           arg.head == :kw &&
+           arg.args[1] === :constant &&
+           arg.args[2] === true
 end
 
 # Process an of specification, converting field references to symbols
-function process_of_spec(spec::Expr, available_fields::Vector{Symbol})
+function process_of_spec(
+    spec::Expr, available_constants::Vector{Symbol}, all_fields::Vector{Symbol}
+)
     if spec.head == :call && length(spec.args) >= 1
         func = spec.args[1]
 
         # Check if this is an of(...) call
-        if func == :of
+        if func === :of || (func isa GlobalRef && func.name === :of)
             # Process the arguments
-            new_args = Any[func]
+            new_args = Any[GlobalRef(@__MODULE__, :of)]
 
             # Separate positional and keyword arguments
             pos_args = []
@@ -980,7 +1148,7 @@ function process_of_spec(spec::Expr, available_fields::Vector{Symbol})
 
             # Process positional arguments
             for arg in pos_args
-                processed_arg = process_dimension_arg(arg, available_fields)
+                processed_arg = process_dimension_arg(arg, available_constants, all_fields)
                 push!(new_args, processed_arg)
             end
 
@@ -993,7 +1161,11 @@ function process_of_spec(spec::Expr, available_fields::Vector{Symbol})
         else
             # Not an of call, process recursively
             return Expr(
-                spec.head, [process_of_spec(arg, available_fields) for arg in spec.args]...
+                spec.head,
+                [
+                    process_of_spec(arg, available_constants, all_fields) for
+                    arg in spec.args
+                ]...,
             )
         end
     else
@@ -1001,18 +1173,47 @@ function process_of_spec(spec::Expr, available_fields::Vector{Symbol})
     end
 end
 
-process_of_spec(x, ::Vector{Symbol}) = x
+process_of_spec(x, ::Vector{Symbol}, ::Vector{Symbol}) = x
 
 # Process a dimension/bound argument, converting field references to symbols
-function process_dimension_arg(arg, available_fields::Vector{Symbol})
-    if arg isa Symbol && arg in available_fields
+function process_dimension_arg(
+    arg, available_constants::Vector{Symbol}, all_fields::Vector{Symbol}
+)
+    if arg isa Symbol && arg in available_constants
         # Convert field reference to symbol
         return QuoteNode(arg)
+    elseif arg isa Symbol && arg in all_fields
+        error(
+            "Field reference `$arg` is not available here. Symbolic dimensions and bounds may only refer to earlier fields declared with constant=true.",
+        )
+    elseif arg isa QuoteNode && arg.value isa Symbol && arg.value in available_constants
+        return arg
+    elseif arg isa QuoteNode && arg.value isa Symbol && arg.value in all_fields
+        error(
+            "Field reference `$(arg.value)` is not available here. Symbolic dimensions and bounds may only refer to earlier fields declared with constant=true.",
+        )
     elseif arg isa Expr
-        return process_expression_refs(arg, available_fields)
+        return process_expression_refs(arg, available_constants, all_fields)
     else
         return arg
     end
+end
+
+function _reject_field_refs_in_unsupported_expr(x, all_fields::Vector{Symbol})
+    if x isa Symbol && x in all_fields
+        error(
+            "Field reference `$x` appears in an unsupported expression. Symbolic references may only be bare symbols or use +, -, *, / arithmetic.",
+        )
+    elseif x isa QuoteNode && x.value isa Symbol && x.value in all_fields
+        error(
+            "Field reference `$(x.value)` appears in an unsupported expression. Symbolic references may only be bare symbols or use +, -, *, / arithmetic.",
+        )
+    elseif x isa Expr
+        for arg in x.args
+            _reject_field_refs_in_unsupported_expr(arg, all_fields)
+        end
+    end
+    return nothing
 end
 
 # Check if a processed expression is a `SymbolicExpr{...}` type. The head may be the bare
@@ -1024,11 +1225,17 @@ function _is_symbolic_expr_type(expr::Expr)
 end
 
 # Process a single argument in an arithmetic expression
-function _process_arithmetic_arg(arg, available_fields::Vector{Symbol})
-    if arg isa Symbol && arg in available_fields
+function _process_arithmetic_arg(
+    arg, available_constants::Vector{Symbol}, all_fields::Vector{Symbol}
+)
+    if arg isa Symbol && arg in available_constants
         return (QuoteNode(arg), true)
+    elseif arg isa Symbol && arg in all_fields
+        error(
+            "Field reference `$arg` is not available here. Symbolic dimensions and bounds may only refer to earlier fields declared with constant=true.",
+        )
     elseif arg isa Expr
-        processed = process_expression_refs(arg, available_fields)
+        processed = process_expression_refs(arg, available_constants, all_fields)
         if _is_symbolic_expr_type(processed)
             # Extract the tuple from SymbolicExpr{...}
             return (processed.args[2], true)
@@ -1041,7 +1248,9 @@ function _process_arithmetic_arg(arg, available_fields::Vector{Symbol})
 end
 
 # Process an arithmetic expression, converting field references to symbols
-function _process_arithmetic_expr(expr::Expr, available_fields::Vector{Symbol})
+function _process_arithmetic_expr(
+    expr::Expr, available_constants::Vector{Symbol}, all_fields::Vector{Symbol}
+)
     op = expr.args[1]
 
     # Build tuple representation: (op, arg1, arg2, ...)
@@ -1049,7 +1258,9 @@ function _process_arithmetic_expr(expr::Expr, available_fields::Vector{Symbol})
     has_field_ref = false
 
     for arg in expr.args[2:end]
-        processed_arg, has_ref = _process_arithmetic_arg(arg, available_fields)
+        processed_arg, has_ref = _process_arithmetic_arg(
+            arg, available_constants, all_fields
+        )
         push!(tuple_args, processed_arg)
         has_field_ref |= has_ref
     end
@@ -1065,15 +1276,18 @@ function _process_arithmetic_expr(expr::Expr, available_fields::Vector{Symbol})
 end
 
 # Process an expression, converting field references to symbols in expressions
-function process_expression_refs(expr::Expr, available_fields::Vector{Symbol})
+function process_expression_refs(
+    expr::Expr, available_constants::Vector{Symbol}, all_fields::Vector{Symbol}
+)
     # Check if this is an arithmetic call expression
     if expr.head == :call && length(expr.args) >= 2
         op = expr.args[1]
         if op in [:+, :-, :*, :/]
-            return _process_arithmetic_expr(expr, available_fields)
+            return _process_arithmetic_expr(expr, available_constants, all_fields)
         end
     end
 
+    _reject_field_refs_in_unsupported_expr(expr, all_fields)
     return expr
 end
 
@@ -1125,7 +1339,7 @@ function Base.rand(rng::AbstractRNG, ::Type{OfArray{T,N,D}}) where {T,N,D}
     any(_is_symbolic_dim, dims) && error(
         "Cannot generate random array with symbolic dimensions. Resolve them with of(T; name=value) first.",
     )
-    return rand(rng, T, dims...)
+    return rand(rng, T, dims)
 end
 Base.rand(::Type{OfArray{T,N,D}}) where {T,N,D} = rand(default_rng(), OfArray{T,N,D})
 
@@ -1232,7 +1446,7 @@ function Base.zero(::Type{OfArray{T,N,D}}) where {T,N,D}
     any(_is_symbolic_dim, dims) && error(
         "Cannot create zero array with symbolic dimensions. Resolve them with of(T; name=value) first.",
     )
-    return zeros(T, dims...)
+    return zeros(T, dims)
 end
 
 function Base.zero(::Type{OfReal{T,L,U}}) where {T,L,U}
@@ -1456,6 +1670,9 @@ end
 
 # Validate that a value is within bounds. `kind` only labels the error message.
 function validate_bounds(value, lower, upper; kind::AbstractString="value")
+    if !isnothing(lower) && !isnothing(upper) && lower > upper
+        error("Invalid $kind bounds: lower bound $lower is greater than upper bound $upper")
+    end
     if !isnothing(lower) && value < lower
         error("$kind $value is below lower bound $lower")
     end
@@ -1531,11 +1748,13 @@ function _validate_container(::Type{OfNamedTuple{Names,Types}}, value) where {Na
             error("Missing required field: $name. Got fields: $(join(value_names, ", "))")
         end
     end
+    extra = setdiff(collect(value_names), collect(Names))
+    isempty(extra) || error("Unexpected field(s): $(join(extra, ", "))")
 
     vals = ntuple(length(Names)) do i
         field_name = Names[i]
         field_type = Types.parameters[i]
-        _validate(field_type, getproperty(value, field_name))
+        return _validate(field_type, getproperty(value, field_name))
     end
     return NamedTuple{Names}(vals)
 end
@@ -1707,7 +1926,7 @@ end
 _unflat_missing(::Type{<:OfReal}) = missing
 _unflat_missing(::Type{<:OfInt}) = missing
 function _unflat_missing(::Type{OfArray{T,N,D}}) where {T,N,D}
-    return fill(missing, get_dims(OfArray{T,N,D})...)
+    return fill(missing, get_dims(OfArray{T,N,D}))
 end
 @generated function _unflat_missing(::Type{OfNamedTuple{Names,Types}}) where {Names,Types}
     vals = [:(_unflat_missing($P)) for P in Types.parameters]
@@ -1725,7 +1944,7 @@ function format_bound(bound_type, constant_fields, use_color)
         sym = type_to_bound(bound_type)
         if sym in constant_fields && use_color
             return sprint() do io_inner
-                printstyled(io_inner, string(sym); color=:cyan)
+                return printstyled(io_inner, string(sym); color=:cyan)
             end
         else
             return string(sym)

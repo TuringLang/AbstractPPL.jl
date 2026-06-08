@@ -6,7 +6,7 @@ The `of` type system provides a declarative way to specify parameter **types** f
 probabilistic programming. It is a lightweight, framework-agnostic type-annotation
 system that:
 
-  - Returns actual Julia types (not instances) that can be used in type annotations
+  - Returns schema types (not instances) for downstream annotation systems
   - Encodes specifications (dimensions, bounds) in type parameters
   - Provides utilities for parameter manipulation (`rand`, `zero`, `flatten`, `unflatten`)
 
@@ -37,7 +37,7 @@ nothing # hide
 The `of` function returns types with specifications encoded in type parameters:
 
   - `of(Array, dims...)` → `OfArray{Float64, N, (dim1, dim2, ...)}` - Arrays with specified dimensions
-  - `of(Array, T, dims...)` → `OfArray{T, N, (dim1, dim2, ...)}` - Typed arrays
+  - `of(Array, T, dims...)` → `OfArray{T, N, (dim1, dim2, ...)}` - Typed numeric arrays (`T <: Number`)
   - `of(Float64)` → `OfReal{Float64, Nothing, Nothing}` - Unbounded 64-bit floating point numbers
   - `of(Float32)` → `OfReal{Float32, Nothing, Nothing}` - Unbounded 32-bit floating point numbers
   - `of(Float64, lower, upper)` → `OfReal{Float64, lower, upper}` - Bounded 64-bit floats
@@ -69,10 +69,10 @@ The system encodes extra useful information into type parameters:
 
   - **Dimensions**: Stored as tuple type parameters (e.g., `(3, 4)` for a 3×4 matrix)
   - **Bounds**: Numeric literals stored directly as type parameters (e.g., `0.0`, `1.0`), or `Nothing` for unbounded
-  - **Symbolic references**: Encoded using `SymbolicRef{:symbol}` for referencing other fields
+  - **Symbolic references**: Encoded using `SymbolicRef{:symbol}` for referencing earlier constant fields
   - **Arithmetic expressions**: Encoded using `SymbolicExpr{expr}` for expressions like `n+1`, `2*n`, etc. Division operations must result in integers for array dimensions.
   - **Field names**: Stored as a tuple of symbols in `OfNamedTuple`
-  - **Element types**: Preserved as type parameters for arrays and nested structures
+  - **Element types**: Preserved as type parameters for numeric arrays and nested structures
 
 ### 3. Operations on Types
 
@@ -94,8 +94,9 @@ bring them into scope with `using AbstractPPL: flatten, unflatten`.
 
 ### 4. The `@of` Macro
 
-The `@of` macro provides cleaner syntax by automatically converting field references to
-symbols. Here `n` in the array dimension is automatically converted to the symbol `:n`:
+The `@of` macro provides cleaner syntax by automatically converting references to earlier
+constant fields to symbols. Here `n` in the array dimension is automatically converted to
+the symbol `:n`:
 
 ```@example of
 T = @of(
@@ -286,11 +287,11 @@ representation and must be resolved with `of(T; kwargs...)` before flattening.
 
 ## Use in models
 
-Because `of` returns ordinary Julia types, the result can be used directly as a type
-annotation. Downstream packages build on this: JuliaBUGS, for instance, accepts an `of`
-type as the parameter annotation of a `@model`'s argument destructuring, e.g.
-`(; mu, beta, sigma)::ParamsType`. See the JuliaBUGS documentation for the modelling
-integration.
+Because `of` returns schema types, downstream packages can use those types in their own
+annotation systems. JuliaBUGS, for instance, accepts an `of` type as the parameter
+annotation of a `@model`'s argument destructuring, e.g. `(; mu, beta, sigma)::ParamsType`.
+These schema types are not supertypes of raw values, so `1.0 isa of(Float64)` is false;
+see the downstream package documentation for the modelling integration.
 
 ## API Reference
 
