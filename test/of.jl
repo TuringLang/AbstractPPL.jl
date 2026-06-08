@@ -1033,20 +1033,20 @@ end
 end
 
 @testset "value validation rejects mismatches" begin
-    @test_throws ErrorException (@of(x=of(Real)))(; x="not real")
-    @test_throws ErrorException (@of(i=of(Int)))(; i=3.5)   # non-integer Real
-    @test_throws ErrorException (@of(i=of(Int)))(; i="x")   # non-Real
-    @test (@of(i=of(Int)))(; i=3.0).i === 3                  # whole-number Real converts
-    @test_throws ErrorException flatten(@of(x=of(Real), y=of(Real)), (x=1.0,))  # missing field
-    @test_throws ErrorException of(@of(n=of(Int; constant=true)); n=3)          # all fields constant
-    @test_throws ErrorException (@of(n=of(Int; constant=true), d=of(Array, n)))()  # missing constant
+    @test_throws ErrorException (@of(x = of(Real)))(; x="not real")
+    @test_throws ErrorException (@of(i = of(Int)))(; i=3.5)   # non-integer Real
+    @test_throws ErrorException (@of(i = of(Int)))(; i="x")   # non-Real
+    @test (@of(i = of(Int)))(; i=3.0).i === 3                  # whole-number Real converts
+    @test_throws ErrorException flatten(@of(x = of(Real), y = of(Real)), (x=1.0,))  # missing field
+    @test_throws ErrorException of(@of(n = of(Int; constant=true)); n=3)          # all fields constant
+    @test_throws ErrorException (@of(n = of(Int; constant=true), d = of(Array, n)))()  # missing constant
     @test_throws ErrorException AbstractPPL._create_with_default(
         OfConstantWrapper{OfInt{Nothing,Nothing}}, 0
     )
 end
 
 @testset "default_value initialises non-constant fields" begin
-    T = @of(n=of(Int; constant=true), x=of(Real), arr=of(Array, n))
+    T = @of(n = of(Int; constant=true), x = of(Real), arr = of(Array, n))
     inst = T(missing; n=2)
     @test inst.x === missing
     @test all(ismissing, inst.arr)
@@ -1064,22 +1064,22 @@ end
     @test :n in syms
     @test :s in syms
     @test has_symbolic_dims(T)
-    @test !has_symbolic_dims(@of(x=of(Real), y=of(Array, 2, 2)))
+    @test !has_symbolic_dims(@of(x = of(Real), y = of(Array, 2, 2)))
     @test get_unresolved_symbols(of(Int; constant=true)) isa Vector{Symbol}
 end
 
 @testset "symbolic bounds resolve under concretization" begin
-    TR = @of(n=of(Int; constant=true), r=of(Real, n, nothing))
+    TR = @of(n = of(Int; constant=true), r = of(Real, n, nothing))
     @test get_lower(get_types(of(TR; n=2)).parameters[1]) == 2
-    TI = @of(m=of(Int; constant=true), k=of(Int, m, nothing))
+    TI = @of(m = of(Int; constant=true), k = of(Int, m, nothing))
     @test get_lower(get_types(of(TI; m=4)).parameters[1]) == 4
-    TE = @of(n=of(Int; constant=true), e=of(Real, n + 1, nothing))
+    TE = @of(n = of(Int; constant=true), e = of(Real, n + 1, nothing))
     @test get_lower(get_types(of(TE; n=5)).parameters[1]) == 6
     @test has_symbolic_dims(of(TR))   # nothing resolved -> reference is retained
 end
 
 @testset "unflatten with missing builds a missing-filled structure" begin
-    P = @of(x=of(Real), a=of(Array, 2, 2))
+    P = @of(x = of(Real), a = of(Array, 2, 2))
     um = unflatten(P, missing)
     @test um.x === missing
     @test all(ismissing, um.a)
@@ -1097,7 +1097,7 @@ end
 
 @testset "show covers colored, symbolic, and fallback paths" begin
     # Non-color array with symbolic and arithmetic dimensions.
-    s = sprint(show, @of(n=of(Int; constant=true), a=of(Array, n, n + 1)))
+    s = sprint(show, @of(n = of(Int; constant=true), a = of(Array, n, n + 1)))
     @test occursin("n", s)
     @test occursin("n + 1", s)
 
@@ -1158,7 +1158,7 @@ end
 end
 
 @testset "missing default fills integer fields too" begin
-    T = @of(n=of(Int; constant=true), i=of(Int), arr=of(Array, n))
+    T = @of(n = of(Int; constant=true), i = of(Int), arr = of(Array, n))
     inst = T(missing; n=2)
     @test inst.i === missing
     @test all(ismissing, inst.arr)
@@ -1186,7 +1186,7 @@ end
 end
 
 @testset "nested arithmetic dimensions collect inner symbols" begin
-    T = @of(n=of(Int; constant=true), m=of(Array, (n + 1) * 2))
+    T = @of(n = of(Int; constant=true), m = of(Array, (n + 1) * 2))
     @test :n in get_unresolved_symbols(T)
     @test get_dims(get_types(of(T; n=3)).parameters[1]) == (8,)
 end
