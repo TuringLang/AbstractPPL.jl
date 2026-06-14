@@ -95,4 +95,15 @@ export AbstractOptic,
 using Accessors: set
 export set
 
+include("of.jl")
+export of, @of
+@static if VERSION >= v"1.11.0"
+    eval(
+        Meta.parse(
+            "public OfType, OfReal, OfInt, OfArray, OfNamedTuple, OfConstantWrapper, " *
+            "flatten, unflatten",
+        ),
+    )
+end
+
 end # module

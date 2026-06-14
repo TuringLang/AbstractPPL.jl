@@ -16,6 +16,7 @@ const GROUP = get(ENV, "GROUP", "All")
         include("varname/hasvalue.jl")
         include("varname/leaves.jl")
         include("varname/serialize.jl")
+        include("of.jl")
     end
 
     if GROUP == "All" || GROUP == "Doctests"

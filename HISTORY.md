@@ -1,3 +1,17 @@
+## 0.15.3
+
+Added the `of` type system: a self-contained, declarative way to specify the shape, element type, and support of model variables. Construct specifications with the exported `of` function or the exported `@of` macro:
+
+```julia
+using AbstractPPL
+s = of(Real, 0, 1)                       # a real in [0, 1]
+RegressionParams = @of(
+    y = of(Array, Float64, 100), beta = of(Array, Float64, 3), sigma = of(Real, 0, nothing),
+)
+```
+
+`of`-types support `rand`/`zero` (drawing or zeroing a value of the declared shape) and `size`/`length` (querying the declared shape), and can be `flatten`ed to / `unflatten`ed from a flat numeric vector. `rand` accepts an optional `AbstractRNG` for reproducible draws. `flatten` returns a vector whose element type is the promotion of the declared leaf types, and `unflatten` is automatic-differentiation transparent (float leaves take `promote_type(declared, eltype(flat))`, so `ForwardDiff.Dual` numbers flow through); both are type-stable. These are narrow methods dispatched on AbstractPPL-owned `OfType` subtypes. The supporting types (`OfType` and its subtypes) and the inspection/`flatten`/`unflatten` helpers are marked `public` for downstream use without being exported.
+
 ## 0.15.2
 
 Added `AbstractPPLForwardDiffExt`, a direct ForwardDiff path for `AutoForwardDiff` (gradient, Jacobian, Hessian, `context`, chunk size, custom `tag`).
