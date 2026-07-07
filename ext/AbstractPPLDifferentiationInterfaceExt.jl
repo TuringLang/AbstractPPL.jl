@@ -7,10 +7,10 @@ using DifferentiationInterface: DifferentiationInterface as DI
 
 # AD target used by every DI cache. `Vararg{Any,N}` with a free `N` forces
 # specialization on the trailing arity (a bare `Vararg{Any}` would skip it).
-# DI invokes this as `_call_evaluator(x, f, c1, …, cN)` on the constants path,
-# and as `_call_evaluator(x, evaluator)` (via `Fix2`) on the closure path —
+# DI invokes this as `_di_call(x, f, c1, …, cN)` on the constants path,
+# and as `_di_call(x, evaluator)` (via `Fix2`) on the closure path —
 # empty `ctx` then makes the splat a no-op.
-@inline _call_evaluator(x, f::F, ctx::Vararg{Any,N}) where {F,N} = f(x, ctx...)
+@inline _di_call(x, f::F, ctx::Vararg{Any,N}) where {F,N} = f(x, ctx...)
 
 # `Mode` tags the call shape:
 #   * `:closure` — compiled-tape ReverseDiff: target is a `Fix2` closure; the
@@ -67,10 +67,10 @@ end
 # `constants == ()` and the splat at every prep/call site collapses to nothing,
 # letting prep and call sites share one shape regardless of mode.
 function _di_call_shape(::AutoReverseDiff{true}, evaluator)
-    return Base.Fix2(_call_evaluator, evaluator), Val(:closure), ()
+    return Base.Fix2(_di_call, evaluator), Val(:closure), ()
 end
 function _di_call_shape(::AbstractADType, evaluator)
-    return _call_evaluator,
+    return _di_call,
     Val(length(evaluator.context)),
     (DI.Constant(evaluator.f), map(DI.Constant, evaluator.context)...)
 end
@@ -100,9 +100,7 @@ function AbstractPPL.prepare(
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
         if length(x) == 0
-            cache = DIHessianCache(
-                _call_evaluator, nothing, nothing, nothing, nothing, mode_empty
-            )
+            cache = DIHessianCache(_di_call, nothing, nothing, nothing, nothing, mode_empty)
             return Prepared(adtype, evaluator, cache, Val(2))
         end
         # Build both gradient and Hessian preps against the same target so
@@ -128,9 +126,9 @@ function AbstractPPL.prepare(
     end
     if length(x) == 0
         cache = if arity === :scalar
-            DIGradientCache(_call_evaluator, nothing, mode_empty)
+            DIGradientCache(_di_call, nothing, mode_empty)
         else
-            DIJacobianCache(_call_evaluator, nothing, mode_empty)
+            DIJacobianCache(_di_call, nothing, mode_empty)
         end
         return Prepared(adtype, evaluator, cache)
     end
@@ -148,17 +146,37 @@ end
 # the `map` splat to nothing.
 const _GradientCapable = Union{DIGradientCache,DIHessianCache}
 
+# Call-time context override (issue #167) resolves via `Evaluators._resolve_context`.
+# Context is threaded as constants whose *values* are read at call time, so an
+# override of matching types/shapes just swaps those values — no re-prepare.
+
+# Compiled-tape ReverseDiff bakes context into its tape, so a call-time override
+# can't apply on either closure reject path (gradient and Hessian).
+function _throw_compiled_rd_override_unsupported()
+    throw(
+        ArgumentError(
+            "Call-time `context` override is not supported for compiled-tape " *
+            "ReverseDiff, which bakes the context into its tape. Re-`prepare` " *
+            "with the new context instead.",
+        ),
+    )
+end
+
 @inline _di_value_and_gradient(
-    c::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, ad, x, _
+    c::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, ad, x, _eval, ::Nothing
 ) = DI.value_and_gradient(c.target, c.gradient_prep, _gradient_adtype(ad), x)
-@inline _di_value_and_gradient(c::_GradientCapable, ad, x, eval) = DI.value_and_gradient(
-    c.target,
-    c.gradient_prep,
-    _gradient_adtype(ad),
-    x,
-    DI.Constant(eval.f),
-    map(DI.Constant, eval.context)...,
-)
+@inline _di_value_and_gradient(
+    ::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, _ad, _x, _eval, ::Tuple
+) = _throw_compiled_rd_override_unsupported()
+@inline _di_value_and_gradient(c::_GradientCapable, ad, x, eval, context) =
+    DI.value_and_gradient(
+        c.target,
+        c.gradient_prep,
+        _gradient_adtype(ad),
+        x,
+        DI.Constant(eval.f),
+        map(DI.Constant, Evaluators._resolve_context(eval, context))...,
+    )
 
 @inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _) =
     DI.value_and_jacobian(c.target, c.jacobian_prep, ad, x)
@@ -171,9 +189,13 @@ const _GradientCapable = Union{DIGradientCache,DIHessianCache}
     map(DI.Constant, eval.context)...,
 )
 
-@inline _di_value_gradient_and_hessian(c::DIHessianCache{:closure}, ad, x, _) =
-    DI.value_gradient_and_hessian!(c.target, c.grad_buf, c.hess_buf, c.hessian_prep, ad, x)
-@inline _di_value_gradient_and_hessian(c::DIHessianCache, ad, x, eval) =
+@inline _di_value_gradient_and_hessian(
+    c::DIHessianCache{:closure}, ad, x, _eval, ::Nothing
+) = DI.value_gradient_and_hessian!(c.target, c.grad_buf, c.hess_buf, c.hessian_prep, ad, x)
+@inline _di_value_gradient_and_hessian(
+    ::DIHessianCache{:closure}, _ad, _x, _eval, ::Tuple
+) = _throw_compiled_rd_override_unsupported()
+@inline _di_value_gradient_and_hessian(c::DIHessianCache, ad, x, eval, context) =
     DI.value_gradient_and_hessian!(
         c.target,
         c.grad_buf,
@@ -182,7 +204,7 @@ const _GradientCapable = Union{DIGradientCache,DIHessianCache}
         ad,
         x,
         DI.Constant(eval.f),
-        map(DI.Constant, eval.context)...,
+        map(DI.Constant, Evaluators._resolve_context(eval, context))...,
     )
 
 # `value_and_gradient!!`: works on both `DIGradientCache` (order=1 scalar) and
@@ -194,22 +216,26 @@ const _GradientCapable = Union{DIGradientCache,DIHessianCache}
         <:VectorEvaluator,
         <:Union{DIGradientCache{<:Any,<:Any,Nothing},DIHessianCache{<:Any,<:Any,Nothing}},
     },
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return (p.evaluator(x), T[])
+    return (Evaluators._evaluate_with_context(p.evaluator, x, context), T[])
 end
 
 @inline function AbstractPPL.value_and_gradient!!(
-    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:_GradientCapable}, x::AbstractVector{T}
+    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:_GradientCapable},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return _di_value_and_gradient(p.cache, p.adtype, x, p.evaluator)
+    return _di_value_and_gradient(p.cache, p.adtype, x, p.evaluator, context)
 end
 
 @inline function AbstractPPL.value_and_gradient!!(
     ::Prepared{<:AbstractADType,<:VectorEvaluator,<:DIJacobianCache},
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_gradient_needs_scalar()
 end
@@ -241,22 +267,28 @@ end
     p::Prepared{
         <:AbstractADType,<:VectorEvaluator,<:DIHessianCache{<:Any,<:Any,<:Any,Nothing}
     },
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return (p.evaluator(x), T[], similar(x, 0, 0))
+    return (
+        Evaluators._evaluate_with_context(p.evaluator, x, context), T[], similar(x, 0, 0)
+    )
 end
 
 @inline function AbstractPPL.value_gradient_and_hessian!!(
-    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DIHessianCache}, x::AbstractVector{T}
+    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DIHessianCache},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return _di_value_gradient_and_hessian(p.cache, p.adtype, x, p.evaluator)
+    return _di_value_gradient_and_hessian(p.cache, p.adtype, x, p.evaluator, context)
 end
 
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     ::Prepared{<:AbstractADType,<:VectorEvaluator,<:Union{DIGradientCache,DIJacobianCache}},
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_hessian_needs_order_2_prep()
 end

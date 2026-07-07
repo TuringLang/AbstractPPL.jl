@@ -30,7 +30,17 @@ struct _ADTarget{F,C}
     context::C
 end
 (t::_ADTarget)(x) = t.f(x, t.context...)
+
 Mooncake.tangent_type(::Type{<:_ADTarget}) = Mooncake.NoTangent
+
+# The `_ADTarget` for a call, over the context resolved by
+# `Evaluators._resolve_context` (issue #167) — the counterpart of ForwardDiff's
+# `_fd_target(p, context)`. On the `nothing` hot path this reconstructs an
+# identical immutable struct from the frozen `f`/context (zero-alloc); a `Tuple`
+# swaps in the override. The gradient cache re-accepts its target each call, so
+# rebuilding it is safe (unlike the identity-bound Hessian cache).
+@inline _mc_target(p, context) =
+    _ADTarget(p.evaluator.f, Evaluators._resolve_context(p.evaluator, context))
 
 # `NamedTupleEvaluator` is passed directly to Mooncake on the NamedTuple
 # gradient path; the same `NoTangent` reasoning applies to its captured fields.
@@ -40,10 +50,11 @@ Mooncake.tangent_type(::Type{<:NamedTupleEvaluator}) = Mooncake.NoTangent
 #
 #   * `A::Symbol` — `:scalar` / `:vector` for order=1 (output arity), `:hessian`
 #                   for order=2. Drives every dispatch decision below.
-#   * `Target`    — the `_ADTarget` closing over `f` and `context`, shared by
-#                   the order=1 scalar-gradient path (both AD modes) and the
-#                   order=2 Hessian path. `Nothing` for the vector/Jacobian and
-#                   empty-input caches.
+#   * `Target`    — the `_ADTarget` (`f` + `context`) stored only for the
+#                   order=2 Hessian path, whose cache binds it by object
+#                   identity. `Nothing` everywhere else: the order=1 scalar path
+#                   rebuilds its target per call (see `_mc_target`), and
+#                   the vector/Jacobian and empty-input caches have none.
 #   * `C`         — the underlying Mooncake cache, or `Nothing` for the
 #                   empty-input shortcut.
 #   * `G`         — gradient cache populated only at order=2 so the order=1
@@ -163,13 +174,16 @@ function AbstractPPL.prepare(
         # cache reuse correct for reverse mode — an alternative that passed
         # `f`/`context` without zeroing their cotangents would let a reused cache
         # accumulate a captured differentiable value's stale cotangent and
-        # corrupt the returned gradient (issue #1238). Forward mode is
-        # unaffected but shares the same target; `_ADTarget` (unlike
-        # `VectorEvaluator{false}`) has no `dim` field, which keeps forward-mode
-        # inference and allocations intact.
+        # corrupt the returned gradient (issue #1238). Forward mode is unaffected
+        # but shares the same target; `_ADTarget` (unlike `VectorEvaluator{false}`)
+        # has no `dim` field, which keeps forward-mode inference and allocations
+        # intact.
         target = _ADTarget(evaluator.f, evaluator.context)
         cache = _mc_gradient_cache(adtype, target, x; config)
-        return Prepared(adtype, evaluator, MooncakeCache{:scalar}(target, cache))
+        # The scalar hot path rebuilds the target per call via `_mc_target`
+        # (cheap, zero-alloc), so the cache need not store it — only the
+        # identity-bound Hessian cache keeps a `target`.
+        return Prepared(adtype, evaluator, MooncakeCache{:scalar}(cache))
     end
     # Vector arity: `context` is guaranteed empty (checked above), so there is
     # nothing to close over and no shadow to carry over. The reverse-mode branch can't
@@ -201,10 +215,11 @@ end
 # `x`.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar,Nothing,Nothing}},
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return (p.evaluator(x), T[])
+    return (Evaluators._evaluate_with_context(p.evaluator, x, context), T[])
 end
 
 # Scalar-gradient hot path, shared by both AD modes. `target` is the
@@ -220,10 +235,11 @@ end
 
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:scalar}},
-    x::AbstractVector{<:Real},
+    x::AbstractVector{<:Real};
+    context=nothing,
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    return _mc_value_and_gradient(p.cache.cache, p.cache.target, x)
+    return _mc_value_and_gradient(p.cache.cache, _mc_target(p, context), x)
 end
 
 # Arity-mismatch errors as dedicated methods so dispatch on
@@ -231,7 +247,8 @@ end
 # time instead of a runtime check on the cache contents.
 @inline function AbstractPPL.value_and_gradient!!(
     ::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector}},
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_gradient_needs_scalar()
 end
@@ -242,20 +259,22 @@ end
     p::Prepared{
         <:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:hessian,<:Any,Nothing,Nothing}
     },
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return (p.evaluator(x), T[])
+    return (Evaluators._evaluate_with_context(p.evaluator, x, context), T[])
 end
 
 # Order=2 prep also satisfies the order=1 gradient contract via the dedicated
 # gradient cache built at prep time — skips the O(n²) Hessian work.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:hessian}},
-    x::AbstractVector{<:Real},
+    x::AbstractVector{<:Real};
+    context=nothing,
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    return _mc_value_and_gradient(p.cache.gradient_cache, p.cache.target, x)
+    return _mc_value_and_gradient(p.cache.gradient_cache, _mc_target(p, context), x)
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
@@ -295,24 +314,41 @@ end
 # methods below that are strictly more specific, so this catch-all only fires
 # for `:scalar` / `:vector`.
 @inline function AbstractPPL.value_gradient_and_hessian!!(
-    ::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache}, ::AbstractVector{<:Real}
+    ::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_hessian_needs_order_2_prep()
 end
 
-# Empty-input shortcut — Mooncake builds no tape for length-zero `x`.
+# Empty-input shortcut — Mooncake builds no tape for length-zero `x`, so there
+# is no Hessian cache to bind and a `context` override is accepted (it only
+# affects the returned value); the identity constraint applies to the tape-built
+# path below.
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:hessian,<:Any,Nothing}},
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return (p.evaluator(x), T[], similar(x, 0, 0))
+    return (
+        Evaluators._evaluate_with_context(p.evaluator, x, context), T[], similar(x, 0, 0)
+    )
 end
 
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:hessian}},
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
+    context === nothing || throw(
+        ArgumentError(
+            "Call-time `context` override is not supported for " *
+            "`value_gradient_and_hessian!!` with Mooncake, whose Hessian cache " *
+            "binds its target by object identity. Re-`prepare` with the new " *
+            "context instead.",
+        ),
+    )
     Evaluators._check_ad_input(p.evaluator, x)
     # Mooncake's `value_gradient_and_hessian!!` currently allocates fresh
     # gradient and Hessian arrays per call despite the `!!` name (unlike its

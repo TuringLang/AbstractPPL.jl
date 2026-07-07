@@ -113,11 +113,20 @@ function prepare(
 end
 
 """
-    value_and_gradient!!(prepared, x::AbstractVector{<:Real})
+    value_and_gradient!!(prepared, x::AbstractVector{<:Real}; context=nothing)
 
 Return `(value, gradient)` for a scalar-valued evaluator, potentially reusing
 internal cache buffers of `prepared`. The returned gradient may alias
 `prepared`'s internal storage; copy if you need to retain it past the next call.
+
+By default the `context` frozen at `prepare` is used. Pass a `Tuple` as
+`context` to override it for a single call without re-preparing — it must match
+the prepared context's element types and shapes, since the prepared cache is
+keyed on types. The override is per-call and does not mutate the frozen context.
+Compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`) bakes the context
+into its tape and throws if an override is supplied for a non-empty input.
+Empty input (`length(x) == 0`) runs no derivative machinery — the value is
+computed directly — so a `context` override is always accepted there.
 """
 function value_and_gradient!! end
 
@@ -132,13 +141,21 @@ The Jacobian has shape `(length(value), length(x))`.
 function value_and_jacobian!! end
 
 """
-    value_gradient_and_hessian!!(prepared, x::AbstractVector{<:Real})
+    value_gradient_and_hessian!!(prepared, x::AbstractVector{<:Real}; context=nothing)
 
 Return `(value, gradient::AbstractVector, hessian::AbstractMatrix)` for a
 scalar-valued evaluator prepared with `order=2`, potentially reusing internal
 cache buffers. The returned gradient and Hessian may alias `prepared`'s
 internal storage; copy if you need to retain them past the next call.
 The Hessian has shape `(length(x), length(x))`.
+
+`context` may override the context frozen at `prepare` for a single call, under
+the same contract as [`value_and_gradient!!`](@ref), except that on a non-empty
+input two backends throw for the Hessian and require re-`prepare` instead:
+compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`), which bakes the
+context into its tape, and Mooncake, whose Hessian cache binds its target by
+object identity. As for the gradient, empty input runs no machinery, so an
+override is always accepted there.
 """
 function value_gradient_and_hessian!! end
 
@@ -246,6 +263,24 @@ function _check_ad_input(e::VectorEvaluator{true}, x::AbstractVector{T}) where {
     return nothing
 end
 _check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
+
+# Primal value under a possibly-overridden call-time context, shared by the
+# AD-backend extensions' empty-input shortcuts (which bypass the backend).
+# `nothing` keeps the frozen context via the evaluator (honouring its
+# `CheckInput`); a `Tuple` calls `f` with the override directly (the per-call
+# shape check having already run via `_check_ad_input` at the entry point).
+@inline _evaluate_with_context(e::VectorEvaluator, x, ::Nothing) = e(x)
+@inline _evaluate_with_context(e::VectorEvaluator, x, context::Tuple) = e.f(x, context...)
+
+# Resolve a call-time `context` override into the context tuple a backend builds
+# its AD target from: `nothing` (the default) keeps the context frozen at
+# `prepare`; a `Tuple` replaces it for this call (issue #167). Shared by the
+# AD-backend override paths so the `nothing`/`Tuple` dispatch lives in one place;
+# each backend wraps the result in its own target (`Constant`s, `_ADTarget`, a
+# `Fix2` evaluator). An override must match the frozen context's element types
+# and shapes, since the prepared cache is keyed on types.
+@inline _resolve_context(e::VectorEvaluator, ::Nothing) = e.context
+@inline _resolve_context(::VectorEvaluator, context::Tuple) = context
 
 # Both bodies rely on `T <: Integer` being a static check so the AD hot path
 # (Float/dual `T`) elides the branch; the `{false}` callable additionally skips

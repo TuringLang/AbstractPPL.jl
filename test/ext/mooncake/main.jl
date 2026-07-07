@@ -175,4 +175,20 @@ end
             @test g_reused ≈ fd rtol = 1.0e-5
         end
     end
+
+    # Mooncake honours a call-time `context` override on the gradient path (the
+    # target is rebuilt per call) but rejects it on the Hessian path (whose cache
+    # binds its target by object identity). Both AD modes share the gradient
+    # path. `check_dims=false` matches the other Mooncake cases.
+    @testset "call-time context override (#167)" begin
+        @testset "$ad" for ad in (
+            AutoMooncake(; config=nothing), AutoMooncakeForward(; config=nothing)
+        )
+            for case in generate_testcases(Val(:context_override))
+                run_testcase(
+                    case; adtype=ad, check_dims=false, rtol=1.0e-6, hessian_override=:reject
+                )
+            end
+        end
+    end
 end

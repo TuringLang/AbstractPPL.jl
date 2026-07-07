@@ -5,7 +5,7 @@ using Test: @inferred, @test, @test_broken, @test_throws, @testset
 
 """
     TestCase(name, tag, f, x_proto; x, value, gradient, jacobian, hessian,
-             context=(), op, exception, inputs, allocations_safe=true)
+             context=(), op, exception, inputs, override, allocations_safe=true)
 
 Single tagged case for AD conformance testing. The `tag::Symbol` selects how
 the case is run; the kwargs populate only the fields the tag uses.
@@ -17,6 +17,11 @@ Reserved tags (recognised by [`run_testcase`](@ref)):
   - `:hessian`     — order=2 round-trip on scalar output.
   - `:context`     — scalar-output gradient with a non-empty `context::Tuple`
                      passed to `prepare`.
+  - `:context_override` — the frozen `context` (`gradient`/`hessian` expected)
+                     against a per-call `override::NamedTuple` `(context, value,
+                     gradient, hessian)`. The `gradient_override` /
+                     `hessian_override` [`run_testcase`](@ref) kwargs select
+                     whether each override is honoured or rejected per backend.
   - `:edge`        — error case; `op(prepared, x)` must throw `exception`.
   - `:cache_reuse` — multiple inputs against a single prepared evaluator
                      (`inputs::Vector{<:NamedTuple}`, with `(x=, value=,
@@ -40,6 +45,7 @@ struct TestCase
     op::Any
     exception::Any
     inputs::Any
+    override::Any
     allocations_safe::Bool
 end
 function TestCase(
@@ -56,6 +62,7 @@ function TestCase(
     op=nothing,
     exception=nothing,
     inputs=nothing,
+    override=nothing,
     allocations_safe::Bool=true,
 )
     return TestCase(
@@ -72,6 +79,7 @@ function TestCase(
         op,
         exception,
         inputs,
+        override,
         allocations_safe,
     )
 end
@@ -83,6 +91,10 @@ struct VectorValuedProblem end
 (::VectorValuedProblem)(x::AbstractVector{<:Real}) = [x[1] * x[2], x[2] + x[3]]
 
 _context_problem(y::AbstractVector{<:Real}, offset) = -0.5 * (y[1] - offset)^2
+
+# `∂/∂y a·‖y‖² = 2a·y` and its Hessian `2a·I` both depend on the context `a`, so
+# a context override is directly observable in the gradient and Hessian.
+_affine(y::AbstractVector{<:Real}, a, b) = a * sum(abs2, y) + b
 
 function AbstractPPL.generate_testcases(::Val{:vector})
     return (
@@ -285,6 +297,29 @@ function AbstractPPL.generate_testcases(::Val{:vector})
     )
 end
 
+function AbstractPPL.generate_testcases(::Val{:context_override})
+    x = [1.0, 2.0, 3.0]
+    return (
+        TestCase(
+            "affine scalar output, context override",
+            :context_override,
+            _affine,
+            zeros(3);
+            x=x,
+            context=(2.0, 1.0),
+            value=_affine(x, 2.0, 1.0),
+            gradient=4.0 .* x,   # 2a·y with a=2
+            hessian=[4.0 0 0; 0 4.0 0; 0 0 4.0],
+            override=(
+                context=(3.0, 5.0),
+                value=_affine(x, 3.0, 5.0),
+                gradient=6.0 .* x,   # 2a·y with a=3
+                hessian=[6.0 0 0; 0 6.0 0; 0 0 6.0],
+            ),
+        ),
+    )
+end
+
 function AbstractPPL.generate_testcases(::Val{:namedtuple})
     return (
         TestCase(
@@ -385,6 +420,110 @@ function _run(
             type_stability, AbstractPPL.value_and_jacobian!!, prepared, case.x
         )
     end
+    return nothing
+end
+
+# Context frozen at `prepare` vs a per-call `context=` override, on both the
+# gradient and Hessian entry points, plus the invariants that hold on every
+# backend. `gradient_override`/`hessian_override` are `:honor` (the value is
+# swapped and observed) or `:reject` (the backend bakes context into its
+# prepared state and throws for a non-empty input); each backend driver passes
+# the pair that matches its caches. Empty input runs no derivative machinery, so
+# an override is always accepted there regardless of the flags.
+function _run(
+    ::Val{:context_override},
+    case;
+    adtype,
+    prepare_fn=AbstractPPL.prepare,
+    atol=0,
+    rtol=1e-10,
+    check_dims::Bool=true,
+    gradient_override::Symbol=:honor,
+    hessian_override::Symbol=:honor,
+    kwargs...,
+)
+    ov = case.override
+
+    # --- order=1 gradient ---
+    prep = prepare_fn(adtype, case.f, case.x_proto; check_dims, context=case.context)
+    val, grad = AbstractPPL.value_and_gradient!!(prep, case.x)
+    @test val ≈ case.value atol = atol rtol = rtol
+    @test grad ≈ case.gradient atol = atol rtol = rtol
+    if gradient_override === :reject
+        @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+            prep, case.x; context=ov.context
+        )
+    else
+        val_o, grad_o = AbstractPPL.value_and_gradient!!(prep, case.x; context=ov.context)
+        @test val_o ≈ ov.value atol = atol rtol = rtol
+        @test grad_o ≈ ov.gradient atol = atol rtol = rtol
+        # Matches a prep built with the override context from the start.
+        fresh = prepare_fn(adtype, case.f, case.x_proto; check_dims, context=ov.context)
+        @test grad_o ≈ AbstractPPL.value_and_gradient!!(fresh, case.x)[2] atol = atol rtol =
+            rtol
+        # The override is per-call: the next default call still uses the frozen context.
+        @test AbstractPPL.value_and_gradient!!(prep, case.x)[2] ≈ case.gradient atol = atol rtol =
+            rtol
+    end
+
+    # --- order=2 gradient+Hessian ---
+    preph = prepare_fn(
+        adtype, case.f, case.x_proto; check_dims, context=case.context, order=2
+    )
+    @test AbstractPPL.value_gradient_and_hessian!!(preph, case.x)[3] ≈ case.hessian atol =
+        atol rtol = rtol
+
+    # `value_and_gradient!!` on an order=2 prep is a distinct dispatch (the
+    # gradient cache, not the Hessian one) that also takes the override; it
+    # follows `gradient_override`, not `hessian_override`.
+    if gradient_override === :reject
+        @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+            preph, case.x; context=ov.context
+        )
+    else
+        @test AbstractPPL.value_and_gradient!!(preph, case.x; context=ov.context)[2] ≈
+            ov.gradient atol = atol rtol = rtol
+    end
+
+    if hessian_override === :reject
+        @test_throws ArgumentError AbstractPPL.value_gradient_and_hessian!!(
+            preph, case.x; context=ov.context
+        )
+    else
+        _, grad_h, hess_h = AbstractPPL.value_gradient_and_hessian!!(
+            preph, case.x; context=ov.context
+        )
+        @test grad_h ≈ ov.gradient atol = atol rtol = rtol
+        @test hess_h ≈ ov.hessian atol = atol rtol = rtol
+        # Matches a fresh order=2 prep built with the override context.
+        freshh = prepare_fn(
+            adtype, case.f, case.x_proto; check_dims, context=ov.context, order=2
+        )
+        @test hess_h ≈ AbstractPPL.value_gradient_and_hessian!!(freshh, case.x)[3] atol =
+            atol rtol = rtol
+        # Per-call: a subsequent default call still uses the frozen context.
+        @test AbstractPPL.value_gradient_and_hessian!!(preph, case.x)[3] ≈ case.hessian atol =
+            atol rtol = rtol
+    end
+
+    # --- backend-independent invariants ---
+    # A stray `context=` on a wrong-arity prep surfaces the domain error, not a
+    # MethodError (reject methods accept and ignore `context`). `VectorValuedProblem`
+    # is the canonical vector-output (wrong-arity) fixture.
+    vprep = prepare_fn(adtype, VectorValuedProblem(), case.x_proto; check_dims)
+    @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+        vprep, case.x; context=ov.context
+    )
+
+    # Empty input accepts an override on every entry point — no tape/cache built.
+    e0 = similar(case.x, 0)
+    empty_val = case.f(e0, ov.context...)
+    epg = prepare_fn(adtype, case.f, e0; check_dims, context=case.context)
+    @test AbstractPPL.value_and_gradient!!(epg, e0; context=ov.context)[1] ≈ empty_val atol =
+        atol rtol = rtol
+    eph = prepare_fn(adtype, case.f, e0; check_dims, context=case.context, order=2)
+    @test AbstractPPL.value_gradient_and_hessian!!(eph, e0; context=ov.context)[1] ≈
+        empty_val atol = atol rtol = rtol
     return nothing
 end
 

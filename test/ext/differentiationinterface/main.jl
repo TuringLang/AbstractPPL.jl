@@ -99,4 +99,22 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         @test grad_ctx ≈ [4.0, 8.0, 12.0]
         @test hess_ctx ≈ [4.0 0 0; 0 4.0 0; 0 0 4.0]
     end
+
+    # Non-compiled ReverseDiff threads context as call-time `Constant`s and
+    # honours an override on both entry points; compiled-tape ReverseDiff bakes
+    # context into its tape and rejects a non-empty override. Empty input is
+    # accepted on both (the runner checks it regardless of the flags).
+    @testset "call-time context override (#167)" begin
+        for case in generate_testcases(Val(:context_override))
+            run_testcase(case; adtype=AutoReverseDiff(), atol=1e-6, rtol=1e-6)
+            run_testcase(
+                case;
+                adtype=AutoReverseDiff(; compile=true),
+                atol=1e-6,
+                rtol=1e-6,
+                gradient_override=:reject,
+                hessian_override=:reject,
+            )
+        end
+    end
 end

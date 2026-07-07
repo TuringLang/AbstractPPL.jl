@@ -103,6 +103,22 @@ end
 # config captured at prep time.
 @inline _fd_call(x, e::VectorEvaluator) = e.f(x, e.context...)
 
+# `_fd_call` target for a call, over the context resolved by
+# `Evaluators._resolve_context` (issue #167): the frozen context (`nothing`) or a
+# per-call override. `_fd_call` reads `e.f`/`e.context` directly, so the wrapper's
+# `CheckInput` is irrelevant here (`{false}` is fine), and the config's `Tag` —
+# keyed on the target type and already bypassed via `Val(false)` — stays valid
+# for an override of matching context types/shapes. (The empty-input
+# primal-under-override lives in `Evaluators._evaluate_with_context`.)
+@inline _fd_target(p, context) = Base.Fix2(
+    _fd_call,
+    VectorEvaluator{false}(
+        p.evaluator.f,
+        p.evaluator.dim,
+        Evaluators._resolve_context(p.evaluator, context),
+    ),
+)
+
 # `Val(false)` on every hot-path call below skips `ForwardDiff.checktag`. A
 # user-supplied `adtype.tag` (e.g. DynamicPPL's `DynamicPPLTag` sentinel for
 # nested AD) has a tag-type parameter that does not equal `typeof(target)`, so
@@ -115,19 +131,21 @@ end
         <:VectorEvaluator,
         <:Union{FDCache{:scalar,Nothing},FDCache{:hessian,Nothing}},
     },
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return (p.evaluator(x), T[])
+    return (Evaluators._evaluate_with_context(p.evaluator, x, context), T[])
 end
 
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:scalar}},
-    x::AbstractVector{<:Real},
+    x::AbstractVector{<:Real};
+    context=nothing,
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.gradient!(
-        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config, Val(false)
+        p.cache.result, _fd_target(p, context), x, p.cache.config, Val(false)
     )
     return (DiffResults.value(p.cache.result), DiffResults.gradient(p.cache.result))
 end
@@ -136,12 +154,13 @@ end
 # gradient cache built at prep time — skips the O(n²) Hessian work.
 @inline function AbstractPPL.value_and_gradient!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:hessian}},
-    x::AbstractVector{<:Real},
+    x::AbstractVector{<:Real};
+    context=nothing,
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.gradient!(
         p.cache.gradient_result,
-        Base.Fix2(_fd_call, p.evaluator),
+        _fd_target(p, context),
         x,
         p.cache.gradient_config,
         Val(false),
@@ -156,7 +175,8 @@ end
 # the failure mode at compile time.
 @inline function AbstractPPL.value_and_gradient!!(
     ::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:vector}},
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_gradient_needs_scalar()
 end
@@ -194,26 +214,31 @@ end
     ::Prepared{
         <:AutoForwardDiff,<:VectorEvaluator,<:Union{FDCache{:scalar},FDCache{:vector}}
     },
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_hessian_needs_order_2_prep()
 end
 
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:hessian,Nothing}},
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return (p.evaluator(x), T[], similar(x, 0, 0))
+    return (
+        Evaluators._evaluate_with_context(p.evaluator, x, context), T[], similar(x, 0, 0)
+    )
 end
 
 @inline function AbstractPPL.value_gradient_and_hessian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:hessian}},
-    x::AbstractVector{<:Real},
+    x::AbstractVector{<:Real};
+    context=nothing,
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.hessian!(
-        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config, Val(false)
+        p.cache.result, _fd_target(p, context), x, p.cache.config, Val(false)
     )
     return (
         DiffResults.value(p.cache.result),
