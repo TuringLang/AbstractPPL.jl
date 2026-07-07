@@ -6,6 +6,7 @@ Pkg.instantiate()
 using AbstractPPL:
     AbstractPPL, prepare, generate_testcases, run_testcase, value_and_gradient!!
 using ADTypes: AutoMooncake, AutoMooncakeForward
+using LinearAlgebra: LowerTriangular, I
 using Mooncake
 using Test
 
@@ -13,8 +14,8 @@ using Test
 #   * `value_and_jacobian!!` allocates fresh cotangent/Jacobian buffers on
 #     every call (both modes); forward-mode Jacobian return type infers as
 #     `Tuple{Any, Union{Array{T,3}, Matrix}}`.
-#   * `value_and_gradient!!` on a forward-mode context-lowered prep splats
-#     `args_to_zero` per call and allocates; forward mode also fails inference.
+#   * `value_and_gradient!!` on a forward-mode context-lowered prep allocates
+#     per call and also fails inference.
 function _mooncake_alloc(case, adtype)
     if case.tag === :vector && case.jacobian !== nothing
         return :broken
@@ -131,5 +132,47 @@ end
         v = view([1.0, 2.0, 3.0], :)
         @test_throws r"dense vector" prepare(AutoMooncake(), problem, v)
         @test_throws r"dense vector" prepare(AutoMooncakeForward(), problem, v)
+    end
+
+    # Reused reverse-mode cache with a differentiable `context` routed through an
+    # in-place linear solve — the shape that reproduces Mooncake issue #1238. An
+    # extension that passes `context` to Mooncake as an ordinary, non-zeroed
+    # argument leaves the data's cotangent to accumulate in a reused cache; the
+    # `\` reverse rule reads that cotangent back, so the *returned* `x`-gradient
+    # is corrupted after the first call.
+    # Closing `f`/`context` into a `NoTangent` `_ADTarget` makes the context
+    # non-differentiable, fixing it. The in-place `\` is essential — hand-unrolled
+    # forward substitution never hits the leaking reverse rule (see PR #177). The
+    # leak is reverse-mode only, so the `AutoMooncake` subtest carries the teeth —
+    # its reused-vs-fresh oracle fails against the pre-fix scheme and passes under
+    # the `_ADTarget` fix; the `AutoMooncakeForward` subtest never leaked and
+    # guards mode parity.
+    @testset "reused cache with a differentiable context does not leak (#1238)" begin
+        M(p) = LowerTriangular([p[1] 0 0; p[2] p[1] 0; p[3] p[2] p[1]] + I)
+        solve_problem(x, data) = sum(abs2, M(x) \ data)
+        data = [1.0, 2.0, 3.0]
+        xA = [0.3, 0.5, 0.2]
+        xB = [1.5, 2.0, -1.0]
+        # Ground-truth `x`-gradient at `xB` by central differences.
+        fd = map(eachindex(xB)) do i
+            e = zeros(length(xB))
+            e[i] = 1.0e-6
+            (solve_problem(xB .+ e, data) - solve_problem(xB .- e, data)) / 2.0e-6
+        end
+        @testset "$ad" for ad in (
+            AutoMooncake(; config=nothing), AutoMooncakeForward(; config=nothing)
+        )
+            # A fresh prep's first evaluation is always correct — the oracle.
+            fresh = prepare(ad, solve_problem, xB; check_dims=false, context=(data,))
+            _, g_fresh = value_and_gradient!!(fresh, xB)
+            @test g_fresh ≈ fd rtol = 1.0e-5
+            # Reuse one prep across two inputs; the second call is the one a
+            # pre-fix cache corrupted.
+            prep = prepare(ad, solve_problem, xA; check_dims=false, context=(data,))
+            value_and_gradient!!(prep, xA)
+            _, g_reused = value_and_gradient!!(prep, xB)
+            @test g_reused ≈ g_fresh
+            @test g_reused ≈ fd rtol = 1.0e-5
+        end
     end
 end

@@ -8,26 +8,42 @@ using Mooncake: Mooncake
 
 const _MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 
-# `NoTangent` stops Mooncake from deriving a `Tangent{...}` for the evaluator
-# wrapper's fields on each backward pass. Load-bearing for both:
-#   * `NamedTupleEvaluator` — passed directly to Mooncake on the NamedTuple
-#                             gradient path.
-#   * `VectorEvaluator`     — wrapped by the order=2 path (Mooncake's Hessian
-#                             API accepts only `AbstractVector` arguments, so
-#                             context is closed over via `VectorEvaluator{false}`).
-Mooncake.tangent_type(::Type{<:VectorEvaluator}) = Mooncake.NoTangent
+# AD target closing over the problem `f` and its (frozen) `context`, so
+# `problem(x, context...)` is presented to Mooncake as a function of `x` alone.
+# Its `NoTangent` tangent type keeps `f` and the *entire* `context` tuple
+# non-differentiable, which serves both AD modes:
+#   * every constant argument (`f` and all of `context`, e.g. a model's captured
+#     observed data) carries no cotangent, so `x` is the only active argument —
+#     and since the whole context is wrapped in this one `NoTangent` target
+#     rather than passed to Mooncake as separate arguments, this holds for any
+#     number of context values (cf. Mooncake issue #1238). An alternative scheme
+#     that passed `f`/`context` to Mooncake as ordinary arguments without zeroing
+#     their cotangents would, on a reused reverse-mode cache, accumulate a stale
+#     cotangent from a differentiable context and corrupt the returned
+#     `x`-gradient after the first call; `NoTangent` removes that; and
+#   * the vector-only Hessian API gets a single `AbstractVector` argument.
+# Deliberately field-minimal: an extra non-differentiable field (e.g. an `Int`)
+# on a `NoTangent` struct defeats Mooncake's forward-mode inference and
+# zero-allocation for the wrapper, so the target holds only `f` and `context`.
+struct _ADTarget{F,C}
+    f::F
+    context::C
+end
+(t::_ADTarget)(x) = t.f(x, t.context...)
+Mooncake.tangent_type(::Type{<:_ADTarget}) = Mooncake.NoTangent
+
+# `NamedTupleEvaluator` is passed directly to Mooncake on the NamedTuple
+# gradient path; the same `NoTangent` reasoning applies to its captured fields.
 Mooncake.tangent_type(::Type{<:NamedTupleEvaluator}) = Mooncake.NoTangent
 
 # Type parameters:
 #
 #   * `A::Symbol` — `:scalar` / `:vector` for order=1 (output arity), `:hessian`
 #                   for order=2. Drives every dispatch decision below.
-#   * `Target`    — `Nothing` for order=1 (Mooncake's gradient/Jacobian API
-#                   takes `f` and `context` as separate args). For `:hessian`,
-#                   a `VectorEvaluator{false}` that closes over `f` and
-#                   `context`, since Mooncake's Hessian API accepts only
-#                   `AbstractVector` arguments. The evaluator's `NoTangent`
-#                   tangent type prevents differentiation of its fields.
+#   * `Target`    — the `_ADTarget` closing over `f` and `context`, shared by
+#                   the order=1 scalar-gradient path (both AD modes) and the
+#                   order=2 Hessian path. `Nothing` for the vector/Jacobian and
+#                   empty-input caches.
 #   * `C`         — the underlying Mooncake cache, or `Nothing` for the
 #                   empty-input shortcut.
 #   * `G`         — gradient cache populated only at order=2 so the order=1
@@ -45,24 +61,24 @@ struct MooncakeCache{A,Target,C,G}
 end
 MooncakeCache{A}(cache) where {A} = MooncakeCache{A}(nothing, cache)
 
-_mooncake_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtype.config
+_mc_config(adtype) = adtype.config === nothing ? Mooncake.Config() : adtype.config
 
 # Mooncake exposes separate `prepare_*_cache` entries per AD mode; the call
-# shape (callable + active arg + extra args) is the same. Used by the
-# NamedTuple path, the order=1 scalar branch, and the order=2 gradient prep.
-function _mooncake_gradient_cache(::AutoMooncake, f, x, args...; config)
-    return Mooncake.prepare_gradient_cache(f, x, args...; config)
+# shape (callable + active arg) is the same. Used by the NamedTuple path, the
+# order=1 scalar branch, and the order=2 gradient prep.
+function _mc_gradient_cache(::AutoMooncake, f, x; config)
+    return Mooncake.prepare_gradient_cache(f, x; config)
 end
-function _mooncake_gradient_cache(::AutoMooncakeForward, f, x, args...; config)
-    return Mooncake.prepare_derivative_cache(f, x, args...; config)
+function _mc_gradient_cache(::AutoMooncakeForward, f, x; config)
+    return Mooncake.prepare_derivative_cache(f, x; config)
 end
 
 function AbstractPPL.prepare(
     adtype::_MooncakeAD, problem, values::NamedTuple; check_dims::Bool=true
 )
     evaluator = AbstractPPL.prepare(problem, values; check_dims)::NamedTupleEvaluator
-    config = _mooncake_config(adtype)
-    cache = _mooncake_gradient_cache(adtype, evaluator, values; config)
+    config = _mc_config(adtype)
+    cache = _mc_gradient_cache(adtype, evaluator, values; config)
     return Prepared(adtype, evaluator, cache)
 end
 
@@ -106,23 +122,17 @@ function AbstractPPL.prepare(
     )
     evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
     arity = _ad_output_arity(evaluator(x))
-    config = _mooncake_config(adtype)
+    config = _mc_config(adtype)
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
-        # `{false}` skips the per-call shape check — `_check_ad_input` on the
-        # AD entry already validates `x`. `dim` is unused for `{false}`.
-        target = VectorEvaluator{false}(evaluator.f, 0, evaluator.context)
         length(x) == 0 && return Prepared(
-            adtype, evaluator, MooncakeCache{:hessian}(target, nothing), Val(2)
+            adtype, evaluator, MooncakeCache{:hessian}(nothing, nothing), Val(2)
         )
+        target = _ADTarget(evaluator.f, evaluator.context)
         hess_cache = Mooncake.prepare_hessian_cache(target, x; config)
         # Order=1 gradient cache so `value_and_gradient!!` on the same prep
-        # skips the Hessian work. Mooncake's `value_and_gradient!!` runs on
-        # `evaluator.f` with context-as-extra-args, distinct from the wrapped
-        # `target` used by the Hessian API.
-        grad_cache = _mooncake_gradient_cache(
-            adtype, evaluator.f, x, evaluator.context...; config
-        )
+        # skips the Hessian work, built against the same `NoTangent` target.
+        grad_cache = _mc_gradient_cache(adtype, target, x; config)
         return Prepared(
             adtype,
             evaluator,
@@ -145,13 +155,29 @@ function AbstractPPL.prepare(
     # Compile the tape on the evaluator's `f` and `context` (not the raw
     # `problem` / `context` kwargs): a downstream override of structural
     # `prepare` may return a `VectorEvaluator` whose `.f`/`.context` differ
-    # from the caller-supplied values, and the hot path reads them off the
-    # evaluator. The reverse-mode vector branch is the only one that can't
-    # share `_mooncake_gradient_cache` — it needs `prepare_pullback_cache`.
-    cache = if arity !== :scalar && adtype isa AutoMooncake
+    # from the caller-supplied values, so the AD target and caches below are
+    # built from the evaluator's fields.
+    if arity === :scalar
+        # Close `f` and `context` into a `NoTangent` target so they carry no
+        # Mooncake cotangent: `x` is the only active argument. This is what makes
+        # cache reuse correct for reverse mode — an alternative that passed
+        # `f`/`context` without zeroing their cotangents would let a reused cache
+        # accumulate a captured differentiable value's stale cotangent and
+        # corrupt the returned gradient (issue #1238). Forward mode is
+        # unaffected but shares the same target; `_ADTarget` (unlike
+        # `VectorEvaluator{false}`) has no `dim` field, which keeps forward-mode
+        # inference and allocations intact.
+        target = _ADTarget(evaluator.f, evaluator.context)
+        cache = _mc_gradient_cache(adtype, target, x; config)
+        return Prepared(adtype, evaluator, MooncakeCache{:scalar}(target, cache))
+    end
+    # Vector arity: `context` is guaranteed empty (checked above), so there is
+    # nothing to close over and no shadow to carry over. The reverse-mode branch can't
+    # share `_mc_gradient_cache` — it needs `prepare_pullback_cache`.
+    cache = if adtype isa AutoMooncake
         Mooncake.prepare_pullback_cache(evaluator.f, x; config)
     else
-        _mooncake_gradient_cache(adtype, evaluator.f, x, evaluator.context...; config)
+        _mc_gradient_cache(adtype, evaluator.f, x; config)
     end
     return Prepared(adtype, evaluator, MooncakeCache{arity}(cache))
 end
@@ -181,27 +207,14 @@ end
     return (p.evaluator(x), T[])
 end
 
-# Scalar-gradient hot path. Reverse mode (`Mooncake.Cache`) needs
-# `args_to_zero` to mark `x` as the lone active input (`false` on `f`,
-# `true` on `x`, `false` on each context value); forward mode
-# (`ForwardCache`) derives activity from its seeded argument and rejects
-# the kwarg. The `adtype isa AutoMooncake` branch is compile-folded
-# since the concrete type lives in `Prepared`'s type parameters. Empty
-# `context` collapses the splat and reduces `args_to_zero` to
-# `(false, true)`. `tangents[2]` is the `x`-gradient; trailing entries
-# (one per context value) are inactive and discarded.
-@inline function _mooncake_value_and_gradient(adtype, gcache, e::VectorEvaluator, x)
-    val, tangents = if adtype isa AutoMooncake
-        Mooncake.value_and_gradient!!(
-            gcache,
-            e.f,
-            x,
-            e.context...;
-            args_to_zero=(false, true, map(_ -> false, e.context)...),
-        )
-    else
-        Mooncake.value_and_gradient!!(gcache, e.f, x, e.context...)
-    end
+# Scalar-gradient hot path, shared by both AD modes. `target` is the
+# `NoTangent` `_ADTarget`, so `x` is the only argument carrying a tangent:
+# Mooncake's default zeroing resets `x`, there is nothing else to reset, and the
+# context has no shadow that could persist in the reused cotangent buffers.
+# Presenting a single active argument also lets forward mode share this path.
+# `tangents[2]` is the `x`-gradient (`tangents[1]` is the target's `NoTangent`).
+@inline function _mc_value_and_gradient(gcache, target, x)
+    val, tangents = Mooncake.value_and_gradient!!(gcache, target, x)
     return (val, tangents[2])
 end
 
@@ -210,7 +223,7 @@ end
     x::AbstractVector{<:Real},
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    return _mooncake_value_and_gradient(p.adtype, p.cache.cache, p.evaluator, x)
+    return _mc_value_and_gradient(p.cache.cache, p.cache.target, x)
 end
 
 # Arity-mismatch errors as dedicated methods so dispatch on
@@ -242,7 +255,7 @@ end
     x::AbstractVector{<:Real},
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    return _mooncake_value_and_gradient(p.adtype, p.cache.gradient_cache, p.evaluator, x)
+    return _mc_value_and_gradient(p.cache.gradient_cache, p.cache.target, x)
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
@@ -273,9 +286,8 @@ end
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
     # Vector arity rejects non-empty `context` at prepare time, so the tape
-    # is compiled on `problem(x)` and there is no splat or `args_to_zero` to
-    # propagate. Mooncake's `value_and_jacobian!!` returns `(val, jac)`
-    # directly with `x` as the only active argument.
+    # is compiled on `problem(x)` with `x` as the only active argument.
+    # Mooncake's `value_and_jacobian!!` returns `(val, jac)` directly.
     return Mooncake.value_and_jacobian!!(p.cache.cache, p.evaluator.f, x)
 end
 
