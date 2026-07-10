@@ -186,7 +186,12 @@ end
         )
             for case in generate_testcases(Val(:context_override))
                 run_testcase(
-                    case; adtype=ad, check_dims=false, rtol=1.0e-6, hessian_override=:reject
+                    case;
+                    adtype=ad,
+                    check_dims=false,
+                    rtol=1.0e-6,
+                    hessian_override=:reject,
+                    jacobian_override=:prepare_rejects,
                 )
             end
         end

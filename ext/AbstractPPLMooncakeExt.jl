@@ -283,7 +283,8 @@ end
         <:VectorEvaluator,
         <:Union{MooncakeCache{:scalar},MooncakeCache{:hessian}},
     },
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_jacobian_needs_vector()
 end
@@ -292,20 +293,24 @@ end
 # scalar case above; skips Mooncake entirely.
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector,Nothing,Nothing}},
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    val = p.evaluator(x)
+    val = Evaluators._evaluate_with_context(p.evaluator, x, context)
     return (val, similar(x, length(val), 0))
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:_MooncakeAD,<:VectorEvaluator,<:MooncakeCache{:vector}},
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
     # Vector arity rejects non-empty `context` at prepare time, so the tape
-    # is compiled on `problem(x)` with `x` as the only active argument.
+    # is compiled on `problem(x)` with `x` as the only active argument and the
+    # frozen context is `()` — the only override that validates is `()` itself.
+    Evaluators._resolve_context(p.evaluator, context)
     # Mooncake's `value_and_jacobian!!` returns `(val, jac)` directly.
     return Mooncake.value_and_jacobian!!(p.cache.cache, p.evaluator.f, x)
 end

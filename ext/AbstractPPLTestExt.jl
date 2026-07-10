@@ -96,6 +96,25 @@ _context_problem(y::AbstractVector{<:Real}, offset) = -0.5 * (y[1] - offset)^2
 # a context override is directly observable in the gradient and Hessian.
 _affine(y::AbstractVector{<:Real}, a, b) = a * sum(abs2, y) + b
 
+# Array-valued context: gradient `2w²ᵢyᵢ` and Hessian `Diagonal(2w²)` reflect an
+# override of the whole data vector. The empty branch only runs on the
+# empty-input shortcuts, which bypass AD entirely.
+_weighted(y::AbstractVector{<:Real}, w) = isempty(y) ? zero(eltype(w)) : sum(abs2, y .* w)
+
+# Vector-output problem for the Jacobian override path: scales the input by the
+# first context element, so the Jacobian is `c₁·I` (or `Diagonal(c₁)` for an
+# array `c₁`) and an override is directly observable.
+_jac_ctx_problem(y::AbstractVector{<:Real}, c1, rest...) = c1 .* y
+function _jac_ctx_expected(context, x)
+    c1 = first(context)
+    n = length(x)
+    J = zeros(n, n)
+    for i in 1:n
+        J[i, i] = c1 isa AbstractArray ? c1[i] : c1
+    end
+    return J
+end
+
 function AbstractPPL.generate_testcases(::Val{:vector})
     return (
         TestCase(
@@ -317,6 +336,23 @@ function AbstractPPL.generate_testcases(::Val{:context_override})
                 hessian=[6.0 0 0; 0 6.0 0; 0 0 6.0],
             ),
         ),
+        TestCase(
+            "weighted scalar output, array-context override",
+            :context_override,
+            _weighted,
+            zeros(3);
+            x=x,
+            context=([1.0, 2.0, 3.0],),
+            value=_weighted(x, [1.0, 2.0, 3.0]),
+            gradient=2.0 .* [1.0, 2.0, 3.0] .^ 2 .* x,
+            hessian=[2.0 0 0; 0 8.0 0; 0 0 18.0],
+            override=(
+                context=([2.0, 1.0, 0.5],),
+                value=_weighted(x, [2.0, 1.0, 0.5]),
+                gradient=2.0 .* [2.0, 1.0, 0.5] .^ 2 .* x,
+                hessian=[8.0 0 0; 0 2.0 0; 0 0 0.5],
+            ),
+        ),
     )
 end
 
@@ -423,13 +459,18 @@ function _run(
     return nothing
 end
 
-# Context frozen at `prepare` vs a per-call `context=` override, on both the
-# gradient and Hessian entry points, plus the invariants that hold on every
-# backend. `gradient_override`/`hessian_override` are `:honor` (the value is
-# swapped and observed) or `:reject` (the backend bakes context into its
-# prepared state and throws for a non-empty input); each backend driver passes
-# the pair that matches its caches. Empty input runs no derivative machinery, so
-# an override is always accepted there regardless of the flags.
+# Context frozen at `prepare` vs a per-call `context=` override, on the
+# gradient, Jacobian, and Hessian entry points, plus the invariants that hold on
+# every backend. `gradient_override`/`hessian_override` are `:honor` (the value
+# is swapped and observed) or `:reject` (the backend bakes context into its
+# prepared state and throws for a non-empty input); `jacobian_override` adds
+# `:prepare_rejects` for backends that refuse vector arity + non-empty context
+# at `prepare` (Mooncake), where only the trivially-matching empty override
+# exists. Each backend driver passes the flags that match its caches. Contract
+# violations (type/shape/arity mismatch, non-`Tuple`) are validated centrally
+# and throw on every backend regardless of the flags. Empty input runs no
+# derivative machinery, so no backend rejects an override there — but the
+# override is still validated, and integer-eltype inputs are still rejected.
 function _run(
     ::Val{:context_override},
     case;
@@ -440,6 +481,7 @@ function _run(
     check_dims::Bool=true,
     gradient_override::Symbol=:honor,
     hessian_override::Symbol=:honor,
+    jacobian_override::Symbol=:honor,
     kwargs...,
 )
     ov = case.override
@@ -506,6 +548,67 @@ function _run(
             atol rtol = rtol
     end
 
+    # --- Jacobian override ---
+    if jacobian_override === :prepare_rejects
+        # Vector arity + non-empty context is refused at `prepare`, so a
+        # context-carrying Jacobian prep cannot exist; on a context-free vector
+        # prep only the trivially-matching empty override validates.
+        @test_throws ArgumentError prepare_fn(
+            adtype, _jac_ctx_problem, case.x_proto; check_dims, context=case.context
+        )
+        jprep0 = prepare_fn(adtype, VectorValuedProblem(), case.x_proto; check_dims)
+        @test AbstractPPL.value_and_jacobian!!(jprep0, case.x; context=())[1] ≈
+            VectorValuedProblem()(case.x) atol = atol rtol = rtol
+        @test_throws ArgumentError AbstractPPL.value_and_jacobian!!(
+            jprep0, case.x; context=ov.context
+        )
+    else
+        jprep = prepare_fn(
+            adtype, _jac_ctx_problem, case.x_proto; check_dims, context=case.context
+        )
+        @test AbstractPPL.value_and_jacobian!!(jprep, case.x)[2] ≈
+            _jac_ctx_expected(case.context, case.x) atol = atol rtol = rtol
+        if jacobian_override === :reject
+            @test_throws ArgumentError AbstractPPL.value_and_jacobian!!(
+                jprep, case.x; context=ov.context
+            )
+        else
+            @test AbstractPPL.value_and_jacobian!!(jprep, case.x; context=ov.context)[2] ≈
+                _jac_ctx_expected(ov.context, case.x) atol = atol rtol = rtol
+            # Per-call: the frozen context is restored afterwards.
+            @test AbstractPPL.value_and_jacobian!!(jprep, case.x)[2] ≈
+                _jac_ctx_expected(case.context, case.x) atol = atol rtol = rtol
+        end
+    end
+
+    # --- override contract violations (validated centrally, all backends) ---
+    # Arity/type/shape mismatches and non-`Tuple` overrides throw an
+    # `ArgumentError` from `Evaluators._resolve_context` before any backend
+    # machinery runs (compiled-tape ReverseDiff throws its own `ArgumentError`
+    # even earlier, so the assertions hold on every backend).
+    @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+        prep, case.x; context=(ov.context..., ov.context[end])
+    )
+    @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+        prep, case.x; context=first(ov.context)
+    )
+    for (i, c) in enumerate(case.context)
+        c isa AbstractArray || continue
+        bad_shape = ntuple(
+            j -> j == i ? case.context[j][1:(end - 1)] : case.context[j],
+            length(case.context),
+        )
+        @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+            prep, case.x; context=bad_shape
+        )
+        bad_eltype = ntuple(
+            j -> j == i ? Float32.(case.context[j]) : case.context[j], length(case.context)
+        )
+        @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+            prep, case.x; context=bad_eltype
+        )
+    end
+
     # --- backend-independent invariants ---
     # A stray `context=` on a wrong-arity prep surfaces the domain error, not a
     # MethodError (reject methods accept and ignore `context`). `VectorValuedProblem`
@@ -524,6 +627,15 @@ function _run(
     eph = prepare_fn(adtype, case.f, e0; check_dims, context=case.context, order=2)
     @test AbstractPPL.value_gradient_and_hessian!!(eph, e0; context=ov.context)[1] ≈
         empty_val atol = atol rtol = rtol
+
+    # Integer-eltype rejection is preserved under an override: the override path
+    # calls `f` directly, so it must apply the same static guard the evaluator
+    # callables do. `check_dims=false` isolates the guard (the `{true}` entry
+    # check already rejects integers before the override is reached).
+    epg_f = prepare_fn(adtype, case.f, e0; check_dims=false, context=case.context)
+    @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+        epg_f, Int[]; context=ov.context
+    )
     return nothing
 end
 

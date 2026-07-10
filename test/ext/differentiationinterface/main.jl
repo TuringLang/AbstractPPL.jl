@@ -101,9 +101,10 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
     end
 
     # Non-compiled ReverseDiff threads context as call-time `Constant`s and
-    # honours an override on both entry points; compiled-tape ReverseDiff bakes
-    # context into its tape and rejects a non-empty override. Empty input is
-    # accepted on both (the runner checks it regardless of the flags).
+    # honours an override on all three entry points; compiled-tape ReverseDiff
+    # bakes context into its tapes and rejects a non-empty override on each of
+    # them. Empty input is accepted on both (the runner checks it regardless of
+    # the flags).
     @testset "call-time context override (#167)" begin
         for case in generate_testcases(Val(:context_override))
             run_testcase(case; adtype=AutoReverseDiff(), atol=1e-6, rtol=1e-6)
@@ -114,6 +115,7 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
                 rtol=1e-6,
                 gradient_override=:reject,
                 hessian_override=:reject,
+                jacobian_override=:reject,
             )
         end
     end

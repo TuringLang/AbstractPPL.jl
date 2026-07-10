@@ -185,27 +185,30 @@ end
     ::Prepared{
         <:AutoForwardDiff,<:VectorEvaluator,<:Union{FDCache{:scalar},FDCache{:hessian}}
     },
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_jacobian_needs_vector()
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:vector,Nothing}},
-    x::AbstractVector{<:Real},
+    x::AbstractVector{<:Real};
+    context=nothing,
 )
     Evaluators._check_ad_input(p.evaluator, x)
-    val = p.evaluator(x)
+    val = Evaluators._evaluate_with_context(p.evaluator, x, context)
     return (val, similar(x, length(val), 0))
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AutoForwardDiff,<:VectorEvaluator,<:FDCache{:vector}},
-    x::AbstractVector{<:Real},
+    x::AbstractVector{<:Real};
+    context=nothing,
 )
     Evaluators._check_ad_input(p.evaluator, x)
     ForwardDiff.jacobian!(
-        p.cache.result, Base.Fix2(_fd_call, p.evaluator), x, p.cache.config, Val(false)
+        p.cache.result, _fd_target(p, context), x, p.cache.config, Val(false)
     )
     return (DiffResults.value(p.cache.result), DiffResults.jacobian(p.cache.result))
 end

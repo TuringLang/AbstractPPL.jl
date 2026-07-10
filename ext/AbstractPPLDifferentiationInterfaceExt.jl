@@ -178,16 +178,19 @@ end
         map(DI.Constant, Evaluators._resolve_context(eval, context))...,
     )
 
-@inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _) =
+@inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _eval, ::Nothing) =
     DI.value_and_jacobian(c.target, c.jacobian_prep, ad, x)
-@inline _di_value_and_jacobian(c::DIJacobianCache, ad, x, eval) = DI.value_and_jacobian(
-    c.target,
-    c.jacobian_prep,
-    ad,
-    x,
-    DI.Constant(eval.f),
-    map(DI.Constant, eval.context)...,
-)
+@inline _di_value_and_jacobian(::DIJacobianCache{:closure}, _ad, _x, _eval, ::Tuple) =
+    _throw_compiled_rd_override_unsupported()
+@inline _di_value_and_jacobian(c::DIJacobianCache, ad, x, eval, context) =
+    DI.value_and_jacobian(
+        c.target,
+        c.jacobian_prep,
+        ad,
+        x,
+        DI.Constant(eval.f),
+        map(DI.Constant, Evaluators._resolve_context(eval, context))...,
+    )
 
 @inline _di_value_gradient_and_hessian(
     c::DIHessianCache{:closure}, ad, x, _eval, ::Nothing
@@ -242,23 +245,27 @@ end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DIJacobianCache{<:Any,<:Any,Nothing}},
-    x::AbstractVector{T},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    val = p.evaluator(x)
+    val = Evaluators._evaluate_with_context(p.evaluator, x, context)
     return (val, similar(x, length(val), 0))
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
-    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DIJacobianCache}, x::AbstractVector{T}
+    p::Prepared{<:AbstractADType,<:VectorEvaluator,<:DIJacobianCache},
+    x::AbstractVector{T};
+    context=nothing,
 ) where {T<:Real}
     Evaluators._check_ad_input(p.evaluator, x)
-    return _di_value_and_jacobian(p.cache, p.adtype, x, p.evaluator)
+    return _di_value_and_jacobian(p.cache, p.adtype, x, p.evaluator, context)
 end
 
 @inline function AbstractPPL.value_and_jacobian!!(
     ::Prepared{<:AbstractADType,<:VectorEvaluator,<:_GradientCapable},
-    ::AbstractVector{<:Real},
+    ::AbstractVector{<:Real};
+    context=nothing,
 )
     return Evaluators._throw_jacobian_needs_vector()
 end

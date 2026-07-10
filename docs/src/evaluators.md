@@ -209,8 +209,8 @@ preserves the unary `f(x)` shape.
 ### Overriding the context for a single call
 
 The context frozen at `prepare` can be replaced for one call by passing a
-`context` tuple to `value_and_gradient!!` or `value_gradient_and_hessian!!`,
-without re-preparing:
+`context` tuple to `value_and_gradient!!`, `value_and_jacobian!!`, or
+`value_gradient_and_hessian!!`, without re-preparing:
 
 ```julia
 prepared = prepare(adtype, affine, zeros(3); context=(2.0, 1.0))
@@ -219,13 +219,19 @@ value_and_gradient!!(prepared, x; context=(3.0, 0.0))  # overrides, this call on
 ```
 
 The override must match the prepared context's element types and shapes (the
-prepared cache is keyed on types), and it is per-call — it does not mutate the
-frozen context. Two backends bake the context into their prepared state and
-reject an override on a non-empty input with an `ArgumentError` (re-`prepare`
+prepared cache is keyed on types); every override is validated against the
+frozen context, and a mismatch — or a non-`Tuple` override — throws an
+`ArgumentError`. The override is per-call — it does not mutate the frozen
+context. Some backends bake the context into their prepared state and reject
+an override on a non-empty input with an `ArgumentError` (re-`prepare`
 instead): compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`), whose
-context is baked into the tape, and Mooncake's `value_gradient_and_hessian!!`,
-whose Hessian cache binds its target by object identity. Empty input runs no
-derivative machinery, so an override is always accepted there.
+context is baked into its tapes on all three entry points, and Mooncake's
+`value_gradient_and_hessian!!`, whose Hessian cache binds its target by object
+identity. Mooncake Jacobian preps are context-free by construction (`prepare`
+rejects vector-valued problems with non-empty `context`), so only an
+empty-`Tuple` override validates there. Empty input runs no derivative
+machinery, so no backend rejects an override there — the override is still
+validated.
 
 ## Without an AD backend
 
