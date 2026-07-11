@@ -467,8 +467,8 @@ end
 # `:prepare_rejects` for backends that refuse vector arity + non-empty context
 # at `prepare` (Mooncake), where only the trivially-matching empty override
 # exists. Each backend driver passes the flags that match its caches. Contract
-# violations (type/shape/arity mismatch, non-`Tuple`) are validated centrally
-# and throw on every backend regardless of the flags. Empty input runs no
+# violations (type/arity mismatch, non-`Tuple`) are validated centrally and
+# throw on every backend regardless of the flags. Empty input runs no
 # derivative machinery, so no backend rejects an override there — but the
 # override is still validated, and integer-eltype inputs are still rejected.
 function _run(
@@ -582,7 +582,7 @@ function _run(
     end
 
     # --- override contract violations (validated centrally, all backends) ---
-    # Arity/type/shape mismatches and non-`Tuple` overrides throw an
+    # Arity/type mismatches and non-`Tuple` overrides throw an
     # `ArgumentError` from `Evaluators._resolve_context` before any backend
     # machinery runs (compiled-tape ReverseDiff throws its own `ArgumentError`
     # even earlier, so the assertions hold on every backend).
@@ -594,13 +594,6 @@ function _run(
     )
     for (i, c) in enumerate(case.context)
         c isa AbstractArray || continue
-        bad_shape = ntuple(
-            j -> j == i ? case.context[j][1:(end - 1)] : case.context[j],
-            length(case.context),
-        )
-        @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
-            prep, case.x; context=bad_shape
-        )
         bad_eltype = ntuple(
             j -> j == i ? Float32.(case.context[j]) : case.context[j], length(case.context)
         )
@@ -627,6 +620,10 @@ function _run(
     eph = prepare_fn(adtype, case.f, e0; check_dims, context=case.context, order=2)
     @test AbstractPPL.value_gradient_and_hessian!!(eph, e0; context=ov.context)[1] ≈
         empty_val atol = atol rtol = rtol
+    # A non-`Tuple` override is rejected on the empty-input shortcut too.
+    @test_throws ArgumentError AbstractPPL.value_and_gradient!!(
+        epg, e0; context=first(ov.context)
+    )
 
     # Integer-eltype rejection is preserved under an override: the override path
     # calls `f` directly, so it must apply the same static guard the evaluator

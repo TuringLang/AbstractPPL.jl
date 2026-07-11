@@ -108,7 +108,7 @@ end
 # per-call override. `_fd_call` reads `e.f`/`e.context` directly, so the wrapper's
 # `CheckInput` is irrelevant here (`{false}` is fine), and the config's `Tag` —
 # keyed on the target type and already bypassed via `Val(false)` — stays valid
-# for an override of matching context types/shapes. (The empty-input
+# for an override of matching context types. (The empty-input
 # primal-under-override lives in `Evaluators._evaluate_with_context`.)
 @inline _fd_target(p, context) = Base.Fix2(
     _fd_call,

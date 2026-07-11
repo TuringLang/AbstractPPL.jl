@@ -122,9 +122,9 @@ internal cache buffers of `prepared`. The returned gradient may alias
 By default the `context` frozen at `prepare` is used. Pass a `Tuple` as
 `context` to override it for a single call without re-preparing — it must match
 the prepared context's element types and shapes, since the prepared cache is
-keyed on types. Every override is validated against the frozen context; a
-mismatch, or a non-`Tuple` override, throws an `ArgumentError`. The override is
-per-call and does not mutate the frozen context.
+keyed on types. A type mismatch, or a non-`Tuple` override, throws an
+`ArgumentError`. The override is per-call and does not mutate the frozen
+context.
 Compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`) bakes the context
 into its tape and throws if an override is supplied for a non-empty input.
 Empty input (`length(x) == 0`) runs no derivative machinery — the value is
@@ -281,7 +281,7 @@ _check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
 # `CheckInput`); a `Tuple` is validated by `_resolve_context` and applied to
 # `f` directly, with the same static integer-eltype rejection as the evaluator
 # callables (on the `{false}` path there is otherwise no check between here
-# and `f`).
+# and `f`); anything else is rejected with the same error as the AD paths.
 @inline _evaluate_with_context(e::VectorEvaluator, x, ::Nothing) = e(x)
 @inline function _evaluate_with_context(
     e::VectorEvaluator, x::AbstractVector{T}, context::Tuple
@@ -289,9 +289,13 @@ _check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
     T <: Integer && _reject_integer_input(x)
     return e.f(x, _resolve_context(e, context)...)
 end
-# A non-`Tuple` override fails with the same `ArgumentError` as the AD paths.
-@inline _evaluate_with_context(e::VectorEvaluator, x, context) =
-    _resolve_context(e, context)
+function _evaluate_with_context(::VectorEvaluator, _, context)
+    throw(
+        ArgumentError(
+            "A call-time `context` override must be a `Tuple`; got $(typeof(context))."
+        ),
+    )
+end
 
 # Resolve a call-time `context` override into the context tuple a backend builds
 # its AD target from: `nothing` (the default) keeps the context frozen at
@@ -300,52 +304,25 @@ end
 # validation live in one place; each backend wraps the result in its own target
 # (`Constant`s, `_ADTarget`, a `Fix2` evaluator).
 #
-# An override must match the frozen context's element types and shapes, since
-# the prepared caches are keyed on types: `typeof === ` catches arity and every
-# element type in one comparison that constant-folds away when the types match,
-# and array elements are additionally compared by `size` (top-level elements
-# only, mirroring the granularity of the backends' own cache validation). The
-# `nothing` hot path is untouched.
+# An override must match the frozen context's element types, since the prepared
+# caches are keyed on types: `typeof === ` catches arity and every element type
+# in one comparison that constant-folds away when the types match. Array sizes
+# are not checked — keeping them fixed is the caller's responsibility.
 @inline _resolve_context(e::VectorEvaluator, ::Nothing) = e.context
 @inline function _resolve_context(e::VectorEvaluator, context::Tuple)
-    typeof(context) === typeof(e.context) ||
-        _throw_context_type_mismatch(e.context, context)
-    _check_context_sizes(e.context, context)
+    typeof(context) === typeof(e.context) || throw(
+        ArgumentError(
+            "Call-time `context` override does not match the context frozen at " *
+            "`prepare`: expected `$(typeof(e.context))`, got `$(typeof(context))`. " *
+            "The prepared caches are keyed on these types; re-`prepare` to change them.",
+        ),
+    )
     return context
 end
 function _resolve_context(::VectorEvaluator, context)
     throw(
         ArgumentError(
             "A call-time `context` override must be a `Tuple`; got $(typeof(context))."
-        ),
-    )
-end
-
-function _throw_context_type_mismatch(frozen, override)
-    throw(
-        ArgumentError(
-            "Call-time `context` override does not match the context frozen at " *
-            "`prepare`: expected `$(typeof(frozen))`, got `$(typeof(override))`. " *
-            "The prepared caches are keyed on these types; re-`prepare` to change them.",
-        ),
-    )
-end
-
-@inline function _check_context_sizes(frozen::Tuple, override::Tuple)
-    ntuple(Val(length(frozen))) do i
-        a, b = frozen[i], override[i]
-        a isa AbstractArray && size(a) != size(b) && _throw_context_size_mismatch(i, a, b)
-        nothing
-    end
-    return nothing
-end
-
-function _throw_context_size_mismatch(i, a, b)
-    throw(
-        ArgumentError(
-            "Call-time `context` override element $i has size $(size(b)); the " *
-            "context frozen at `prepare` has size $(size(a)). Re-`prepare` to " *
-            "change context shapes.",
         ),
     )
 end

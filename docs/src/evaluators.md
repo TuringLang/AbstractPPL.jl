@@ -219,19 +219,18 @@ value_and_gradient!!(prepared, x; context=(3.0, 0.0))  # overrides, this call on
 ```
 
 The override must match the prepared context's element types and shapes (the
-prepared cache is keyed on types); every override is validated against the
-frozen context, and a mismatch — or a non-`Tuple` override — throws an
-`ArgumentError`. The override is per-call — it does not mutate the frozen
-context. Some backends bake the context into their prepared state and reject
-an override on a non-empty input with an `ArgumentError` (re-`prepare`
-instead): compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`), whose
-context is baked into its tapes on all three entry points, and Mooncake's
-`value_gradient_and_hessian!!`, whose Hessian cache binds its target by object
-identity. Mooncake Jacobian preps are context-free by construction (`prepare`
-rejects vector-valued problems with non-empty `context`), so only an
-empty-`Tuple` override validates there. Empty input runs no derivative
-machinery, so no backend rejects an override there — the override is still
-validated.
+prepared cache is keyed on types); a type mismatch — or a non-`Tuple`
+override — throws an `ArgumentError`. The override is per-call — it does not
+mutate the frozen context. Some backends bake the context into their prepared
+state and reject an override on a non-empty input with an `ArgumentError`
+(re-`prepare` instead): compiled-tape ReverseDiff
+(`AutoReverseDiff(; compile=true)`), whose context is baked into its tapes on
+all three entry points, and Mooncake's `value_gradient_and_hessian!!`, whose
+Hessian cache binds its target by object identity. Mooncake Jacobian preps are
+context-free by construction (`prepare` rejects vector-valued problems with
+non-empty `context`), so only an empty-`Tuple` override validates there. Empty
+input runs no derivative machinery, so no backend rejects an override there —
+the override is still validated.
 
 ## Without an AD backend
 
