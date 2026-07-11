@@ -113,32 +113,61 @@ function prepare(
 end
 
 """
-    value_and_gradient!!(prepared, x::AbstractVector{<:Real})
+    value_and_gradient!!(prepared, x::AbstractVector{<:Real}; context=nothing)
 
 Return `(value, gradient)` for a scalar-valued evaluator, potentially reusing
 internal cache buffers of `prepared`. The returned gradient may alias
 `prepared`'s internal storage; copy if you need to retain it past the next call.
+
+By default the `context` frozen at `prepare` is used. Pass a `Tuple` as
+`context` to override it for a single call without re-preparing — it must match
+the prepared context's element types and shapes, since the prepared cache is
+keyed on types. A type mismatch, or a non-`Tuple` override, throws an
+`ArgumentError`. The override is per-call and does not mutate the frozen
+context. Overrides apply to vector-input preparations; a NamedTuple prep
+accepts only `context=nothing`.
+Compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`) bakes the context
+into its tape and throws if an override is supplied for a non-empty input.
+Empty input (`length(x) == 0`) runs no derivative machinery — the value is
+computed directly — so no backend rejects an override there; the override is
+still validated against the frozen context.
 """
 function value_and_gradient!! end
 
 """
-    value_and_jacobian!!(prepared, x::AbstractVector{<:Real})
+    value_and_jacobian!!(prepared, x::AbstractVector{<:Real}; context=nothing)
 
 Return `(value::AbstractVector, jacobian::AbstractMatrix)` for a vector-valued
 evaluator, potentially reusing internal cache buffers. The returned arrays may
 alias `prepared`'s internal storage; copy if needed.
 The Jacobian has shape `(length(value), length(x))`.
+
+`context` may override the context frozen at `prepare` for a single call, under
+the same contract as [`value_and_gradient!!`](@ref). Compiled-tape ReverseDiff
+(`AutoReverseDiff(; compile=true)`) bakes the context into its tape and throws
+for a non-empty-input override. Mooncake Jacobian preps are context-free by
+construction (`prepare` rejects vector-valued problems with non-empty
+`context`), so only an empty-`Tuple` override validates there.
 """
 function value_and_jacobian!! end
 
 """
-    value_gradient_and_hessian!!(prepared, x::AbstractVector{<:Real})
+    value_gradient_and_hessian!!(prepared, x::AbstractVector{<:Real}; context=nothing)
 
 Return `(value, gradient::AbstractVector, hessian::AbstractMatrix)` for a
 scalar-valued evaluator prepared with `order=2`, potentially reusing internal
 cache buffers. The returned gradient and Hessian may alias `prepared`'s
 internal storage; copy if you need to retain them past the next call.
 The Hessian has shape `(length(x), length(x))`.
+
+`context` may override the context frozen at `prepare` for a single call, under
+the same contract as [`value_and_gradient!!`](@ref), except that on a non-empty
+input two backends throw for the Hessian and require re-`prepare` instead:
+compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`), which bakes the
+context into its tape, and Mooncake, whose Hessian cache binds its target by
+object identity. As for the gradient, empty input runs no machinery, so no
+backend rejects an override there (it is still validated against the frozen
+context).
 """
 function value_gradient_and_hessian!! end
 
@@ -246,6 +275,58 @@ function _check_ad_input(e::VectorEvaluator{true}, x::AbstractVector{T}) where {
     return nothing
 end
 _check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
+
+# Primal value under a possibly-overridden call-time context, shared by the
+# AD-backend extensions' empty-input shortcuts (which bypass the backend).
+# `nothing` keeps the frozen context via the evaluator (honouring its
+# `CheckInput`); a `Tuple` is validated by `_resolve_context` and applied to
+# `f` directly, with the same static integer-eltype rejection as the evaluator
+# callables (on the `{false}` path there is otherwise no check between here
+# and `f`); anything else is rejected with the same error as the AD paths.
+@inline _evaluate_with_context(e::VectorEvaluator, x, ::Nothing) = e(x)
+@inline function _evaluate_with_context(
+    e::VectorEvaluator, x::AbstractVector{T}, context::Tuple
+) where {T}
+    T <: Integer && _reject_integer_input(x)
+    return e.f(x, _resolve_context(e, context)...)
+end
+function _evaluate_with_context(::VectorEvaluator, _, context)
+    throw(
+        ArgumentError(
+            "A call-time `context` override must be a `Tuple`; got $(typeof(context))."
+        ),
+    )
+end
+
+# Resolve a call-time `context` override into the context tuple a backend builds
+# its AD target from: `nothing` (the default) keeps the context frozen at
+# `prepare`; a `Tuple` replaces it for this call (issue #167). Shared by the
+# AD-backend override paths so the `nothing`/`Tuple` dispatch and the override
+# validation live in one place; each backend wraps the result in its own target
+# (`Constant`s, `_ADTarget`, a `Fix2` evaluator).
+#
+# An override must match the frozen context's element types, since the prepared
+# caches are keyed on types: `typeof === ` catches arity and every element type
+# in one comparison that constant-folds away when the types match. Array sizes
+# are not checked — keeping them fixed is the caller's responsibility.
+@inline _resolve_context(e::VectorEvaluator, ::Nothing) = e.context
+@inline function _resolve_context(e::VectorEvaluator, context::Tuple)
+    typeof(context) === typeof(e.context) || throw(
+        ArgumentError(
+            "Call-time `context` override does not match the context frozen at " *
+            "`prepare`: expected `$(typeof(e.context))`, got `$(typeof(context))`. " *
+            "The prepared caches are keyed on these types; re-`prepare` to change them.",
+        ),
+    )
+    return context
+end
+function _resolve_context(::VectorEvaluator, context)
+    throw(
+        ArgumentError(
+            "A call-time `context` override must be a `Tuple`; got $(typeof(context))."
+        ),
+    )
+end
 
 # Both bodies rely on `T <: Integer` being a static check so the AD hot path
 # (Float/dual `T`) elides the branch; the `{false}` callable additionally skips

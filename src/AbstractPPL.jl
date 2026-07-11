@@ -18,20 +18,26 @@ using .Evaluators:
     generate_testcases(::Val{group})
 
 Return a tuple of AD conformance test cases for the input-shape `group`.
-Reserved groups: `:vector` (vector input) and `:namedtuple` (NamedTuple
-input; Mooncake-only). Iterate and pass each to [`run_testcase`](@ref).
+Reserved groups: `:vector` (vector input), `:namedtuple` (NamedTuple
+input; Mooncake-only), and `:context_override` (call-time `context`
+overrides). Iterate and pass each to [`run_testcase`](@ref).
 Implemented by the `Test` extension (`AbstractPPLTestExt`).
 """
 function generate_testcases end
 
 """
     run_testcase(case; adtype, prepare_fn=AbstractPPL.prepare, atol=0, rtol=1e-10,
-                 check_dims=true, type_stability=:skip, allocations=:skip)
+                 check_dims=true, type_stability=:skip, allocations=:skip,
+                 gradient_override=:honor, hessian_override=:honor,
+                 jacobian_override=:honor)
 
 Run a single conformance case against an AD backend. `type_stability` and
 `allocations` accept `:skip` / `:test` / `:broken` — `:test` asserts the
 invariant, `:broken` marks it `@test_broken` (use for backends with known
-regressions). Implemented by the `Test` extension.
+regressions). The `*_override` kwargs apply to the `:context_override` group
+and declare whether the backend honours or rejects a call-time `context`
+override on each entry point (see the `Test` extension's `TestCase` docs).
+Implemented by the `Test` extension.
 """
 function run_testcase end
 
