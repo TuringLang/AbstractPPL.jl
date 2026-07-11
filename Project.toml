@@ -19,6 +19,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [weakdeps]
+ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -27,6 +28,7 @@ Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [extensions]
+AbstractPPLComponentArraysExt = ["ComponentArrays"]
 AbstractPPLDifferentiationInterfaceExt = ["DifferentiationInterface"]
 AbstractPPLDistributionsExt = ["Distributions", "LinearAlgebra"]
 AbstractPPLForwardDiffExt = ["ForwardDiff", "DiffResults"]
@@ -37,7 +39,8 @@ AbstractPPLTestExt = ["Test"]
 ADTypes = "1"
 AbstractMCMC = "2, 3, 4, 5"
 Accessors = "0.1"
-BangBang = "0.4"
+BangBang = "0.4.1"
+ComponentArrays = "0.15"
 DensityInterface = "0.4"
 DiffResults = "1"
 DifferentiationInterface = "0.6, 0.7"

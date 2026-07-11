@@ -16,6 +16,7 @@ const GROUP = get(ENV, "GROUP", "All")
         include("varname/hasvalue.jl")
         include("varname/leaves.jl")
         include("varname/serialize.jl")
+        include("varnamedtuple.jl")
         include("of.jl")
     end
 
@@ -24,7 +25,8 @@ const GROUP = get(ENV, "GROUP", "All")
             DocMeta.setdocmeta!(
                 AbstractPPL, :DocTestSetup, :(using AbstractPPL); recursive=true
             )
-            doctest(AbstractPPL; manual=false)
+            doctestfilters = [r"└ @ .+:[0-9]+"]
+            doctest(AbstractPPL; manual=false, doctestfilters)
         end
     end
 end

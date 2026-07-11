@@ -4,6 +4,12 @@
 
 Fixed a Mooncake reverse-mode correctness bug ([Mooncake issue #1238](https://github.com/chalk-lab/Mooncake.jl/issues/1238)): when a problem function closed over differentiable data (e.g. a model capturing observed data reached through an in-place solve), a reused prepared cache accumulated that captured data's cotangent and returned an incorrect gradient after the first evaluation. The Mooncake extension now closes the function and its context into a `NoTangent` target, so the captured data carries no cotangent and reuse is correct.
 
+Moved `VarNamedTuple` and its structured-array support from DynamicPPL into AbstractPPL so
+probabilistic programming frontends can share a lossless, `VarName`-keyed parameter
+container. The exported API includes `VarNamedTuple`, `@vnt`, `subset`, and the existing
+mapping, densification, and skeleton helpers. Template-based insertion remains public as
+`templated_setindex!!`. ComponentArrays integration is provided by a package extension.
+
 ## 0.15.3
 
 Added the `of` type system: a self-contained, declarative way to specify the shape, element type, and support of model variables. Construct specifications with the exported `of` function or the exported `@of` macro:

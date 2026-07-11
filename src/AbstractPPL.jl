@@ -101,6 +101,42 @@ export AbstractOptic,
 using Accessors: set
 export set
 
+"""
+    subset(value, varnames)
+
+Return the part of `value` selected by `varnames`.
+"""
+function subset end
+
+include("varnamedtuple.jl")
+using .VarNamedTuples:
+    VarNamedTuples,
+    VarNamedTuple,
+    map_pairs!!,
+    map_values!!,
+    apply!!,
+    densify!!,
+    templated_setindex!!,
+    NoTemplate,
+    SkipTemplate,
+    @vnt,
+    skeleton
+
+export VarNamedTuple,
+    @vnt,
+    map_pairs!!,
+    map_values!!,
+    apply!!,
+    densify!!,
+    skeleton,
+    subset,
+    NoTemplate,
+    SkipTemplate
+
+@static if VERSION >= v"1.11.0"
+    eval(Meta.parse("public VarNamedTuples, templated_setindex!!"))
+end
+
 include("of.jl")
 export of, @of
 @static if VERSION >= v"1.11.0"

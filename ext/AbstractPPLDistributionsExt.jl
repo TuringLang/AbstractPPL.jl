@@ -50,6 +50,7 @@ This decision may be revisited in the future.
 module AbstractPPLDistributionsExt
 
 using AbstractPPL: AbstractPPL, VarName, Accessors
+using AbstractPPL.VarNamedTuples: VarNamedTuple, PartialArray, _getindex_optic
 using Distributions: Distributions
 using LinearAlgebra: Cholesky, LowerTriangular, UpperTriangular
 
@@ -70,7 +71,7 @@ function get_optics(dist::Distributions.LKJCholesky)
     is_up = dist.uplo == 'U'
     cartesian_indices = filter(CartesianIndices(size(dist))) do cartesian_index
         i, j = cartesian_index.I
-        is_up ? i <= j : i >= j
+        return is_up ? i <= j : i >= j
     end
     # there is an additional layer as we need to access `.L` or `.U` before we
     # can index into it
@@ -300,6 +301,63 @@ function AbstractPPL.getvalue(
     else
         error("$(vn) was not found in the dictionary provided")
     end
+end
+
+# A VarNamedTuple already retains its structure, so most distributions can use its direct
+# lookup. LKJCholesky is the exception: values may be stored under the `.L` or `.U` optics
+# and need the existing dictionary reconstruction path below.
+function AbstractPPL.hasvalue(
+    vals::VarNamedTuple, vn::VarName, ::Distributions.Distribution
+)
+    return haskey(vals, vn)
+end
+function AbstractPPL.getvalue(
+    vals::VarNamedTuple, vn::VarName, ::Distributions.Distribution
+)
+    return vals[vn]
+end
+
+function AbstractPPL.hasvalue(
+    vnt::VarNamedTuple, vn::VarName, dist::Distributions.LKJCholesky
+)
+    haskey(vnt, vn) || return false
+    val = _getindex_optic(vnt, vn)
+    if !(val isa VarNamedTuple || val isa PartialArray)
+        return true
+    end
+
+    et = val isa VarNamedTuple ? Any : eltype(val)
+    dval = Dict{VarName,et}()
+    for key in keys(val)
+        subvn = if val isa VarNamedTuple
+            AbstractPPL.prefix(key, vn)
+        else
+            AbstractPPL.append_optic(vn, key)
+        end
+        dval[subvn] = _getindex_optic(val, key, subvn)
+    end
+    return AbstractPPL.hasvalue(dval, vn, dist)
+end
+
+function AbstractPPL.getvalue(
+    vnt::VarNamedTuple, vn::VarName, dist::Distributions.LKJCholesky
+)
+    val = _getindex_optic(vnt, vn)
+    if !(val isa VarNamedTuple || val isa PartialArray)
+        return val
+    end
+
+    et = val isa VarNamedTuple ? Any : eltype(val)
+    dval = Dict{VarName,et}()
+    for key in keys(val)
+        subvn = if val isa VarNamedTuple
+            AbstractPPL.prefix(key, vn)
+        else
+            AbstractPPL.append_optic(vn, key)
+        end
+        dval[subvn] = _getindex_optic(val, key, subvn)
+    end
+    return AbstractPPL.getvalue(dval, vn, dist)
 end
 
 end

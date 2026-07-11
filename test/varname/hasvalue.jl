@@ -34,11 +34,11 @@ using Test
         @test canview(@opticof(_[1:2]), x)
         @test canview(@opticof(_[:]), x)
         @test !canview(@opticof(_[4]), x)
-        @test canview(@opticof(_[i=1]), x)
+        @test canview(@opticof(_[i = 1]), x)
         # For some weird reason DimData does not error on these two but just warns that
         # there's no index j!
-        @test canview(@opticof(_[j=2]), x)
-        @test canview(@opticof(_[i=1, j=2]), x)
+        @test canview(@opticof(_[j = 2]), x)
+        @test canview(@opticof(_[i = 1, j = 2]), x)
     end
 
     @testset "Dict" begin
@@ -246,14 +246,14 @@ end
         @test getvalue(x, @varname(a[1, 2])) == x.a[1, 2]
         @test hasvalue(x, @varname(a[:]))
         @test getvalue(x, @varname(a[:])) == x.a[:]
-        @test canview(@opticof(_[i=1]), x.a)
-        @test hasvalue(x, @varname(a[i=1]))
-        @test getvalue(x, @varname(a[i=1])) == x.a[i=1]
-        @test canview(@opticof(_[i=1, j=2]), x.a)
-        @test hasvalue(x, @varname(a[i=1, j=2]))
-        @test getvalue(x, @varname(a[i=1, j=2])) == x.a[i=1, j=2]
-        @test hasvalue(x, @varname(a[i=DD.Not(1)]))
-        @test getvalue(x, @varname(a[i=DD.Not(1)])) == x.a[i=DD.Not(1)]
+        @test canview(@opticof(_[i = 1]), x.a)
+        @test hasvalue(x, @varname(a[i = 1]))
+        @test getvalue(x, @varname(a[i = 1])) == x.a[i = 1]
+        @test canview(@opticof(_[i = 1, j = 2]), x.a)
+        @test hasvalue(x, @varname(a[i = 1, j = 2]))
+        @test getvalue(x, @varname(a[i = 1, j = 2])) == x.a[i = 1, j = 2]
+        @test hasvalue(x, @varname(a[i = DD.Not(1)]))
+        @test getvalue(x, @varname(a[i = DD.Not(1)])) == x.a[i = DD.Not(1)]
 
         y = (; b=DD.DimArray(randn(2, 3), (DD.X, DD.Y)))
         @test hasvalue(y, @varname(b))
@@ -279,6 +279,13 @@ end
         @test getvalue(d, @varname(x), Normal()) == 1.0
         @test hasvalue(d, @varname(y[1][1]), Normal())
         @test getvalue(d, @varname(y[1][1]), Normal()) == 2.0
+
+        vnt = @vnt begin
+            x := 1.0
+        end
+        @test hasvalue(vnt, @varname(x), Normal())
+        @test getvalue(vnt, @varname(x), Normal()) == 1.0
+        @test !hasvalue(vnt, @varname(y), Normal())
     end
 
     @testset "multivariate + matrix" begin
@@ -311,6 +318,17 @@ end
         )
         @test !hasvalue(d, @varname(y), LKJCholesky(3, 1.0); error_on_incomplete=true)
 
+        vnt = @vnt begin
+            @template x = (; L=zeros(2, 2))
+            x.L[1, 1] := 1.0
+            x.L[2, 1] := 2.0
+            x.L[2, 2] := 3.0
+        end
+        @test hasvalue(vnt, @varname(x), LKJCholesky(2, 1.0))
+        @test getvalue(vnt, @varname(x), LKJCholesky(2, 1.0)) ==
+            Cholesky(LowerTriangular([1.0 0.0; 2.0 3.0]))
+        @test !hasvalue(vnt, @varname(x), LKJCholesky(3, 1.0))
+
         d = Dict(
             @varname(x.U[1, 1]) => 1.0,
             @varname(x.U[1, 2]) => 2.0,
@@ -324,6 +342,17 @@ end
             d, @varname(x), LKJCholesky(3, 1.0, :U); error_on_incomplete=true
         )
         @test !hasvalue(d, @varname(y), LKJCholesky(3, 1.0, :U); error_on_incomplete=true)
+
+        vnt = @vnt begin
+            @template x = (; U=zeros(2, 2))
+            x.U[1, 1] := 1.0
+            x.U[1, 2] := 2.0
+            x.U[2, 2] := 3.0
+        end
+        @test hasvalue(vnt, @varname(x), LKJCholesky(2, 1.0, :U))
+        @test getvalue(vnt, @varname(x), LKJCholesky(2, 1.0, :U)) ==
+            Cholesky(UpperTriangular([1.0 2.0; 0.0 3.0]))
+        @test !hasvalue(vnt, @varname(x), LKJCholesky(3, 1.0, :U))
     end
 end
 
