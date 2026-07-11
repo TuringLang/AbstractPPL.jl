@@ -203,8 +203,14 @@ end
 # again here would duplicate the second check on every AD call.
 # (`∂f` is `NoTangent` thanks to the `tangent_type` overload above.)
 @inline function AbstractPPL.value_and_gradient!!(
-    p::Prepared{<:_MooncakeAD,<:NamedTupleEvaluator}, values::NamedTuple
+    p::Prepared{<:_MooncakeAD,<:NamedTupleEvaluator}, values::NamedTuple; context=nothing
 )
+    context === nothing || throw(
+        ArgumentError(
+            "Call-time `context` overrides apply only to vector-input " *
+            "preparations; NamedTuple evaluators take no `context`.",
+        ),
+    )
     val, (_, grad) = Mooncake.value_and_gradient!!(p.cache, p.evaluator, values)
     return (val, grad)
 end

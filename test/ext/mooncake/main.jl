@@ -60,6 +60,13 @@ end
             for case in generate_testcases(Val(:namedtuple))
                 run_testcase(case; adtype, atol=1e-6, rtol=1e-6)
             end
+            # NamedTuple preps take no `context`: `nothing` is accepted, a
+            # `Tuple` override is rejected.
+            nt_prep = prepare(adtype, v -> v.a^2, (a=0.5,))
+            @test value_and_gradient!!(nt_prep, (a=0.5,); context=nothing)[1] ≈ 0.25
+            @test_throws ArgumentError value_and_gradient!!(
+                nt_prep, (a=0.5,); context=(1.0,)
+            )
         end
     end
 

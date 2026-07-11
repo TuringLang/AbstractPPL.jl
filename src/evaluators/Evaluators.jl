@@ -124,7 +124,8 @@ By default the `context` frozen at `prepare` is used. Pass a `Tuple` as
 the prepared context's element types and shapes, since the prepared cache is
 keyed on types. A type mismatch, or a non-`Tuple` override, throws an
 `ArgumentError`. The override is per-call and does not mutate the frozen
-context.
+context. Overrides apply to vector-input preparations; a NamedTuple prep
+accepts only `context=nothing`.
 Compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`) bakes the context
 into its tape and throws if an override is supplied for a non-empty input.
 Empty input (`length(x) == 0`) runs no derivative machinery — the value is
