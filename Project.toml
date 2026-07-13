@@ -3,7 +3,7 @@ uuid = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
 keywords = ["probabilistic programming"]
 license = "MIT"
 desc = "Common interfaces for probabilistic programming"
-version = "0.15.4"
+version = "0.16.0"
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"

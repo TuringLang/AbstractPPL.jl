@@ -436,7 +436,7 @@ function make_leaf_multiindex(value, coptic::AbstractPPL.Index, template)
     pa_eltype = if sub_value isa AbstractArray || sub_value isa PartialArray
         eltype(sub_value)
     else
-        idx_size_type = Dims{_ndims(template, coptic.ix...;coptic.kw...)}
+        idx_size_type = Dims{_ndims(template, coptic.ix...; coptic.kw...)}
         ArrayLikeBlock{typeof(sub_value),typeof(coptic.ix),typeof(coptic.kw),idx_size_type}
     end
 

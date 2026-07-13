@@ -34,11 +34,11 @@ using Test
         @test canview(@opticof(_[1:2]), x)
         @test canview(@opticof(_[:]), x)
         @test !canview(@opticof(_[4]), x)
-        @test canview(@opticof(_[i = 1]), x)
+        @test canview(@opticof(_[i=1]), x)
         # For some weird reason DimData does not error on these two but just warns that
         # there's no index j!
-        @test canview(@opticof(_[j = 2]), x)
-        @test canview(@opticof(_[i = 1, j = 2]), x)
+        @test canview(@opticof(_[j=2]), x)
+        @test canview(@opticof(_[i=1, j=2]), x)
     end
 
     @testset "Dict" begin
@@ -246,14 +246,14 @@ end
         @test getvalue(x, @varname(a[1, 2])) == x.a[1, 2]
         @test hasvalue(x, @varname(a[:]))
         @test getvalue(x, @varname(a[:])) == x.a[:]
-        @test canview(@opticof(_[i = 1]), x.a)
-        @test hasvalue(x, @varname(a[i = 1]))
-        @test getvalue(x, @varname(a[i = 1])) == x.a[i = 1]
-        @test canview(@opticof(_[i = 1, j = 2]), x.a)
-        @test hasvalue(x, @varname(a[i = 1, j = 2]))
-        @test getvalue(x, @varname(a[i = 1, j = 2])) == x.a[i = 1, j = 2]
-        @test hasvalue(x, @varname(a[i = DD.Not(1)]))
-        @test getvalue(x, @varname(a[i = DD.Not(1)])) == x.a[i = DD.Not(1)]
+        @test canview(@opticof(_[i=1]), x.a)
+        @test hasvalue(x, @varname(a[i=1]))
+        @test getvalue(x, @varname(a[i=1])) == x.a[i=1]
+        @test canview(@opticof(_[i=1, j=2]), x.a)
+        @test hasvalue(x, @varname(a[i=1, j=2]))
+        @test getvalue(x, @varname(a[i=1, j=2])) == x.a[i=1, j=2]
+        @test hasvalue(x, @varname(a[i=DD.Not(1)]))
+        @test getvalue(x, @varname(a[i=DD.Not(1)])) == x.a[i=DD.Not(1)]
 
         y = (; b=DD.DimArray(randn(2, 3), (DD.X, DD.Y)))
         @test hasvalue(y, @varname(b))

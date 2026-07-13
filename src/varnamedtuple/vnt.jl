@@ -234,16 +234,19 @@ end
         if !_has_partial_array(ValType)
             return :(return false)
         end
-        push!(exs, quote
-            val = vnt.data.$name
-            if val isa VarNamedTuple || val isa PartialArray
-                if !Base.isempty(val)
+        push!(
+            exs,
+            quote
+                val = vnt.data.$name
+                if val isa VarNamedTuple || val isa PartialArray
+                    if !Base.isempty(val)
+                        return false
+                    end
+                else
                     return false
                 end
-            else
-                return false
-            end
-        end)
+            end,
+        )
     end
     push!(exs, :(return true))
     return Expr(:block, exs...)
