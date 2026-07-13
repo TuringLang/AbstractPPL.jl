@@ -4,7 +4,18 @@ Moved `VarNamedTuple` and its structured-array support from DynamicPPL into Abst
 probabilistic programming frontends can share a lossless, `VarName`-keyed parameter
 container. The exported API includes `VarNamedTuple`, `@vnt`, `subset`, and the existing
 mapping, densification, and skeleton helpers. Template-based insertion remains public as
-`templated_setindex!!`. ComponentArrays integration is provided by a package extension.
+`templated_setindex!!`. ComponentArrays integration is provided by a package extension, and
+the `Distribution`-aware `hasvalue`/`getvalue` methods live in the existing Distributions
+package extension.
+
+This release is purely additive over 0.15 — nothing was removed or changed in the existing
+public API, so downstream packages can widen their compat bound without code changes.
+However, the ten newly exported names (`VarNamedTuple`, `@vnt`, `map_pairs!!`,
+`map_values!!`, `apply!!`, `densify!!`, `skeleton`, `subset`, `NoTemplate`, `SkipTemplate`)
+are currently also exported by DynamicPPL for its own copy of the same functionality. Code
+that does `using DynamicPPL, AbstractPPL` unqualified will therefore see ambiguous bindings
+for these names until DynamicPPL migrates to re-export AbstractPPL's implementation;
+qualify uses in the meantime.
 
 ## 0.15.4
 
