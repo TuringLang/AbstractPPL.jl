@@ -1,3 +1,9 @@
+## 0.15.4
+
+`value_and_gradient!!`, `value_and_jacobian!!`, and `value_gradient_and_hessian!!` now accept a `context=` keyword that overrides, for a single call, the `context` frozen at `prepare` — without re-preparing (#167). The default (`context=nothing`) leaves the hot path unchanged; a `Tuple` override must match the frozen context's element types and shapes — a type mismatch (or a non-`Tuple` override) throws an `ArgumentError` — and reuses the type-keyed cache. Backends that bake context into their prepared state throw an `ArgumentError` for a non-empty-input override (re-`prepare` instead): compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`) on all three entry points, and Mooncake's Hessian; Mooncake Jacobian preps are context-free by construction, so only an empty override validates there. Empty input runs no derivative machinery, so no backend rejects an override there (it is still validated).
+
+Fixed a Mooncake reverse-mode correctness bug ([Mooncake issue #1238](https://github.com/chalk-lab/Mooncake.jl/issues/1238)): when a problem function closed over differentiable data (e.g. a model capturing observed data reached through an in-place solve), a reused prepared cache accumulated that captured data's cotangent and returned an incorrect gradient after the first evaluation. The Mooncake extension now closes the function and its context into a `NoTangent` target, so the captured data carries no cotangent and reuse is correct.
+
 ## 0.15.3
 
 Added the `of` type system: a self-contained, declarative way to specify the shape, element type, and support of model variables. Construct specifications with the exported `of` function or the exported `@of` macro:

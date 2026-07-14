@@ -47,4 +47,12 @@ using Test
         @test val ≈ 5.0
         @test grad ≈ [2.0, 4.0]
     end
+
+    # ForwardDiff rebuilds the target per call, so both the gradient and Hessian
+    # entry points honour a call-time `context` override.
+    @testset "call-time context override (#167)" begin
+        for case in generate_testcases(Val(:context_override))
+            run_testcase(case; adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
+        end
+    end
 end
