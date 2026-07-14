@@ -9,7 +9,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 ADTypes = "1"
-AbstractPPL = "0.15.2"
+AbstractPPL = "0.15.4"
 DifferentiationInterface = "0.6, 0.7"
 ForwardDiff = "1"
 ReverseDiff = "1"
