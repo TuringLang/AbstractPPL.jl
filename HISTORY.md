@@ -1,3 +1,7 @@
+## 0.15.5
+
+Widened the `Mooncake` compat bound to `0.5.27, 0.6` (#180). Mooncake 0.6 is a breaking release (forward-mode redesign), but the reverse-mode rule API and the prepared-cache API `AbstractPPLMooncakeExt` uses (`prepare_gradient_cache`, `prepare_derivative_cache`, `prepare_hessian_cache`, `value_and_gradient!!`, `value_gradient_and_hessian!!`, `AutoMooncake`, `AutoMooncakeForward`) are unchanged, so the extension works as-is.
+
 ## 0.15.4
 
 `value_and_gradient!!`, `value_and_jacobian!!`, and `value_gradient_and_hessian!!` now accept a `context=` keyword that overrides, for a single call, the `context` frozen at `prepare` — without re-preparing (#167). The default (`context=nothing`) leaves the hot path unchanged; a `Tuple` override must match the frozen context's element types and shapes — a type mismatch (or a non-`Tuple` override) throws an `ArgumentError` — and reuses the type-keyed cache. Backends that bake context into their prepared state throw an `ArgumentError` for a non-empty-input override (re-`prepare` instead): compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`) on all three entry points, and Mooncake's Hessian; Mooncake Jacobian preps are context-free by construction, so only an empty override validates there. Empty input runs no derivative machinery, so no backend rejects an override there (it is still validated).
