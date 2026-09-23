@@ -1,3 +1,7 @@
+## 0.15.6
+
+Reuse gradient output buffers in the DifferentiationInterface extension via `value_and_gradient!`, including gradient calls on Hessian preparations. Returned gradients alias cache storage, consistent with the existing `!!` contract.
+
 ## 0.15.5
 
 Widened the `Mooncake` compat bound to `0.5.27, 0.6` (#180). Mooncake 0.6 is a breaking release (forward-mode redesign), but the reverse-mode rule API and the prepared-cache API `AbstractPPLMooncakeExt` uses (`prepare_gradient_cache`, `prepare_derivative_cache`, `prepare_hessian_cache`, `value_and_gradient!!`, `value_gradient_and_hessian!!`, `AutoMooncake`, `AutoMooncakeForward`) are unchanged, so the extension works as-is.
