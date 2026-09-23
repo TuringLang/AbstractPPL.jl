@@ -143,7 +143,11 @@ _pretty_string_index(ix) = string(ix)
 _pretty_string_index(::Colon) = ":"
 _pretty_string_index(x::Symbol) = repr(x)
 _pretty_string_index(x::String) = repr(x)
-_pretty_string_index(di::DynamicIndex) = "DynamicIndex($(di.expr))"
+function _pretty_string_index(di::DynamicIndex)
+    # Julia 1.13 quotes these keywords when printing expressions outside indexing syntax.
+    expr = replace(string(di.expr), "var\"begin\"" => "begin", "var\"end\"" => "end")
+    return "DynamicIndex($expr)"
+end
 
 _concretize_index(idx::Any, ::Any) = idx
 _concretize_index(idx::DynamicIndex, val) = idx.f(val)
