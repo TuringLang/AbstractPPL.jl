@@ -25,11 +25,14 @@ using DifferentiationInterface: DifferentiationInterface as DI
 # on length-0 input, e.g. ForwardDiff `BoundsError`). Hot paths dispatch on the
 # `Nothing` parameter to short-circuit before any DI call. Same convention for
 # `DIJacobianCache` and `DIHessianCache` below.
-struct DIGradientCache{Mode,F,GP}
+struct DIGradientCache{Mode,F,GP,G}
     target::F
     gradient_prep::GP
-    function DIGradientCache(target::F, gp::GP, ::Val{Mode}) where {Mode,F,GP}
-        return new{Mode,F,GP}(target, gp)
+    grad_buf::G
+    function DIGradientCache(
+        target::F, gp::GP, grad_buf::G, ::Val{Mode}
+    ) where {Mode,F,GP,G}
+        return new{Mode,F,GP,G}(target, gp, grad_buf)
     end
 end
 
@@ -126,7 +129,7 @@ function AbstractPPL.prepare(
     end
     if length(x) == 0
         cache = if arity === :scalar
-            DIGradientCache(_di_call, nothing, mode_empty)
+            DIGradientCache(_di_call, nothing, nothing, mode_empty)
         else
             DIJacobianCache(_di_call, nothing, mode_empty)
         end
@@ -134,7 +137,9 @@ function AbstractPPL.prepare(
     end
     if arity === :scalar
         target, gradient_prep, mode = _prepare_di(DI.prepare_gradient, adtype, x, evaluator)
-        return Prepared(adtype, evaluator, DIGradientCache(target, gradient_prep, mode))
+        return Prepared(
+            adtype, evaluator, DIGradientCache(target, gradient_prep, similar(x), mode)
+        )
     end
     target, jacobian_prep, mode = _prepare_di(DI.prepare_jacobian, adtype, x, evaluator)
     return Prepared(adtype, evaluator, DIJacobianCache(target, jacobian_prep, mode))
@@ -153,7 +158,7 @@ const _GradientCapable = Union{DIGradientCache,DIHessianCache}
 # Compiled-tape ReverseDiff bakes context into its tape, so a call-time override
 # can't apply on either closure reject path (gradient and Hessian).
 function _throw_compiled_rd_override_unsupported()
-    throw(
+    return throw(
         ArgumentError(
             "Call-time `context` override is not supported for compiled-tape " *
             "ReverseDiff, which bakes the context into its tape. Re-`prepare` " *
@@ -164,13 +169,14 @@ end
 
 @inline _di_value_and_gradient(
     c::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, ad, x, _eval, ::Nothing
-) = DI.value_and_gradient(c.target, c.gradient_prep, _gradient_adtype(ad), x)
+) = DI.value_and_gradient!(c.target, c.grad_buf, c.gradient_prep, _gradient_adtype(ad), x)
 @inline _di_value_and_gradient(
     ::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, _ad, _x, _eval, ::Tuple
 ) = _throw_compiled_rd_override_unsupported()
 @inline _di_value_and_gradient(c::_GradientCapable, ad, x, eval, context) =
-    DI.value_and_gradient(
+    DI.value_and_gradient!(
         c.target,
+        c.grad_buf,
         c.gradient_prep,
         _gradient_adtype(ad),
         x,
@@ -217,7 +223,9 @@ end
     p::Prepared{
         <:AbstractADType,
         <:VectorEvaluator,
-        <:Union{DIGradientCache{<:Any,<:Any,Nothing},DIHessianCache{<:Any,<:Any,Nothing}},
+        <:Union{
+            DIGradientCache{<:Any,<:Any,Nothing,<:Any},DIHessianCache{<:Any,<:Any,Nothing}
+        },
     },
     x::AbstractVector{T};
     context=nothing,
