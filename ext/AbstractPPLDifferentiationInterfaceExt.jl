@@ -167,22 +167,28 @@ function _throw_compiled_rd_override_unsupported()
     )
 end
 
+@inline function _di_gradient(target, grad, prep, ad, x, contexts::Vararg{Any,N}) where {N}
+    if typeof(grad) !== typeof(x)
+        return DI.value_and_gradient(target, prep, ad, x, contexts...)
+    end
+    return DI.value_and_gradient!(target, grad, prep, ad, x, contexts...)
+end
+
 @inline _di_value_and_gradient(
     c::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, ad, x, _eval, ::Nothing
-) = DI.value_and_gradient!(c.target, c.grad_buf, c.gradient_prep, _gradient_adtype(ad), x)
+) = _di_gradient(c.target, c.grad_buf, c.gradient_prep, _gradient_adtype(ad), x)
 @inline _di_value_and_gradient(
     ::Union{DIGradientCache{:closure},DIHessianCache{:closure}}, _ad, _x, _eval, ::Tuple
 ) = _throw_compiled_rd_override_unsupported()
-@inline _di_value_and_gradient(c::_GradientCapable, ad, x, eval, context) =
-    DI.value_and_gradient!(
-        c.target,
-        c.grad_buf,
-        c.gradient_prep,
-        _gradient_adtype(ad),
-        x,
-        DI.Constant(eval.f),
-        map(DI.Constant, Evaluators._resolve_context(eval, context))...,
-    )
+@inline _di_value_and_gradient(c::_GradientCapable, ad, x, eval, context) = _di_gradient(
+    c.target,
+    c.grad_buf,
+    c.gradient_prep,
+    _gradient_adtype(ad),
+    x,
+    DI.Constant(eval.f),
+    map(DI.Constant, Evaluators._resolve_context(eval, context))...,
+)
 
 @inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _eval, ::Nothing) =
     DI.value_and_jacobian(c.target, c.jacobian_prep, ad, x)
