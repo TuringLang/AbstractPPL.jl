@@ -67,6 +67,10 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         @inferred value_and_gradient!!(prep_noctx, x)
         @inferred value_and_gradient!!(prep_closure, x)
         @inferred value_and_gradient!!(prep_ctx, x)
+        for prep in (prep_noctx, prep_closure, prep_ctx)
+            grad = last(value_and_gradient!!(prep, x))
+            @test grad === last(value_and_gradient!!(prep, 2x))
+        end
     end
 
     # `SecondOrder(outer, inner)` lets the caller pick the inner gradient
