@@ -17,7 +17,10 @@ using DifferentiationInterface: DifferentiationInterface as DI
 #                  AD call passes **0** `DI.Constant`s.
 #   * `N::Int`   — constants path: `N == length(evaluator.context)`; the AD
 #                  call passes **N + 1** `DI.Constant`s (`f` plus the `N`
-#                  context values).
+#                  context values), followed by one `DI.ConstantOrCache` per
+#                  `cache` value. `ConstantOrCache` passes the storage to the
+#                  backend as it is, so values stored in it before the call
+#                  stay readable (a `DI.Cache` may be reallocated).
 # Encoding `Mode` in each cache type resolves the closure-vs-constants dispatch
 # in `_di_value_and_*` at compile time without a runtime branch.
 
@@ -75,7 +78,11 @@ end
 function _di_call_shape(::AbstractADType, evaluator)
     return _di_call,
     Val(length(evaluator.context)),
-    (DI.Constant(evaluator.f), map(DI.Constant, evaluator.context)...)
+    (
+        DI.Constant(evaluator.f),
+        map(DI.Constant, evaluator.context)...,
+        map(DI.ConstantOrCache, evaluator.cache)...,
+    )
 end
 
 # `SecondOrder` doesn't define gradient prep; per DI's contract the inner
@@ -94,17 +101,21 @@ function AbstractPPL.prepare(
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
     context::Tuple=(),
+    cache::Tuple=(),
     order::Int=1,
 )
     Evaluators._validate_ad_order(order)
-    evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
+    evaluator = Evaluators._prepare_vector_evaluator(problem, x, check_dims, context, cache)
     arity = _ad_output_arity(evaluator(x))
+    Evaluators._check_cache_supported(evaluator.cache, arity, order)
     mode_empty = Val(length(context))
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
         if length(x) == 0
-            cache = DIHessianCache(_di_call, nothing, nothing, nothing, nothing, mode_empty)
-            return Prepared(adtype, evaluator, cache, Val(2))
+            di_cache = DIHessianCache(
+                _di_call, nothing, nothing, nothing, nothing, mode_empty
+            )
+            return Prepared(adtype, evaluator, di_cache, Val(2))
         end
         # Build both gradient and Hessian preps against the same target so
         # `value_and_gradient!!` on the order=2 prep skips the O(n²) Hessian
@@ -117,7 +128,7 @@ function AbstractPPL.prepare(
         hessian_prep = DI.prepare_hessian(target, adtype, x, constants...)
         # Buffers pre-allocated from `x`: hot path is zero-allocation on the
         # gradient/Hessian outputs, returned arrays alias these slots.
-        cache = DIHessianCache(
+        di_cache = DIHessianCache(
             target,
             gradient_prep,
             hessian_prep,
@@ -125,15 +136,15 @@ function AbstractPPL.prepare(
             similar(x, length(x), length(x)),
             mode,
         )
-        return Prepared(adtype, evaluator, cache, Val(2))
+        return Prepared(adtype, evaluator, di_cache, Val(2))
     end
     if length(x) == 0
-        cache = if arity === :scalar
+        di_cache = if arity === :scalar
             DIGradientCache(_di_call, nothing, nothing, mode_empty)
         else
             DIJacobianCache(_di_call, nothing, mode_empty)
         end
-        return Prepared(adtype, evaluator, cache)
+        return Prepared(adtype, evaluator, di_cache)
     end
     if arity === :scalar
         target, gradient_prep, mode = _prepare_di(DI.prepare_gradient, adtype, x, evaluator)
@@ -188,6 +199,7 @@ end
     x,
     DI.Constant(eval.f),
     map(DI.Constant, Evaluators._resolve_context(eval, context))...,
+    map(DI.ConstantOrCache, eval.cache)...,
 )
 
 @inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _eval, ::Nothing) =
