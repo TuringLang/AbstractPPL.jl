@@ -67,8 +67,8 @@ order(::Prepared{<:Any,<:Any,<:Any,O}) where {O} = O
 
 """
     prepare(problem, values::NamedTuple; check_dims::Bool=true)
-    prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=())
-    prepare(adtype, problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=(), order::Int=1)
+    prepare(problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=(), cache::Tuple=())
+    prepare(adtype, problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=(), cache::Tuple=(), order::Int=1)
 
 Prepare a callable evaluator for `problem`.
 
@@ -86,6 +86,17 @@ The vector-input forms accept a `context::Tuple` of constant arguments threaded
 through to `problem`: the prepared evaluator computes `problem(x, context...)`,
 and AD backends differentiate only with respect to `x`. `context=()` (the
 default) preserves the unary `problem(x)` contract.
+
+`cache` is a tuple of storage that `problem` writes into and reads back during
+a call, such as a workspace holding values computed from `x`. The prepared
+evaluator computes `problem(x, context..., cache...)`. Unlike `context`, AD
+backends differentiate through the values written into `cache`, and still
+return the derivative with respect to `x` alone. The storage is handed to the
+backend as it is, so values stored in it before the call can be read, and it
+has to be able to hold the backend's numbers: floating-point arrays work with
+Mooncake and with Enzyme through DifferentiationInterface, while ForwardDiff
+rejects a non-empty `cache`. `cache` is supported for scalar-valued problems
+with `order=1`, and a call-time `context` override leaves it unchanged.
 
 `order` selects the derivative order to prepare for on the AD-aware form. The
 default `order=1` prepares gradient (scalar output) or jacobian (vector output)
@@ -107,9 +118,37 @@ function prepare(problem, values::NamedTuple; check_dims::Bool=true)
     return NamedTupleEvaluator{check_dims}(problem, values)
 end
 function prepare(
-    problem, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
+    problem,
+    x::AbstractVector{<:Real};
+    check_dims::Bool=true,
+    context::Tuple=(),
+    cache::Tuple=(),
 )
-    return VectorEvaluator{check_dims}(problem, length(x), context)
+    return VectorEvaluator{check_dims}(problem, length(x), context, cache)
+end
+
+# Structural `prepare` for the AD-aware forms. `cache` is passed on only when it
+# is non-empty, so a downstream `prepare` method written before `cache` existed
+# keeps working for every call that does not use one.
+function _prepare_vector_evaluator(problem, x, check_dims, context, cache)
+    evaluator = if isempty(cache)
+        prepare(problem, x; check_dims, context)
+    else
+        prepare(problem, x; check_dims, context, cache)
+    end
+    return evaluator::VectorEvaluator
+end
+
+# Shared by the AD-backend extensions so the error string is identical.
+function _check_cache_supported(cache::Tuple, arity::Symbol, order::Int)
+    isempty(cache) ||
+        (arity === :scalar && order == 1) ||
+        throw(
+            ArgumentError(
+                "`cache` is supported only for scalar-valued problems prepared with `order=1`.",
+            ),
+        )
+    return nothing
 end
 
 """
@@ -172,8 +211,8 @@ context).
 function value_gradient_and_hessian!! end
 
 """
-    VectorEvaluator{CheckInput}(f, dim, context::Tuple=())
-    VectorEvaluator(f, dim, context::Tuple=())  # equivalent to `VectorEvaluator{true}(f, dim, context)`
+    VectorEvaluator{CheckInput}(f, dim, context::Tuple=(), cache::Tuple=())
+    VectorEvaluator(f, dim, context::Tuple=(), cache::Tuple=())  # equivalent to `VectorEvaluator{true}(f, dim, context, cache)`
 
 Evaluator shape for scalar functions of a vector input. Part of the extension
 author API; end users interact with the wrapping `Prepared` instead.
@@ -185,27 +224,33 @@ where input shape is already guaranteed and the runtime check would persist in
 the dual/shadow hot path.
 
 `context` is a tuple of constant arguments threaded through to `f`:
-`evaluator(x)` computes `f(x, context...)`. AD backends treat every value in
-`context` as inactive and differentiate only with respect to `x`. The default
-empty tuple keeps the unary `f(x)` contract.
+`evaluator(x)` computes `f(x, context..., cache...)`. AD backends treat every
+value in `context` as inactive and differentiate only with respect to `x`. The
+default empty tuple keeps the unary `f(x)` contract.
+
+`cache` is a tuple of storage `f` writes into and reads back during a call. AD
+backends differentiate through the values written into it (see [`prepare`](@ref)).
 
 A bare `VectorEvaluator` is *not* differentiable; gradient capability is the
 contract of the wrapping `Prepared` returned by `prepare(adtype, ...)`.
 """
-struct VectorEvaluator{CheckInput,F,C<:Tuple}
+struct VectorEvaluator{CheckInput,F,C<:Tuple,K<:Tuple}
     f::F
     dim::Int
     context::C
+    cache::K
     function VectorEvaluator{CheckInput}(
-        f::F, dim::Int, context::C=()
-    ) where {CheckInput,F,C<:Tuple}
+        f::F, dim::Int, context::C=(), cache::K=()
+    ) where {CheckInput,F,C<:Tuple,K<:Tuple}
         CheckInput isa Bool || throw(ArgumentError("`CheckInput` must be a Bool."))
         dim >= 0 || throw(ArgumentError("`dim` must be non-negative, got $dim."))
-        return new{CheckInput,F,C}(f, dim, context)
+        return new{CheckInput,F,C,K}(f, dim, context, cache)
     end
 end
 
-VectorEvaluator(f, dim::Int, context::Tuple=()) = VectorEvaluator{true}(f, dim, context)
+function VectorEvaluator(f, dim::Int, context::Tuple=(), cache::Tuple=())
+    return VectorEvaluator{true}(f, dim, context, cache)
+end
 
 """
     NamedTupleEvaluator{CheckInput}(f, inputspec)
@@ -288,7 +333,7 @@ _check_ad_input(::VectorEvaluator{false}, ::AbstractVector) = nothing
     e::VectorEvaluator, x::AbstractVector{T}, context::Tuple
 ) where {T}
     T <: Integer && _reject_integer_input(x)
-    return e.f(x, _resolve_context(e, context)...)
+    return e.f(x, _resolve_context(e, context)..., e.cache...)
 end
 function _evaluate_with_context(::VectorEvaluator, _, context)
     throw(
@@ -334,12 +379,12 @@ end
 function (e::VectorEvaluator{true})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
     _check_vector_length(e.dim, x)
-    return e.f(x, e.context...)
+    return e.f(x, e.context..., e.cache...)
 end
 
 function (e::VectorEvaluator{false})(x::AbstractVector{T}) where {T}
     T <: Integer && _reject_integer_input(x)
-    return e.f(x, e.context...)
+    return e.f(x, e.context..., e.cache...)
 end
 
 function (e::NamedTupleEvaluator{true})(values::NamedTuple)

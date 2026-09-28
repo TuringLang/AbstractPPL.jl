@@ -35,6 +35,18 @@ function AbstractPPL.value_and_gradient!!(
     return (sum(x), ones(length(x)))
 end
 
+# A downstream structural `prepare` written before `cache` existed.
+struct NoCacheProblem end
+(::NoCacheProblem)(x, context...) = sum(x)
+function AbstractPPL.prepare(
+    problem::NoCacheProblem,
+    x::AbstractVector{<:Real};
+    check_dims::Bool=true,
+    context::Tuple=(),
+)
+    return VectorEvaluator{check_dims}(problem, length(x), context)
+end
+
 @testset "Evaluators interface" begin
     @testset "explicit evaluator shapes" begin
         ve = AbstractPPL.Evaluators.VectorEvaluator(sum, 3)
@@ -126,6 +138,27 @@ end
         @test pv_ctx isa VectorEvaluator{true}
         @test pv_ctx.context === (2.0, 1.0)
         @test pv_ctx([3.0, 4.0]) == 15.0
+        @test pv_ctx.cache === ()
+
+        # `cache` comes after the context and reaches the callable as it is, so a
+        # value written into it is there after the call.
+        into_cache(x, a, work) = (work[1] = a * sum(x); work[1] + 1)
+        work = [0.0]
+        pv_cache = prepare(into_cache, zeros(2); context=(2.0,), cache=(work,))
+        @test pv_cache.cache === (work,)
+        @test pv_cache([3.0, 4.0]) == 15.0
+        @test work == [14.0]
+
+        # The AD-aware forms pass `cache` on only when it is non-empty, so a
+        # downstream `prepare` without the keyword keeps working without a cache.
+        legacy = AbstractPPL.Evaluators._prepare_vector_evaluator(
+            NoCacheProblem(), zeros(2), true, (1.0,), ()
+        )
+        @test legacy.context === (1.0,)
+        @test legacy([1.0, 2.0]) == 3.0
+        @test_throws MethodError AbstractPPL.Evaluators._prepare_vector_evaluator(
+            NoCacheProblem(), zeros(2), true, (), (work,)
+        )
     end
 
     @testset "prepare (AD-aware)" begin
