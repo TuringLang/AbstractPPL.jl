@@ -203,4 +203,24 @@ end
             end
         end
     end
+
+    # The `cache` rides in the `NoTangent` target after the context, and both
+    # modes differentiate through the values the problem writes into it, on a
+    # reused prepared cache too.
+    @testset "cache" begin
+        @testset "$ad" for ad in (
+            AutoMooncake(; config=nothing), AutoMooncakeForward(; config=nothing)
+        )
+            for case in generate_testcases(Val(:cache))
+                run_testcase(case; adtype=ad, atol=1e-6, rtol=1e-6)
+            end
+            work = (; y=[2.0, 0.0], mu=zeros(2))
+            @test_throws r"scalar-valued problems prepared with `order=1`" prepare(
+                ad, (x, w) -> x .* w.y[1], [1.0, 2.0]; cache=(work,)
+            )
+            @test_throws r"scalar-valued problems prepared with `order=1`" prepare(
+                ad, (x, w) -> sum(abs2, x) * w.y[1], [1.0, 2.0]; cache=(work,), order=2
+            )
+        end
+    end
 end
