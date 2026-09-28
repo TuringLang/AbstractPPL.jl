@@ -2,6 +2,8 @@
 
 Reuse gradient output buffers in the DifferentiationInterface extension via `value_and_gradient!`, including gradient calls on Hessian preparations. Returned gradients alias cache storage, consistent with the existing `!!` contract.
 
+`prepare` takes a `cache::Tuple` of storage that the problem writes values computed from `x` into and reads back, such as a workspace of intermediate arrays. The prepared evaluator computes `problem(x, context..., cache...)`, and AD differentiates through the values written into `cache` while still returning the derivative with respect to `x` alone. Values stored in the cache before the call stay readable, since it reaches the backend as it is. Mooncake supports it in both modes and DifferentiationInterface passes each value as a `ConstantOrCache`, which gives Enzyme the storage it needs. ForwardDiff rejects a non-empty `cache`, and it is supported for scalar-valued problems with `order=1`. The `AbstractPPLTestExt` harness has a `:cache` group.
+
 ## 0.15.5
 
 Widened the `Mooncake` compat bound to `0.5.27, 0.6` (#180). Mooncake 0.6 is a breaking release (forward-mode redesign), but the reverse-mode rule API and the prepared-cache API `AbstractPPLMooncakeExt` uses (`prepare_gradient_cache`, `prepare_derivative_cache`, `prepare_hessian_cache`, `value_and_gradient!!`, `value_gradient_and_hessian!!`, `AutoMooncake`, `AutoMooncakeForward`) are unchanged, so the extension works as-is.
