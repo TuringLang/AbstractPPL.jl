@@ -39,12 +39,15 @@ struct FDCache{A,R,C,GR,GC}
 end
 
 """
-    prepare(adtype::AutoForwardDiff, problem, x; check_dims=true, context::Tuple=(), order=1)
+    prepare(adtype::AutoForwardDiff, problem, x; check_dims=true, context::Tuple=(), cache::Tuple=(), order=1)
 
 Prepare a ForwardDiff gradient, Jacobian, or Hessian evaluator for a vector
 input. `order=1` (default) picks gradient/Jacobian by output arity; `order=2`
 builds Hessian machinery and requires a scalar-valued problem. `context` and
 `check_dims` follow the base `prepare` contract.
+
+A non-empty `cache` throws an `ArgumentError`: `problem` would have to store
+ForwardDiff's dual numbers in it, which floating-point storage cannot hold.
 """
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff,
@@ -52,9 +55,17 @@ function AbstractPPL.prepare(
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
     context::Tuple=(),
+    cache::Tuple=(),
     order::Int=1,
 )
     Evaluators._validate_ad_order(order)
+    isempty(cache) || throw(
+        ArgumentError(
+            "`cache` is not supported by `AutoForwardDiff`, since its dual numbers " *
+            "cannot be stored in the cache. Use a reverse-mode backend such as " *
+            "`AutoMooncake` or `AutoEnzyme` instead.",
+        ),
+    )
     evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
     # Probe the output once: the value classifies arity, and the vector branch
     # reuses it as the Jacobian-result prototype. The base `prepare` contract
@@ -75,8 +86,8 @@ function AbstractPPL.prepare(
         hess_config = ForwardDiff.HessianConfig(target, hess_result, x, chunk, tag)
         grad_result = DiffResults.MutableDiffResult(zero(eltype(x)), (similar(x),))
         grad_config = ForwardDiff.GradientConfig(target, x, chunk, tag)
-        cache = FDCache{:hessian}(hess_result, hess_config, grad_result, grad_config)
-        return Prepared(adtype, evaluator, cache, Val(2))
+        fd_cache = FDCache{:hessian}(hess_result, hess_config, grad_result, grad_config)
+        return Prepared(adtype, evaluator, fd_cache, Val(2))
     end
 
     if arity === :scalar

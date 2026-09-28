@@ -55,4 +55,11 @@ using Test
             run_testcase(case; adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
         end
     end
+
+    @testset "cache is rejected" begin
+        work = (; y=[2.0, 0.0], mu=zeros(2))
+        @test_throws r"not supported by `AutoForwardDiff`" prepare(
+            AutoForwardDiff(), (x, w) -> sum(abs2, x), [1.0, 2.0]; cache=(work,)
+        )
+    end
 end
