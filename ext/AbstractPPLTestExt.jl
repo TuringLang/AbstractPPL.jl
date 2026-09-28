@@ -5,7 +5,7 @@ using Test: @inferred, @test, @test_broken, @test_throws, @testset
 
 """
     TestCase(name, tag, f, x_proto; x, value, gradient, jacobian, hessian,
-             context=(), op, exception, inputs, override, allocations_safe=true)
+             context=(), cache=(), op, exception, inputs, override, allocations_safe=true)
 
 Single tagged case for AD conformance testing. The `tag::Symbol` selects how
 the case is run; the kwargs populate only the fields the tag uses.
@@ -17,6 +17,11 @@ Reserved tags (recognised by [`run_testcase`](@ref)):
   - `:hessian`     — order=2 round-trip on scalar output.
   - `:context`     — scalar-output gradient with a non-empty `context::Tuple`
                      passed to `prepare`.
+  - `:cache`       — scalar-output gradient through a `cache` the problem writes
+                     into and reads back, over several `inputs` (`(x=, value=,
+                     gradient=)` per row) on one prepared evaluator, then a
+                     call-time `override::NamedTuple` `(x, context, value,
+                     gradient)` that must leave the cache in place.
   - `:context_override` — the frozen `context` (`gradient`/`hessian` expected)
                      against a per-call `override::NamedTuple` `(context, value,
                      gradient, hessian)`. The `gradient_override` /
@@ -42,6 +47,7 @@ struct TestCase
     jacobian::Any
     hessian::Any
     context::Tuple
+    cache::Tuple
     op::Any
     exception::Any
     inputs::Any
@@ -59,6 +65,7 @@ function TestCase(
     jacobian=nothing,
     hessian=nothing,
     context::Tuple=(),
+    cache::Tuple=(),
     op=nothing,
     exception=nothing,
     inputs=nothing,
@@ -76,6 +83,7 @@ function TestCase(
         jacobian,
         hessian,
         context,
+        cache,
         op,
         exception,
         inputs,
@@ -91,6 +99,20 @@ struct VectorValuedProblem end
 (::VectorValuedProblem)(x::AbstractVector{<:Real}) = [x[1] * x[2], x[2] + x[3]]
 
 _context_problem(y::AbstractVector{<:Real}, offset) = -0.5 * (y[1] - offset)^2
+
+# Writes `y[1]` into a workspace that also holds a value set before the call,
+# then reads both back, so the gradient has to follow the writes. The value is
+# `-0.5 * scale^2 * (work.y[1]^2 + y[1]^2) - 0.5 * y[2]^2`, and the gradient
+# `[-scale^2 * y[1], -y[2]]`.
+function _cache_problem(y::AbstractVector{<:Real}, scale, work)
+    work.y[2] = y[1]
+    for i in eachindex(work.mu)
+        work.mu[i] = scale * work.y[i]
+    end
+    return -0.5 * sum(abs2, work.mu) - 0.5 * y[2]^2
+end
+_cache_value(y, scale, y1) = -0.5 * scale^2 * (y1^2 + y[1]^2) - 0.5 * y[2]^2
+_cache_gradient(y, scale) = [-scale^2 * y[1], -y[2]]
 
 # `∂/∂y a·‖y‖² = 2a·y` and its Hessian `2a·I` both depend on the context `a`, so
 # a context override is directly observable in the gradient and Hessian.
@@ -311,6 +333,24 @@ function AbstractPPL.generate_testcases(::Val{:vector})
                 (x=[5.0, 1.0, 7.0], value=[5.0, 8.0], jacobian=[1.0 5.0 0.0; 0.0 1.0 1.0]),
                 (x=[0.0, 4.0, -2.0], value=[0.0, 2.0], jacobian=[4.0 0.0 0.0; 0.0 1.0 1.0]),
             ],
+            allocations_safe=false,  # cache-reuse loops aren't single-call alloc tests
+        ),
+    )
+end
+
+function AbstractPPL.generate_testcases(::Val{:cache})
+    scale, y1 = 3.0, 2.0
+    row(x, s=scale) = (x=x, value=_cache_value(x, s, y1), gradient=_cache_gradient(x, s))
+    return (
+        TestCase(
+            "scalar gradient through a cache",
+            :cache,
+            _cache_problem,
+            [0.3, -1.2];
+            context=(scale,),
+            cache=((; y=[y1, 0.0], mu=zeros(2)),),
+            inputs=[row([0.3, -1.2]), row([1.7, 0.4]), row([-0.9, 2.5])],
+            override=merge(row([1.7, 0.4], 2.0), (; context=(2.0,))),
             allocations_safe=false,  # cache-reuse loops aren't single-call alloc tests
         ),
     )
@@ -697,6 +737,33 @@ function _run(
             @test jac ≈ input.jacobian atol = atol rtol = rtol
         end
     end
+    return nothing
+end
+
+function _run(
+    ::Val{:cache},
+    case;
+    adtype,
+    prepare_fn=AbstractPPL.prepare,
+    atol=0,
+    rtol=1e-10,
+    check_dims::Bool=true,
+    kwargs...,
+)
+    prepared = prepare_fn(
+        adtype, case.f, case.x_proto; check_dims, context=case.context, cache=case.cache
+    )
+    @test AbstractPPL.order(prepared) == 1
+    for input in case.inputs
+        @test prepared(input.x) ≈ input.value atol = atol rtol = rtol
+        val, grad = AbstractPPL.value_and_gradient!!(prepared, input.x)
+        @test val ≈ input.value atol = atol rtol = rtol
+        _compare_derivative(grad, input.gradient; atol, rtol)
+    end
+    o = case.override
+    val, grad = AbstractPPL.value_and_gradient!!(prepared, o.x; context=o.context)
+    @test val ≈ o.value atol = atol rtol = rtol
+    _compare_derivative(grad, o.gradient; atol, rtol)
     return nothing
 end
 
