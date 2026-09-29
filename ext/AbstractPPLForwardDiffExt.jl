@@ -38,6 +38,16 @@ struct FDCache{A,R,C,GR,GC}
     end
 end
 
+function _throw_cache_unsupported()
+    throw(
+        ArgumentError(
+            "`cache` is not supported by `AutoForwardDiff`, since its dual numbers " *
+            "cannot be stored in the cache. Use a reverse-mode backend such as " *
+            "`AutoMooncake` or `AutoEnzyme` instead.",
+        ),
+    )
+end
+
 """
     prepare(adtype::AutoForwardDiff, problem, x; check_dims=true, context::Tuple=(), cache::Tuple=(), order=1)
 
@@ -46,7 +56,8 @@ input. `order=1` (default) picks gradient/Jacobian by output arity; `order=2`
 builds Hessian machinery and requires a scalar-valued problem. `context` and
 `check_dims` follow the base `prepare` contract.
 
-A non-empty `cache` throws an `ArgumentError`: `problem` would have to store
+A non-empty `cache`, passed here or attached by the structural `prepare` of
+`problem`, throws an `ArgumentError`: `problem` would have to store
 ForwardDiff's dual numbers in it, which floating-point storage cannot hold.
 """
 function AbstractPPL.prepare(
@@ -59,14 +70,10 @@ function AbstractPPL.prepare(
     order::Int=1,
 )
     Evaluators._validate_ad_order(order)
-    isempty(cache) || throw(
-        ArgumentError(
-            "`cache` is not supported by `AutoForwardDiff`, since its dual numbers " *
-            "cannot be stored in the cache. Use a reverse-mode backend such as " *
-            "`AutoMooncake` or `AutoEnzyme` instead.",
-        ),
-    )
+    isempty(cache) || _throw_cache_unsupported()
     evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
+    # `_fd_call` leaves the cache out, so one the problem attached itself is rejected too.
+    isempty(evaluator.cache) || _throw_cache_unsupported()
     # Probe the output once: the value classifies arity, and the vector branch
     # reuses it as the Jacobian-result prototype. The base `prepare` contract
     # promises one prep-time call into `problem`.
