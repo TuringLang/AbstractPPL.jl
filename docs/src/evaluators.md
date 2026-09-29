@@ -260,6 +260,8 @@ work with Mooncake, in both modes, and with Enzyme through
 DifferentiationInterface, which receives each value as a
 `DifferentiationInterface.ConstantOrCache`. ForwardDiff cannot store its dual
 numbers there and `prepare` throws an `ArgumentError` for a non-empty `cache`.
+So does compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`), whose
+tape would keep the values it read from the cache while recording.
 `cache` is supported for scalar-valued problems with `order=1`, and a call-time
 `context` override leaves it unchanged.
 

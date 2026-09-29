@@ -138,4 +138,14 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
             ad, (x, w) -> x .* w.y[1], [1.0, 2.0]; cache=(work,)
         )
     end
+
+    @testset "cache is rejected by compiled-tape ReverseDiff" begin
+        work = (; mu=zeros(2))
+        @test_throws r"not supported for compiled-tape ReverseDiff" prepare(
+            AutoReverseDiff(; compile=true),
+            (x, w) -> sum(abs2, x),
+            [1.0, 2.0];
+            cache=(work,),
+        )
+    end
 end

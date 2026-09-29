@@ -75,6 +75,20 @@ end
 function _di_call_shape(::AutoReverseDiff{true}, evaluator)
     return Base.Fix2(_di_call, evaluator), Val(:closure), ()
 end
+
+# The compiled tape would keep what it read from a cache while recording, so a
+# value stored there later would never reach the gradient.
+_check_cache_backend(::AbstractADType, ::Tuple) = nothing
+function _check_cache_backend(::AutoReverseDiff{true}, cache::Tuple)
+    isempty(cache) || throw(
+        ArgumentError(
+            "`cache` is not supported for compiled-tape ReverseDiff, which bakes " *
+            "the values it reads from the cache into its tape. Use a backend such " *
+            "as `AutoMooncake` or `AutoEnzyme` instead.",
+        ),
+    )
+    return nothing
+end
 function _di_call_shape(::AbstractADType, evaluator)
     return _di_call,
     Val(length(evaluator.context)),
@@ -106,6 +120,7 @@ function AbstractPPL.prepare(
 )
     Evaluators._validate_ad_order(order)
     evaluator = Evaluators._prepare_vector_evaluator(problem, x, check_dims, context, cache)
+    _check_cache_backend(adtype, evaluator.cache)
     arity = _ad_output_arity(evaluator(x))
     Evaluators._check_cache_supported(evaluator.cache, arity, order)
     mode_empty = Val(length(context))

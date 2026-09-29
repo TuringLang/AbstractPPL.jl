@@ -95,8 +95,9 @@ return the derivative with respect to `x` alone. The storage is handed to the
 backend as it is, so values stored in it before the call can be read, and it
 has to be able to hold the backend's numbers: floating-point arrays work with
 Mooncake and with Enzyme through DifferentiationInterface, while ForwardDiff
-rejects a non-empty `cache`. `cache` is supported for scalar-valued problems
-with `order=1`, and a call-time `context` override leaves it unchanged.
+and compiled-tape ReverseDiff reject a non-empty `cache`. `cache` is supported
+for scalar-valued problems with `order=1`, and a call-time `context` override
+leaves it unchanged.
 
 `order` selects the derivative order to prepare for on the AD-aware form. The
 default `order=1` prepares gradient (scalar output) or jacobian (vector output)
