@@ -25,9 +25,8 @@ const _MooncakeAD = Union{AutoMooncake,AutoMooncakeForward}
 # Deliberately field-minimal: an extra non-differentiable field (e.g. an `Int`)
 # on a `NoTangent` struct defeats Mooncake's forward-mode inference and
 # zero-allocation for the wrapper, so the target holds only `f` and `context`.
-# A `cache` rides in the same `context` field after the context values, as a
-# problem closing over its workspace would: Mooncake still differentiates
-# through the values `f` writes into it, in both modes and on a reused cache.
+# A `cache` goes in `context` after the context values. `NoTangent` does not stop
+# Mooncake from following what `f` writes into it, as with a captured workspace.
 struct _ADTarget{F,C}
     f::F
     context::C
@@ -116,8 +115,7 @@ computes `problem(x, context...)` with AD differentiating only `x`. One
 Mooncake-specific restriction for `order=1`: vector-valued problems require
 `context=()`. `order=2` accepts any `context`.
 
-`cache` follows the base `prepare` contract, for scalar-valued problems with
-`order=1`, in both AD modes.
+`cache` follows the base `prepare` contract in both AD modes.
 
 Empty input (`length(x) == 0`) is supported with any `context`; Mooncake
 builds no tape for zero-length `x`, so the prepared evaluator's AD entry

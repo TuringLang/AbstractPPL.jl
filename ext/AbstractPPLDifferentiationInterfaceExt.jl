@@ -17,10 +17,9 @@ using DifferentiationInterface: DifferentiationInterface as DI
 #                  AD call passes **0** `DI.Constant`s.
 #   * `N::Int`   — constants path: `N == length(evaluator.context)`; the AD
 #                  call passes **N + 1** `DI.Constant`s (`f` plus the `N`
-#                  context values), followed by one `DI.ConstantOrCache` per
-#                  `cache` value. `ConstantOrCache` passes the storage to the
-#                  backend as it is, so values stored in it before the call
-#                  stay readable (a `DI.Cache` may be reallocated).
+#                  context values), then one `DI.ConstantOrCache` per `cache`
+#                  value, which keeps what was stored in it before the call,
+#                  where a `DI.Cache` may be reallocated.
 # Encoding `Mode` in each cache type resolves the closure-vs-constants dispatch
 # in `_di_value_and_*` at compile time without a runtime branch.
 
@@ -75,9 +74,16 @@ end
 function _di_call_shape(::AutoReverseDiff{true}, evaluator)
     return Base.Fix2(_di_call, evaluator), Val(:closure), ()
 end
+function _di_call_shape(::AbstractADType, evaluator)
+    return _di_call,
+    Val(length(evaluator.context)),
+    (
+        DI.Constant(evaluator.f),
+        map(DI.Constant, evaluator.context)...,
+        map(DI.ConstantOrCache, evaluator.cache)...,
+    )
+end
 
-# The compiled tape would keep what it read from a cache while recording, so a
-# value stored there later would never reach the gradient.
 _check_cache_backend(::AbstractADType, ::Tuple) = nothing
 function _check_cache_backend(::AutoReverseDiff{true}, cache::Tuple)
     isempty(cache) || throw(
@@ -88,15 +94,6 @@ function _check_cache_backend(::AutoReverseDiff{true}, cache::Tuple)
         ),
     )
     return nothing
-end
-function _di_call_shape(::AbstractADType, evaluator)
-    return _di_call,
-    Val(length(evaluator.context)),
-    (
-        DI.Constant(evaluator.f),
-        map(DI.Constant, evaluator.context)...,
-        map(DI.ConstantOrCache, evaluator.cache)...,
-    )
 end
 
 # `SecondOrder` doesn't define gradient prep; per DI's contract the inner

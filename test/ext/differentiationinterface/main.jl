@@ -125,9 +125,6 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         end
     end
 
-    # Enzyme gets each `cache` value as a `DI.ConstantOrCache`, so it follows
-    # the values the problem writes into it. Passed as a `DI.Constant`, those
-    # writes would drop out of the gradient without an error.
     @testset "cache (Enzyme)" begin
         ad = AutoEnzyme(; mode=Enzyme.Reverse)
         for case in generate_testcases(Val(:cache))

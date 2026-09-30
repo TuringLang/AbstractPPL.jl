@@ -56,9 +56,7 @@ input. `order=1` (default) picks gradient/Jacobian by output arity; `order=2`
 builds Hessian machinery and requires a scalar-valued problem. `context` and
 `check_dims` follow the base `prepare` contract.
 
-A non-empty `cache`, passed here or attached by the structural `prepare` of
-`problem`, throws an `ArgumentError`: `problem` would have to store
-ForwardDiff's dual numbers in it, which floating-point storage cannot hold.
+A non-empty `cache`, passed here or attached by the structural `prepare` of `problem`, throws an `ArgumentError`, since floating-point storage cannot hold ForwardDiff's dual numbers.
 """
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff,
@@ -72,7 +70,7 @@ function AbstractPPL.prepare(
     Evaluators._validate_ad_order(order)
     isempty(cache) || _throw_cache_unsupported()
     evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
-    # `_fd_call` leaves the cache out, so one the problem attached itself is rejected too.
+    # `_fd_call` passes no cache, so reject one the problem's own `prepare` attached.
     isempty(evaluator.cache) || _throw_cache_unsupported()
     # Probe the output once: the value classifies arity, and the vector branch
     # reuses it as the Jacobian-result prototype. The base `prepare` contract

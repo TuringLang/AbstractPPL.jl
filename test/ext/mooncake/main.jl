@@ -204,9 +204,6 @@ end
         end
     end
 
-    # The `cache` rides in the `NoTangent` target after the context, and both
-    # modes differentiate through the values the problem writes into it, on a
-    # reused prepared cache too.
     @testset "cache" begin
         @testset "$ad" for ad in (
             AutoMooncake(; config=nothing), AutoMooncakeForward(; config=nothing)

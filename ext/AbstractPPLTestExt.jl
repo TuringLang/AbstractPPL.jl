@@ -100,10 +100,8 @@ struct VectorValuedProblem end
 
 _context_problem(y::AbstractVector{<:Real}, offset) = -0.5 * (y[1] - offset)^2
 
-# Writes `y[1]` into a workspace that also holds a value set before the call,
-# then reads both back, so the gradient has to follow the writes. The value is
-# `-0.5 * scale^2 * (work.y[1]^2 + y[1]^2) - 0.5 * y[2]^2`, and the gradient
-# `[-scale^2 * y[1], -y[2]]`.
+# Writes `y[1]` next to a value stored before the call and reads both back, so
+# the gradient has to follow the write.
 function _cache_problem(y::AbstractVector{<:Real}, scale, work)
     work.y[2] = y[1]
     for i in eachindex(work.mu)

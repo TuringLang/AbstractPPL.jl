@@ -87,17 +87,11 @@ through to `problem`: the prepared evaluator computes `problem(x, context...)`,
 and AD backends differentiate only with respect to `x`. `context=()` (the
 default) preserves the unary `problem(x)` contract.
 
-`cache` is a tuple of storage that `problem` writes into and reads back during
-a call, such as a workspace holding values computed from `x`. The prepared
-evaluator computes `problem(x, context..., cache...)`. Unlike `context`, AD
-backends differentiate through the values written into `cache`, and still
-return the derivative with respect to `x` alone. The storage is handed to the
-backend as it is, so values stored in it before the call can be read, and it
-has to be able to hold the backend's numbers: floating-point arrays work with
-Mooncake and with Enzyme through DifferentiationInterface, while ForwardDiff
-and compiled-tape ReverseDiff reject a non-empty `cache`. `cache` is supported
-for scalar-valued problems with `order=1`, and a call-time `context` override
-leaves it unchanged.
+`cache` is a tuple of storage that `problem` writes values computed from `x` into and reads back, such as a workspace.
+The prepared evaluator computes `problem(x, context..., cache...)`, and AD differentiates through the values written into `cache` while still returning the derivative with respect to `x` alone.
+The storage reaches the backend as it is, so values stored in it before the call can be read, and it has to be able to hold the backend's numbers.
+Floating-point storage works with Mooncake and with Enzyme through DifferentiationInterface, and ForwardDiff and compiled-tape ReverseDiff reject a non-empty `cache`.
+`cache` is supported for scalar-valued problems with `order=1`, and a call-time `context` override leaves it unchanged.
 
 `order` selects the derivative order to prepare for on the AD-aware form. The
 default `order=1` prepares gradient (scalar output) or jacobian (vector output)
@@ -128,9 +122,8 @@ function prepare(
     return VectorEvaluator{check_dims}(problem, length(x), context, cache)
 end
 
-# Structural `prepare` for the AD-aware forms. `cache` is passed on only when it
-# is non-empty, so a downstream `prepare` method written before `cache` existed
-# keeps working for every call that does not use one.
+# `cache` is passed on only when it is non-empty, so a downstream `prepare`
+# written before `cache` existed keeps working without one.
 function _prepare_vector_evaluator(problem, x, check_dims, context, cache)
     evaluator = if isempty(cache)
         prepare(problem, x; check_dims, context)
@@ -225,12 +218,12 @@ where input shape is already guaranteed and the runtime check would persist in
 the dual/shadow hot path.
 
 `context` is a tuple of constant arguments threaded through to `f`:
-`evaluator(x)` computes `f(x, context..., cache...)`. AD backends treat every
-value in `context` as inactive and differentiate only with respect to `x`. The
-default empty tuple keeps the unary `f(x)` contract.
+`evaluator(x)` computes `f(x, context...)`. AD backends treat every value in
+`context` as inactive and differentiate only with respect to `x`. The default
+empty tuple keeps the unary `f(x)` contract.
 
-`cache` is a tuple of storage `f` writes into and reads back during a call. AD
-backends differentiate through the values written into it (see [`prepare`](@ref)).
+`cache` is a tuple of storage that `f` writes into and reads back, and `evaluator(x)` then computes `f(x, context..., cache...)`.
+AD backends differentiate through the values written into it (see [`prepare`](@ref)).
 
 A bare `VectorEvaluator` is *not* differentiable; gradient capability is the
 contract of the wrapping `Prepared` returned by `prepare(adtype, ...)`.
