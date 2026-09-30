@@ -1,3 +1,7 @@
+## 0.15.7
+
+Widened the `OrderedCollections` compat bound to `1.8.1, 2`. OrderedCollections 2.0 is a breaking release, but it removes only deprecated API — `similar(::OrderedDict)`/`similar(::OrderedSet)`, `sort(::Dict)` and `OrderedSet` indexing — turns `convert(OrderedDict, ::AbstractDict)` on an unordered dict into an error instead of a warning, makes `first`/`last` on an empty collection throw `ArgumentError`, and changes `OrderedDict`'s internal struct layout. AbstractPPL only ever constructs `OrderedDict`s (`dict_to_varname(JSON.parse(str; dicttype=OrderedDict{String,Any}))` in `src/varname/serialize.jl`), so none of that is reachable and the package works as-is.
+
 ## 0.15.6
 
 Reuse gradient output buffers in the DifferentiationInterface extension via `value_and_gradient!`, including gradient calls on Hessian preparations. Returned gradients alias cache storage, consistent with the existing `!!` contract.
