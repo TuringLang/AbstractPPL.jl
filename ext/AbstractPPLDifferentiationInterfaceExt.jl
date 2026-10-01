@@ -7,7 +7,7 @@ using DifferentiationInterface: DifferentiationInterface as DI
 
 # AD target used by every DI cache. `Vararg{Any,N}` with a free `N` forces
 # specialization on the trailing arity (a bare `Vararg{Any}` would skip it).
-# DI invokes this as `_di_call(x, f, c1, …, cN)` on the constants path,
+# DI invokes this as `_di_call(x, f, context..., cache...)` on the constants path,
 # and as `_di_call(x, evaluator)` (via `Fix2`) on the closure path —
 # empty `ctx` then makes the splat a no-op.
 @inline _di_call(x, f::F, ctx::Vararg{Any,N}) where {F,N} = f(x, ctx...)
@@ -18,8 +18,8 @@ using DifferentiationInterface: DifferentiationInterface as DI
 #   * `N::Int`   — constants path: `N == length(evaluator.context)`; the AD
 #                  call passes **N + 1** `DI.Constant`s (`f` plus the `N`
 #                  context values), then one `DI.ConstantOrCache` per `cache`
-#                  value, which keeps what was stored in it before the call,
-#                  where a `DI.Cache` may be reallocated.
+#                  value, which DI passes on unchanged, so slots the problem
+#                  only reads keep their values. A `DI.Cache` may be reallocated.
 # Encoding `Mode` in each cache type resolves the closure-vs-constants dispatch
 # in `_di_value_and_*` at compile time without a runtime branch.
 
@@ -170,8 +170,8 @@ end
 
 # Hot-path dispatch is by cache type + `Mode` (closure vs constants), both
 # resolved at compile time. On the constants path we always pass
-# `DI.Constant(eval.f)` plus the `N` context constants — `N == 0` collapses
-# the `map` splat to nothing.
+# `DI.Constant(eval.f)`, the `N` context constants, and the cache values.
+# Empty tuples collapse their `map` splats to nothing.
 const _GradientCapable = Union{DIGradientCache,DIHessianCache}
 
 # Call-time context override (issue #167) resolves via `Evaluators._resolve_context`.
@@ -226,6 +226,7 @@ end
         x,
         DI.Constant(eval.f),
         map(DI.Constant, Evaluators._resolve_context(eval, context))...,
+        map(DI.ConstantOrCache, eval.cache)...,
     )
 
 @inline _di_value_gradient_and_hessian(
@@ -244,6 +245,7 @@ end
         x,
         DI.Constant(eval.f),
         map(DI.Constant, Evaluators._resolve_context(eval, context))...,
+        map(DI.ConstantOrCache, eval.cache)...,
     )
 
 # `value_and_gradient!!`: works on both `DIGradientCache` (order=1 scalar) and
