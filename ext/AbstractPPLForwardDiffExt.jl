@@ -42,8 +42,8 @@ function _throw_cache_unsupported()
     throw(
         ArgumentError(
             "`cache` is not supported by `AutoForwardDiff`, since its dual numbers " *
-            "cannot be stored in the cache. Use a reverse-mode backend such as " *
-            "`AutoMooncake` or `AutoEnzyme` instead.",
+            "cannot be stored in the cache. Use `AutoMooncake`, `AutoMooncakeForward` " *
+            "or `AutoEnzyme` instead.",
         ),
     )
 end
