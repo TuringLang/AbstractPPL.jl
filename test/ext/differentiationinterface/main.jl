@@ -142,8 +142,8 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         end
     end
 
-    @testset "cache (Enzyme)" begin
-        ad = AutoEnzyme(; mode=Enzyme.Reverse)
+    @testset "cache (Enzyme, $mode)" for mode in (Enzyme.Reverse, Enzyme.Forward)
+        ad = AutoEnzyme(; mode)
         for case in generate_testcases(Val(:cache))
             run_testcase(case; adtype=ad, atol=1e-6, rtol=1e-6)
         end
@@ -151,6 +151,11 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         @test_throws r"scalar-valued problems prepared with `order=1`" prepare(
             ad, (x, w) -> x .* w.y[1], [1.0, 2.0]; cache=(work,)
         )
+        val, grad = value_and_gradient!!(
+            prepare(ad, AttachesCache(), [1.0, 2.0]), [1.0, 2.0]
+        )
+        @test val ≈ 5.0
+        @test grad ≈ [2.0, 4.0]
     end
 
     @testset "cache is rejected by unsupported DI backends" begin
