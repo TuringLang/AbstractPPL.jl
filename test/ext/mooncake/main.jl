@@ -5,10 +5,20 @@ Pkg.instantiate()
 
 using AbstractPPL:
     AbstractPPL, prepare, generate_testcases, run_testcase, value_and_gradient!!
+using AbstractPPL.Evaluators: VectorEvaluator
 using ADTypes: AutoMooncake, AutoMooncakeForward
 using LinearAlgebra: LowerTriangular, I
 using Mooncake
 using Test
+
+# A problem whose own `prepare` attaches a cache, as a downstream package can.
+struct AttachesCache end
+_copy_then_square(x, buffer) = sum(abs2, copyto!(buffer, x))
+function AbstractPPL.prepare(
+    ::AttachesCache, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
+)
+    return VectorEvaluator{check_dims}(_copy_then_square, length(x), context, (similar(x),))
+end
 
 # Known-broken paths in Mooncake:
 #   * `value_and_jacobian!!` allocates fresh cotangent/Jacobian buffers on
@@ -183,6 +193,25 @@ end
         end
     end
 
+    # In reverse mode a `cache` is a Mooncake argument, so the same oracle fails
+    # unless its tangent is zeroed on every call.
+    @testset "reused cache with the data in `cache` does not leak" begin
+        M(p) = LowerTriangular([p[1] 0 0; p[2] p[1] 0; p[3] p[2] p[1]] + I)
+        solve_problem(x, data) = sum(abs2, M(x) \ data)
+        data = [1.0, 2.0, 3.0]
+        xA = [0.3, 0.5, 0.2]
+        xB = [1.5, 2.0, -1.0]
+        @testset "$ad" for ad in (
+            AutoMooncake(; config=nothing), AutoMooncakeForward(; config=nothing)
+        )
+            fresh = prepare(ad, solve_problem, xB; cache=(data,))
+            g_fresh = copy(value_and_gradient!!(fresh, xB)[2])
+            prep = prepare(ad, solve_problem, xA; cache=(data,))
+            value_and_gradient!!(prep, xA)
+            @test value_and_gradient!!(prep, xB)[2] ≈ g_fresh
+        end
+    end
+
     # Mooncake honours a call-time `context` override on the gradient path (the
     # target is rebuilt per call) but rejects it on the Hessian path (whose cache
     # binds its target by object identity). Both AD modes share the gradient
@@ -218,6 +247,23 @@ end
             @test_throws r"scalar-valued problems prepared with `order=1`" prepare(
                 ad, (x, w) -> sum(abs2, x) * w.y[1], [1.0, 2.0]; cache=(work,), order=2
             )
+            val, grad = value_and_gradient!!(
+                prepare(ad, AttachesCache(), [1.0, 2.0]), [1.0, 2.0]
+            )
+            @test val ≈ 5.0
+            @test grad ≈ [2.0, 4.0]
         end
+    end
+
+    @testset "cache tangent storage is reused" begin
+        x = [2.0]
+        write_first(x, w) = (w[1] = x[1]; w[1]^2)
+        p = prepare(AutoMooncake(), write_first, x; cache=(zeros(100_000),))
+        value_and_gradient!!(p, x)
+        value_and_gradient!!(p, x)
+        @test (@allocated value_and_gradient!!(p, x)) < 10_000
+        val, grad = @inferred value_and_gradient!!(p, x)
+        @test val == 4.0
+        @test grad == [4.0]
     end
 end
