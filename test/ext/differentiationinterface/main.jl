@@ -11,12 +11,29 @@ using AbstractPPL:
     value_and_gradient!!,
     value_gradient_and_hessian!!,
     order
-using ADTypes: AutoEnzyme, AutoForwardDiff, AutoReverseDiff
+using AbstractPPL.Evaluators: VectorEvaluator
+using ADTypes:
+    AutoEnzyme,
+    AutoFiniteDiff,
+    AutoForwardDiff,
+    AutoReverseDiff,
+    AutoZygote,
+    AutoTracker,
+    AutoMooncake
 using DifferentiationInterface: DifferentiationInterface as DI, SecondOrder
 using Enzyme: Enzyme
 using ForwardDiff
 using ReverseDiff
 using Test
+
+# A problem whose own `prepare` attaches a cache, as a downstream package can.
+struct AttachesCache end
+_copy_then_square(x, buffer) = sum(abs2, copyto!(buffer, x))
+function AbstractPPL.prepare(
+    ::AttachesCache, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
+)
+    return VectorEvaluator{check_dims}(_copy_then_square, length(x), context, (similar(x),))
+end
 
 const DIExt = Base.get_extension(AbstractPPL, :AbstractPPLDifferentiationInterfaceExt)
 
@@ -136,13 +153,21 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         )
     end
 
-    @testset "cache is rejected by compiled-tape ReverseDiff" begin
-        work = (; mu=zeros(2))
-        @test_throws r"not supported for compiled-tape ReverseDiff" prepare(
+    @testset "cache is rejected by unsupported DI backends" begin
+        for ad in (
+            AutoReverseDiff(; compile=false),
             AutoReverseDiff(; compile=true),
-            (x, w) -> sum(abs2, x),
-            [1.0, 2.0];
-            cache=(work,),
+            AutoZygote(),
+            AutoTracker(),
+            AutoMooncake(),
+            AutoFiniteDiff(),
+        )
+            @test_throws r"only supported by `AutoEnzyme`" prepare(
+                ad, (x, w) -> sum(abs2, copyto!(w, x)), [1.0, 2.0]; cache=(zeros(2),)
+            )
+        end
+        @test_throws r"only supported by `AutoEnzyme`" prepare(
+            AutoReverseDiff(), AttachesCache(), [1.0, 2.0]
         )
     end
 end

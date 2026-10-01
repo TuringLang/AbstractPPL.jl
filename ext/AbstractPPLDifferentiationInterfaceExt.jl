@@ -2,7 +2,7 @@ module AbstractPPLDifferentiationInterfaceExt
 
 using AbstractPPL: AbstractPPL
 using AbstractPPL.Evaluators: Evaluators, Prepared, VectorEvaluator, _ad_output_arity
-using ADTypes: AbstractADType, AutoReverseDiff
+using ADTypes: AbstractADType, AutoEnzyme, AutoReverseDiff
 using DifferentiationInterface: DifferentiationInterface as DI
 
 # AD target used by every DI cache. `Vararg{Any,N}` with a free `N` forces
@@ -84,13 +84,13 @@ function _di_call_shape(::AbstractADType, evaluator)
     )
 end
 
-_check_cache_backend(::AbstractADType, ::Tuple) = nothing
-function _check_cache_backend(::AutoReverseDiff{true}, cache::Tuple)
+_check_cache_backend(::AutoEnzyme, ::Tuple) = nothing
+function _check_cache_backend(::AbstractADType, cache::Tuple)
     isempty(cache) || throw(
         ArgumentError(
-            "`cache` is not supported for compiled-tape ReverseDiff, which bakes " *
-            "the values it reads from the cache into its tape. Use a backend such " *
-            "as `AutoMooncake` or `AutoEnzyme` instead.",
+            "`cache` is only supported by `AutoEnzyme` through DifferentiationInterface. " *
+            "Use `AutoEnzyme`, or load Mooncake and use `AutoMooncake` or " *
+            "`AutoMooncakeForward` instead.",
         ),
     )
     return nothing
@@ -117,9 +117,9 @@ function AbstractPPL.prepare(
 )
     Evaluators._validate_ad_order(order)
     evaluator = Evaluators._prepare_vector_evaluator(problem, x, check_dims, context, cache)
-    _check_cache_backend(adtype, evaluator.cache)
     arity = _ad_output_arity(evaluator(x))
     Evaluators._check_cache_supported(evaluator.cache, arity, order)
+    _check_cache_backend(adtype, evaluator.cache)
     mode_empty = Val(length(context))
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
