@@ -26,11 +26,11 @@ using ForwardDiff
 using ReverseDiff
 using Test
 
-# A problem whose own `prepare` attaches a cache, as a downstream package can.
-struct AttachesCache end
+# A problem whose own `prepare` attaches scratch storage, as a downstream package can.
+struct AttachesScratch end
 _copy_then_square(x, buffer) = sum(abs2, copyto!(buffer, x))
 function AbstractPPL.prepare(
-    ::AttachesCache, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
+    ::AttachesScratch, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
 )
     return VectorEvaluator{check_dims}(_copy_then_square, length(x), context, (similar(x),))
 end
@@ -142,23 +142,23 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
         end
     end
 
-    @testset "cache (Enzyme, $mode)" for mode in (Enzyme.Reverse, Enzyme.Forward)
+    @testset "scratch (Enzyme, $mode)" for mode in (Enzyme.Reverse, Enzyme.Forward)
         ad = AutoEnzyme(; mode)
-        for case in generate_testcases(Val(:cache))
+        for case in generate_testcases(Val(:scratch))
             run_testcase(case; adtype=ad, atol=1e-6, rtol=1e-6)
         end
         work = (; y=[2.0, 0.0], mu=zeros(2))
         @test_throws r"scalar-valued problems prepared with `order=1`" prepare(
-            ad, (x, w) -> x .* w.y[1], [1.0, 2.0]; cache=(work,)
+            ad, (x, w) -> x .* w.y[1], [1.0, 2.0]; scratch=(work,)
         )
         val, grad = value_and_gradient!!(
-            prepare(ad, AttachesCache(), [1.0, 2.0]), [1.0, 2.0]
+            prepare(ad, AttachesScratch(), [1.0, 2.0]), [1.0, 2.0]
         )
         @test val ≈ 5.0
         @test grad ≈ [2.0, 4.0]
     end
 
-    @testset "cache is rejected by unsupported DI backends" begin
+    @testset "scratch is rejected by unsupported DI backends" begin
         for ad in (
             AutoReverseDiff(; compile=false),
             AutoReverseDiff(; compile=true),
@@ -168,11 +168,11 @@ quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
             AutoFiniteDiff(),
         )
             @test_throws r"only supported by `AutoEnzyme`" prepare(
-                ad, (x, w) -> sum(abs2, copyto!(w, x)), [1.0, 2.0]; cache=(zeros(2),)
+                ad, (x, w) -> sum(abs2, copyto!(w, x)), [1.0, 2.0]; scratch=(zeros(2),)
             )
         end
         @test_throws r"only supported by `AutoEnzyme`" prepare(
-            AutoReverseDiff(), AttachesCache(), [1.0, 2.0]
+            AutoReverseDiff(), AttachesScratch(), [1.0, 2.0]
         )
     end
 end

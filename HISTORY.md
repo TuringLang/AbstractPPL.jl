@@ -2,7 +2,7 @@
 
 Reuse gradient output buffers in the DifferentiationInterface extension via `value_and_gradient!`, including gradient calls on Hessian preparations. Returned gradients alias cache storage, consistent with the existing `!!` contract.
 
-`prepare` takes `cache::Tuple`, storage that a scalar-valued problem with `order=1` writes values computed from `x` into and reads back. Mooncake (both modes) and Enzyme through DifferentiationInterface support it, and ForwardDiff and every other DifferentiationInterface backend reject it. Every slot the problem writes must be written on every call before it is read, and the storage must reach the problem only through `cache`, with no aliasing across entries. The DifferentiationInterface compat bound is now `0.6.47, 0.7`.
+`prepare` takes `scratch::Tuple`, storage that a scalar-valued problem with `order=1` writes values computed from `x` into and reads back. Mooncake (both modes) and Enzyme through DifferentiationInterface support it, and ForwardDiff and every other DifferentiationInterface backend reject it. Every slot the problem writes must be written on every call before it is read, and the storage must reach the problem only through `scratch`, with no aliasing across entries. The DifferentiationInterface compat bound is now `0.6.47, 0.7`.
 
 ## 0.15.5
 

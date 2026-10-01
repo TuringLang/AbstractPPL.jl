@@ -7,7 +7,7 @@ using DifferentiationInterface: DifferentiationInterface as DI
 
 # AD target used by every DI cache. `Vararg{Any,N}` with a free `N` forces
 # specialization on the trailing arity (a bare `Vararg{Any}` would skip it).
-# DI invokes this as `_di_call(x, f, context..., cache...)` on the constants path,
+# DI invokes this as `_di_call(x, f, context..., scratch...)` on the constants path,
 # and as `_di_call(x, evaluator)` (via `Fix2`) on the closure path —
 # empty `ctx` then makes the splat a no-op.
 @inline _di_call(x, f::F, ctx::Vararg{Any,N}) where {F,N} = f(x, ctx...)
@@ -17,7 +17,7 @@ using DifferentiationInterface: DifferentiationInterface as DI
 #                  AD call passes **0** `DI.Constant`s.
 #   * `N::Int`   — constants path: `N == length(evaluator.context)`; the AD
 #                  call passes **N + 1** `DI.Constant`s (`f` plus the `N`
-#                  context values), then one `DI.ConstantOrCache` per `cache`
+#                  context values), then one `DI.ConstantOrCache` per `scratch`
 #                  value, which DI passes on unchanged, so slots the problem
 #                  only reads keep their values. A `DI.Cache` may be reallocated.
 # Encoding `Mode` in each cache type resolves the closure-vs-constants dispatch
@@ -80,17 +80,17 @@ function _di_call_shape(::AbstractADType, evaluator)
     (
         DI.Constant(evaluator.f),
         map(DI.Constant, evaluator.context)...,
-        map(DI.ConstantOrCache, evaluator.cache)...,
+        map(DI.ConstantOrCache, evaluator.scratch)...,
     )
 end
 
-_check_cache_backend(::AutoEnzyme, ::Tuple) = nothing
-function _check_cache_backend(::AbstractADType, cache::Tuple)
-    isempty(cache) || throw(
+_check_scratch_backend(::AutoEnzyme, ::Tuple) = nothing
+function _check_scratch_backend(::AbstractADType, scratch::Tuple)
+    isempty(scratch) || throw(
         ArgumentError(
-            "`cache` is only supported by `AutoEnzyme` through DifferentiationInterface. " *
-            "Use `AutoEnzyme`, or load Mooncake and use `AutoMooncake` or " *
-            "`AutoMooncakeForward` instead.",
+            "`scratch` is only supported by `AutoEnzyme` through " *
+            "DifferentiationInterface. Use `AutoEnzyme`, or load Mooncake and use " *
+            "`AutoMooncake` or `AutoMooncakeForward` instead.",
         ),
     )
     return nothing
@@ -112,22 +112,22 @@ function AbstractPPL.prepare(
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
     context::Tuple=(),
-    cache::Tuple=(),
+    scratch::Tuple=(),
     order::Int=1,
 )
     Evaluators._validate_ad_order(order)
-    evaluator = Evaluators._prepare_vector_evaluator(problem, x, check_dims, context, cache)
+    evaluator = Evaluators._prepare_vector_evaluator(
+        problem, x, check_dims, context, scratch
+    )
     arity = _ad_output_arity(evaluator(x))
-    Evaluators._check_cache_supported(evaluator.cache, arity, order)
-    _check_cache_backend(adtype, evaluator.cache)
+    Evaluators._check_scratch_supported(evaluator.scratch, arity, order)
+    _check_scratch_backend(adtype, evaluator.scratch)
     mode_empty = Val(length(context))
     if order == 2
         arity === :scalar || Evaluators._throw_hessian_needs_scalar()
         if length(x) == 0
-            di_cache = DIHessianCache(
-                _di_call, nothing, nothing, nothing, nothing, mode_empty
-            )
-            return Prepared(adtype, evaluator, di_cache, Val(2))
+            cache = DIHessianCache(_di_call, nothing, nothing, nothing, nothing, mode_empty)
+            return Prepared(adtype, evaluator, cache, Val(2))
         end
         # Build both gradient and Hessian preps against the same target so
         # `value_and_gradient!!` on the order=2 prep skips the O(n²) Hessian
@@ -140,7 +140,7 @@ function AbstractPPL.prepare(
         hessian_prep = DI.prepare_hessian(target, adtype, x, constants...)
         # Buffers pre-allocated from `x`: hot path is zero-allocation on the
         # gradient/Hessian outputs, returned arrays alias these slots.
-        di_cache = DIHessianCache(
+        cache = DIHessianCache(
             target,
             gradient_prep,
             hessian_prep,
@@ -148,15 +148,15 @@ function AbstractPPL.prepare(
             similar(x, length(x), length(x)),
             mode,
         )
-        return Prepared(adtype, evaluator, di_cache, Val(2))
+        return Prepared(adtype, evaluator, cache, Val(2))
     end
     if length(x) == 0
-        di_cache = if arity === :scalar
+        cache = if arity === :scalar
             DIGradientCache(_di_call, nothing, nothing, mode_empty)
         else
             DIJacobianCache(_di_call, nothing, mode_empty)
         end
-        return Prepared(adtype, evaluator, di_cache)
+        return Prepared(adtype, evaluator, cache)
     end
     if arity === :scalar
         target, gradient_prep, mode = _prepare_di(DI.prepare_gradient, adtype, x, evaluator)
@@ -170,7 +170,7 @@ end
 
 # Hot-path dispatch is by cache type + `Mode` (closure vs constants), both
 # resolved at compile time. On the constants path we always pass
-# `DI.Constant(eval.f)`, the `N` context constants, and the cache values.
+# `DI.Constant(eval.f)`, the `N` context constants, and the `scratch` values.
 # Empty tuples collapse their `map` splats to nothing.
 const _GradientCapable = Union{DIGradientCache,DIHessianCache}
 
@@ -211,7 +211,7 @@ end
     x,
     DI.Constant(eval.f),
     map(DI.Constant, Evaluators._resolve_context(eval, context))...,
-    map(DI.ConstantOrCache, eval.cache)...,
+    map(DI.ConstantOrCache, eval.scratch)...,
 )
 
 @inline _di_value_and_jacobian(c::DIJacobianCache{:closure}, ad, x, _eval, ::Nothing) =
@@ -226,7 +226,7 @@ end
         x,
         DI.Constant(eval.f),
         map(DI.Constant, Evaluators._resolve_context(eval, context))...,
-        map(DI.ConstantOrCache, eval.cache)...,
+        map(DI.ConstantOrCache, eval.scratch)...,
     )
 
 @inline _di_value_gradient_and_hessian(
@@ -245,7 +245,7 @@ end
         x,
         DI.Constant(eval.f),
         map(DI.Constant, Evaluators._resolve_context(eval, context))...,
-        map(DI.ConstantOrCache, eval.cache)...,
+        map(DI.ConstantOrCache, eval.scratch)...,
     )
 
 # `value_and_gradient!!`: works on both `DIGradientCache` (order=1 scalar) and

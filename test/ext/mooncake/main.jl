@@ -11,11 +11,11 @@ using LinearAlgebra: LowerTriangular, I
 using Mooncake
 using Test
 
-# A problem whose own `prepare` attaches a cache, as a downstream package can.
-struct AttachesCache end
+# A problem whose own `prepare` attaches scratch storage, as a downstream package can.
+struct AttachesScratch end
 _copy_then_square(x, buffer) = sum(abs2, copyto!(buffer, x))
 function AbstractPPL.prepare(
-    ::AttachesCache, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
+    ::AttachesScratch, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
 )
     return VectorEvaluator{check_dims}(_copy_then_square, length(x), context, (similar(x),))
 end
@@ -193,9 +193,9 @@ end
         end
     end
 
-    # In reverse mode a `cache` is a Mooncake argument, so the same oracle fails
+    # In reverse mode `scratch` is a Mooncake argument, so the same oracle fails
     # unless its tangent is zeroed on every call.
-    @testset "reused cache with the data in `cache` does not leak" begin
+    @testset "reused cache with the data in `scratch` does not leak" begin
         M(p) = LowerTriangular([p[1] 0 0; p[2] p[1] 0; p[3] p[2] p[1]] + I)
         solve_problem(x, data) = sum(abs2, M(x) \ data)
         data = [1.0, 2.0, 3.0]
@@ -204,9 +204,9 @@ end
         @testset "$ad" for ad in (
             AutoMooncake(; config=nothing), AutoMooncakeForward(; config=nothing)
         )
-            fresh = prepare(ad, solve_problem, xB; cache=(data,))
+            fresh = prepare(ad, solve_problem, xB; scratch=(data,))
             g_fresh = copy(value_and_gradient!!(fresh, xB)[2])
-            prep = prepare(ad, solve_problem, xA; cache=(data,))
+            prep = prepare(ad, solve_problem, xA; scratch=(data,))
             value_and_gradient!!(prep, xA)
             @test value_and_gradient!!(prep, xB)[2] ≈ g_fresh
         end
@@ -233,32 +233,32 @@ end
         end
     end
 
-    @testset "cache" begin
+    @testset "scratch" begin
         @testset "$ad" for ad in (
             AutoMooncake(; config=nothing), AutoMooncakeForward(; config=nothing)
         )
-            for case in generate_testcases(Val(:cache))
+            for case in generate_testcases(Val(:scratch))
                 run_testcase(case; adtype=ad, atol=1e-6, rtol=1e-6)
             end
             work = (; y=[2.0, 0.0], mu=zeros(2))
             @test_throws r"scalar-valued problems prepared with `order=1`" prepare(
-                ad, (x, w) -> x .* w.y[1], [1.0, 2.0]; cache=(work,)
+                ad, (x, w) -> x .* w.y[1], [1.0, 2.0]; scratch=(work,)
             )
             @test_throws r"scalar-valued problems prepared with `order=1`" prepare(
-                ad, (x, w) -> sum(abs2, x) * w.y[1], [1.0, 2.0]; cache=(work,), order=2
+                ad, (x, w) -> sum(abs2, x) * w.y[1], [1.0, 2.0]; scratch=(work,), order=2
             )
             val, grad = value_and_gradient!!(
-                prepare(ad, AttachesCache(), [1.0, 2.0]), [1.0, 2.0]
+                prepare(ad, AttachesScratch(), [1.0, 2.0]), [1.0, 2.0]
             )
             @test val ≈ 5.0
             @test grad ≈ [2.0, 4.0]
         end
     end
 
-    @testset "cache tangent storage is reused" begin
+    @testset "scratch tangent storage is reused" begin
         x = [2.0]
         write_first(x, w) = (w[1] = x[1]; w[1]^2)
-        p = prepare(AutoMooncake(), write_first, x; cache=(zeros(100_000),))
+        p = prepare(AutoMooncake(), write_first, x; scratch=(zeros(100_000),))
         value_and_gradient!!(p, x)
         value_and_gradient!!(p, x)
         @test (@allocated value_and_gradient!!(p, x)) < 10_000

@@ -10,11 +10,11 @@ using ADTypes: AutoForwardDiff
 using ForwardDiff
 using Test
 
-# A problem whose own `prepare` attaches a cache, as a downstream package can.
-struct AttachesCache end
+# A problem whose own `prepare` attaches scratch storage, as a downstream package can.
+struct AttachesScratch end
 _copy_then_square(x, buffer) = sum(abs2, copyto!(buffer, x))
 function AbstractPPL.prepare(
-    ::AttachesCache, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
+    ::AttachesScratch, x::AbstractVector{<:Real}; check_dims::Bool=true, context::Tuple=()
 )
     return VectorEvaluator{check_dims}(_copy_then_square, length(x), context, (similar(x),))
 end
@@ -66,13 +66,13 @@ end
         end
     end
 
-    @testset "cache is rejected" begin
+    @testset "scratch is rejected" begin
         work = (; y=[2.0, 0.0], mu=zeros(2))
         @test_throws r"not supported by `AutoForwardDiff`" prepare(
-            AutoForwardDiff(), (x, w) -> sum(abs2, x), [1.0, 2.0]; cache=(work,)
+            AutoForwardDiff(), (x, w) -> sum(abs2, x), [1.0, 2.0]; scratch=(work,)
         )
         @test_throws r"not supported by `AutoForwardDiff`" prepare(
-            AutoForwardDiff(), AttachesCache(), [1.0, 2.0]
+            AutoForwardDiff(), AttachesScratch(), [1.0, 2.0]
         )
     end
 end

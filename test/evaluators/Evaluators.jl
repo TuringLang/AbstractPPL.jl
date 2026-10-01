@@ -35,11 +35,11 @@ function AbstractPPL.value_and_gradient!!(
     return (sum(x), ones(length(x)))
 end
 
-# A downstream structural `prepare` written before `cache` existed.
-struct NoCacheProblem end
-(::NoCacheProblem)(x, context...) = sum(x)
+# A downstream structural `prepare` written before `scratch` existed.
+struct NoScratchProblem end
+(::NoScratchProblem)(x, context...) = sum(x)
 function AbstractPPL.prepare(
-    problem::NoCacheProblem,
+    problem::NoScratchProblem,
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
     context::Tuple=(),
@@ -138,22 +138,22 @@ end
         @test pv_ctx isa VectorEvaluator{true}
         @test pv_ctx.context === (2.0, 1.0)
         @test pv_ctx([3.0, 4.0]) == 15.0
-        @test pv_ctx.cache === ()
+        @test pv_ctx.scratch === ()
 
-        into_cache(x, a, work) = (work[1] = a * sum(x); work[1] + 1)
+        into_scratch(x, a, work) = (work[1] = a * sum(x); work[1] + 1)
         work = [0.0]
-        pv_cache = prepare(into_cache, zeros(2); context=(2.0,), cache=(work,))
-        @test pv_cache.cache === (work,)
-        @test pv_cache([3.0, 4.0]) == 15.0
+        pv_scratch = prepare(into_scratch, zeros(2); context=(2.0,), scratch=(work,))
+        @test pv_scratch.scratch === (work,)
+        @test pv_scratch([3.0, 4.0]) == 15.0
         @test work == [14.0]
 
         legacy = AbstractPPL.Evaluators._prepare_vector_evaluator(
-            NoCacheProblem(), zeros(2), true, (1.0,), ()
+            NoScratchProblem(), zeros(2), true, (1.0,), ()
         )
         @test legacy.context === (1.0,)
         @test legacy([1.0, 2.0]) == 3.0
         @test_throws MethodError AbstractPPL.Evaluators._prepare_vector_evaluator(
-            NoCacheProblem(), zeros(2), true, (), (work,)
+            NoScratchProblem(), zeros(2), true, (), (work,)
         )
     end
 

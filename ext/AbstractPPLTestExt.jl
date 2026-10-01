@@ -5,7 +5,7 @@ using Test: @inferred, @test, @test_broken, @test_throws, @testset
 
 """
     TestCase(name, tag, f, x_proto; x, value, gradient, jacobian, hessian,
-             context=(), cache=(), op, exception, inputs, override, allocations_safe=true)
+             context=(), scratch=(), op, exception, inputs, override, allocations_safe=true)
 
 Single tagged case for AD conformance testing. The `tag::Symbol` selects how
 the case is run; the kwargs populate only the fields the tag uses.
@@ -17,11 +17,11 @@ Reserved tags (recognised by [`run_testcase`](@ref)):
   - `:hessian`     — order=2 round-trip on scalar output.
   - `:context`     — scalar-output gradient with a non-empty `context::Tuple`
                      passed to `prepare`.
-  - `:cache`       — scalar-output gradient through a `cache` the problem writes
-                     into and reads back, over several `inputs` (`(x=, value=,
-                     gradient=)` per row) on one prepared evaluator, then a
-                     call-time `override::NamedTuple` `(x, context, value,
-                     gradient)` that must leave the cache in place.
+  - `:scratch`     — scalar-output gradient through `scratch` storage the problem
+                     writes into and reads back, over several `inputs` (`(x=,
+                     value=, gradient=)` per row) on one prepared evaluator, then
+                     a call-time `override::NamedTuple` `(x, context, value,
+                     gradient)` that must leave `scratch` in place.
   - `:context_override` — the frozen `context` (`gradient`/`hessian` expected)
                      against a per-call `override::NamedTuple` `(context, value,
                      gradient, hessian)`. The `gradient_override` /
@@ -47,7 +47,7 @@ struct TestCase
     jacobian::Any
     hessian::Any
     context::Tuple
-    cache::Tuple
+    scratch::Tuple
     op::Any
     exception::Any
     inputs::Any
@@ -65,7 +65,7 @@ function TestCase(
     jacobian=nothing,
     hessian=nothing,
     context::Tuple=(),
-    cache::Tuple=(),
+    scratch::Tuple=(),
     op=nothing,
     exception=nothing,
     inputs=nothing,
@@ -83,7 +83,7 @@ function TestCase(
         jacobian,
         hessian,
         context,
-        cache,
+        scratch,
         op,
         exception,
         inputs,
@@ -102,15 +102,15 @@ _context_problem(y::AbstractVector{<:Real}, offset) = -0.5 * (y[1] - offset)^2
 
 # Writes `y[1]` next to a value stored before the call and reads both back, so
 # the gradient has to follow the write.
-function _cache_problem(y::AbstractVector{<:Real}, scale, work)
+function _scratch_problem(y::AbstractVector{<:Real}, scale, work)
     work.y[2] = y[1]
     for i in eachindex(work.mu)
         work.mu[i] = scale * work.y[i]
     end
     return -0.5 * sum(abs2, work.mu) - 0.5 * y[2]^2
 end
-_cache_value(y, scale, y1) = -0.5 * scale^2 * (y1^2 + y[1]^2) - 0.5 * y[2]^2
-_cache_gradient(y, scale) = [-scale^2 * y[1], -y[2]]
+_scratch_value(y, scale, y1) = -0.5 * scale^2 * (y1^2 + y[1]^2) - 0.5 * y[2]^2
+_scratch_gradient(y, scale) = [-scale^2 * y[1], -y[2]]
 
 # `∂/∂y a·‖y‖² = 2a·y` and its Hessian `2a·I` both depend on the context `a`, so
 # a context override is directly observable in the gradient and Hessian.
@@ -336,17 +336,19 @@ function AbstractPPL.generate_testcases(::Val{:vector})
     )
 end
 
-function AbstractPPL.generate_testcases(::Val{:cache})
+function AbstractPPL.generate_testcases(::Val{:scratch})
     scale, y1 = 3.0, 2.0
-    row(x, s=scale) = (x=x, value=_cache_value(x, s, y1), gradient=_cache_gradient(x, s))
+    function row(x, s=scale)
+        return (x=x, value=_scratch_value(x, s, y1), gradient=_scratch_gradient(x, s))
+    end
     return (
         TestCase(
-            "scalar gradient through a cache",
-            :cache,
-            _cache_problem,
+            "scalar gradient through scratch storage",
+            :scratch,
+            _scratch_problem,
             [0.3, -1.2];
             context=(scale,),
-            cache=((; y=[y1, 0.0], mu=zeros(2)),),
+            scratch=((; y=[y1, 0.0], mu=zeros(2)),),
             inputs=[row([0.3, -1.2]), row([1.7, 0.4]), row([-0.9, 2.5])],
             override=merge(row([1.7, 0.4], 2.0), (; context=(2.0,))),
         ),
@@ -738,7 +740,7 @@ function _run(
 end
 
 function _run(
-    ::Val{:cache},
+    ::Val{:scratch},
     case;
     adtype,
     prepare_fn=AbstractPPL.prepare,
@@ -748,7 +750,7 @@ function _run(
     kwargs...,
 )
     prepared = prepare_fn(
-        adtype, case.f, case.x_proto; check_dims, context=case.context, cache=case.cache
+        adtype, case.f, case.x_proto; check_dims, context=case.context, scratch=case.scratch
     )
     @test AbstractPPL.order(prepared) == 1
     for input in case.inputs
