@@ -87,11 +87,22 @@ through to `problem`: the prepared evaluator computes `problem(x, context...)`,
 and AD backends differentiate only with respect to `x`. `context=()` (the
 default) preserves the unary `problem(x)` contract.
 
-`cache` is a tuple of storage that `problem` writes values computed from `x` into and reads back, such as a workspace.
-The prepared evaluator computes `problem(x, context..., cache...)`, and AD differentiates through the values written into `cache` while still returning the derivative with respect to `x` alone.
-The storage reaches the backend as it is, so values stored in it before the call can be read, and it has to be able to hold the backend's numbers.
-Floating-point storage works with Mooncake and with Enzyme through DifferentiationInterface, and ForwardDiff and compiled-tape ReverseDiff reject a non-empty `cache`.
-`cache` is supported for scalar-valued problems with `order=1`, and a call-time `context` override leaves it unchanged.
+`cache` is a tuple of storage that `problem` writes values computed from `x`
+into and reads back, such as a workspace. The prepared evaluator computes
+`problem(x, context..., cache...)`, and AD differentiates through the values
+written into `cache` while still returning the derivative with respect to `x`
+alone.
+
+Every slot the problem writes must be written on every call, before it is read
+in that call. Slots it only reads act as constants. The storage must reach
+`problem` only through `cache`: if it is also captured by `problem`, passed in
+`context`, or aliased across cache entries, its writes can silently drop out of
+the gradient. Its arrays must keep the sizes they had at `prepare`.
+
+Floating-point storage works with Mooncake in both modes and with Enzyme through
+DifferentiationInterface. ForwardDiff and every other DifferentiationInterface
+backend reject a non-empty `cache`. `cache` is supported for scalar-valued
+problems with `order=1`, and a call-time `context` override leaves it unchanged.
 
 `order` selects the derivative order to prepare for on the AD-aware form. The
 default `order=1` prepares gradient (scalar output) or jacobian (vector output)
@@ -222,8 +233,9 @@ the dual/shadow hot path.
 `context` as inactive and differentiate only with respect to `x`. The default
 empty tuple keeps the unary `f(x)` contract.
 
-`cache` is a tuple of storage that `f` writes into and reads back, and `evaluator(x)` then computes `f(x, context..., cache...)`.
-AD backends differentiate through the values written into it (see [`prepare`](@ref)).
+`cache` is a tuple of storage that `f` writes into and reads back, and
+`evaluator(x)` then computes `f(x, context..., cache...)`. AD backends
+differentiate through the values written into it (see [`prepare`](@ref)).
 
 A bare `VectorEvaluator` is *not* differentiable; gradient capability is the
 contract of the wrapping `Prepared` returned by `prepare(adtype, ...)`.

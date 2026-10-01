@@ -56,7 +56,9 @@ input. `order=1` (default) picks gradient/Jacobian by output arity; `order=2`
 builds Hessian machinery and requires a scalar-valued problem. `context` and
 `check_dims` follow the base `prepare` contract.
 
-A non-empty `cache`, passed here or attached by the structural `prepare` of `problem`, throws an `ArgumentError`, since floating-point storage cannot hold ForwardDiff's dual numbers.
+A non-empty `cache`, passed here or attached by the structural `prepare` of
+`problem`, throws an `ArgumentError`, since floating-point storage cannot hold
+ForwardDiff's dual numbers.
 """
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff,

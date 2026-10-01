@@ -234,8 +234,11 @@ the override is still validated.
 
 ## Storage the problem writes into
 
-When the callable writes values computed from `x` into storage it also reads back, such as a workspace of intermediate arrays, pass that storage as `cache`.
-The prepared evaluator computes `f(x, context..., cache...)`, and AD differentiates through the values written into `cache` while taking the derivative with respect to `x` alone:
+When the callable writes values computed from `x` into storage it also reads
+back, such as a workspace of intermediate arrays, pass that storage as `cache`.
+The prepared evaluator computes `f(x, context..., cache...)`, and AD
+differentiates through the values written into `cache` while taking the
+derivative with respect to `x` alone:
 
 ```julia
 function shifted(x, offset, work)
@@ -248,12 +251,20 @@ val, grad = value_and_gradient!!(prepared, [1.0, 2.0, 3.0])
 # (-14.5, [-2.0, -3.0, -4.0])
 ```
 
-Storage passed as `context` is treated as a constant, and for some backends the writes then drop out of the gradient.
+Every slot the problem writes must be written on every call, before it is read
+in that call. Slots it only reads act as constants. Some backends run the
+problem more than once per gradient or keep derivative state for the storage
+between calls, so a slot written on only some calls, or read before it is
+written, can give a wrong gradient without an error. The storage must reach the
+callable only through `cache`: if it is also captured by the callable, passed
+in `context`, or aliased across cache entries, its writes can silently drop out
+of the gradient. Its arrays must keep the sizes they had at `prepare`.
 
-The storage reaches the backend as it is, so values stored in it before the call can be read, and it has to be able to hold the backend's numbers.
-Floating-point storage works with Mooncake in both modes and with Enzyme through DifferentiationInterface.
-`prepare` throws an `ArgumentError` for a non-empty `cache` with ForwardDiff, which cannot store its dual numbers there, and with compiled-tape ReverseDiff (`AutoReverseDiff(; compile=true)`), whose tape would keep the values it read from the cache while recording.
-`cache` is supported for scalar-valued problems with `order=1`, and a call-time `context` override leaves it unchanged.
+Floating-point storage works with Mooncake in both modes and with Enzyme through
+DifferentiationInterface. ForwardDiff, whose dual numbers the storage cannot
+hold, and every other DifferentiationInterface backend throw an `ArgumentError`
+for a non-empty `cache` at `prepare`. `cache` is supported for scalar-valued
+problems with `order=1`, and a call-time `context` override leaves it unchanged.
 
 ## Without an AD backend
 
