@@ -349,7 +349,6 @@ function AbstractPPL.generate_testcases(::Val{:cache})
             cache=((; y=[y1, 0.0], mu=zeros(2)),),
             inputs=[row([0.3, -1.2]), row([1.7, 0.4]), row([-0.9, 2.5])],
             override=merge(row([1.7, 0.4], 2.0), (; context=(2.0,))),
-            allocations_safe=false,  # cache-reuse loops aren't single-call alloc tests
         ),
     )
 end
