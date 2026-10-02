@@ -38,13 +38,27 @@ struct FDCache{A,R,C,GR,GC}
     end
 end
 
+function _throw_scratch_unsupported()
+    throw(
+        ArgumentError(
+            "`scratch` is not supported by `AutoForwardDiff`, since its dual numbers " *
+            "cannot be stored in floating-point storage. Use `AutoMooncake`, " *
+            "`AutoMooncakeForward` or `AutoEnzyme` instead.",
+        ),
+    )
+end
+
 """
-    prepare(adtype::AutoForwardDiff, problem, x; check_dims=true, context::Tuple=(), order=1)
+    prepare(adtype::AutoForwardDiff, problem, x; check_dims=true, context::Tuple=(), scratch::Tuple=(), order=1)
 
 Prepare a ForwardDiff gradient, Jacobian, or Hessian evaluator for a vector
 input. `order=1` (default) picks gradient/Jacobian by output arity; `order=2`
 builds Hessian machinery and requires a scalar-valued problem. `context` and
 `check_dims` follow the base `prepare` contract.
+
+A non-empty `scratch`, passed here or attached by the structural `prepare` of
+`problem`, throws an `ArgumentError`, since floating-point storage cannot hold
+ForwardDiff's dual numbers.
 """
 function AbstractPPL.prepare(
     adtype::AutoForwardDiff,
@@ -52,10 +66,14 @@ function AbstractPPL.prepare(
     x::AbstractVector{<:Real};
     check_dims::Bool=true,
     context::Tuple=(),
+    scratch::Tuple=(),
     order::Int=1,
 )
     Evaluators._validate_ad_order(order)
+    isempty(scratch) || _throw_scratch_unsupported()
     evaluator = AbstractPPL.prepare(problem, x; check_dims, context)::VectorEvaluator
+    # `_fd_call` passes no `scratch`, so reject any the problem's own `prepare` attached.
+    isempty(evaluator.scratch) || _throw_scratch_unsupported()
     # Probe the output once: the value classifies arity, and the vector branch
     # reuses it as the Jacobian-result prototype. The base `prepare` contract
     # promises one prep-time call into `problem`.

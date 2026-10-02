@@ -232,6 +232,41 @@ non-empty `context`), so only an empty-`Tuple` override validates there. Empty
 input runs no derivative machinery, so no backend rejects an override there —
 the override is still validated.
 
+## Storage the problem writes into
+
+When the callable writes values computed from `x` into storage it also reads
+back, such as a workspace of intermediate arrays, pass that storage as
+`scratch`. The prepared evaluator computes `f(x, context..., scratch...)`, and
+AD differentiates through the values written into `scratch` while taking the
+derivative with respect to `x` alone:
+
+```julia
+function shifted(x, offset, work)
+    work.mu .= x .+ offset
+    return -0.5 * sum(abs2, work.mu)
+end
+work = (; mu=zeros(3))
+prepared = prepare(adtype, shifted, zeros(3); context=(1.0,), scratch=(work,))
+val, grad = value_and_gradient!!(prepared, [1.0, 2.0, 3.0])
+# (-14.5, [-2.0, -3.0, -4.0])
+```
+
+Every slot the problem writes must be written on every call, before it is read
+in that call. Slots it only reads act as constants. Some backends run the
+problem more than once per gradient or keep derivative state for the storage
+between calls, so a slot written on only some calls, or read before it is
+written, can give a wrong gradient without an error. The storage must reach the
+callable only through `scratch`: if it is also captured by the callable, passed
+in `context`, or aliased across `scratch` entries, its writes can silently drop
+out of the gradient. Its arrays must keep the sizes they had at `prepare`.
+
+Floating-point storage works with Mooncake in both modes and with Enzyme through
+DifferentiationInterface. ForwardDiff, whose dual numbers the storage cannot
+hold, and every other DifferentiationInterface backend throw an `ArgumentError`
+for a non-empty `scratch` at `prepare`. `scratch` is supported for
+scalar-valued problems with `order=1`, and a call-time `context` override leaves
+it unchanged.
+
 ## Without an AD backend
 
 The two-argument form `prepare(problem, x)` is available without any AD

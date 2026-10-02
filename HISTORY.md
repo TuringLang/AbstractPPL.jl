@@ -5,6 +5,8 @@ Reuse gradient output buffers in the DifferentiationInterface extension via `val
 Widened the `OrderedCollections` compat bound to `1.8.1, 2` (#192).
 OrderedCollections 2.0 is a breaking release, but AbstractPPL only constructs `OrderedDict`s, so none of its removals or behaviour changes apply.
 
+`prepare` takes `scratch::Tuple`, storage that a scalar-valued problem with `order=1` writes values computed from `x` into and reads back. Mooncake (both modes) and Enzyme through DifferentiationInterface support it, and ForwardDiff and every other DifferentiationInterface backend reject it. Every slot the problem writes must be written on every call before it is read, and the storage must reach the problem only through `scratch`, with no aliasing across entries. The DifferentiationInterface compat bound is now `0.6.47, 0.7`.
+
 ## 0.15.5
 
 Widened the `Mooncake` compat bound to `0.5.27, 0.6` (#180). Mooncake 0.6 is a breaking release (forward-mode redesign), but the reverse-mode rule API and the prepared-cache API `AbstractPPLMooncakeExt` uses (`prepare_gradient_cache`, `prepare_derivative_cache`, `prepare_hessian_cache`, `value_and_gradient!!`, `value_gradient_and_hessian!!`, `AutoMooncake`, `AutoMooncakeForward`) are unchanged, so the extension works as-is.

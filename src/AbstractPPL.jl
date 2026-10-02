@@ -19,8 +19,9 @@ using .Evaluators:
 
 Return a tuple of AD conformance test cases for the input-shape `group`.
 Reserved groups: `:vector` (vector input), `:namedtuple` (NamedTuple
-input; Mooncake-only), and `:context_override` (call-time `context`
-overrides). Iterate and pass each to [`run_testcase`](@ref).
+input; Mooncake-only), `:context_override` (call-time `context`
+overrides), and `:scratch` (`scratch` storage the problem writes into and
+reads back). Iterate and pass each to [`run_testcase`](@ref).
 Implemented by the `Test` extension (`AbstractPPLTestExt`).
 """
 function generate_testcases end
