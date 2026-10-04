@@ -36,6 +36,17 @@ Always refresh each environment (`Pkg.update()` / `up`) before tests or doc buil
 
 Run the smallest relevant test first, then broaden when changing public interfaces, extensions, or downstream-facing behaviour. Do not weaken tests just to make CI pass.
 
+## Julia-specific guidance
+
+  - Keep numeric and array code generic. Preserve input types with `zero`, `one`, `oftype`, and `similar`; avoid unnecessary concrete argument types and hardcoded `Float64` buffers.
+  - Parameterize fields to keep storage concrete. Add explicit specialization on `Type`, `Function`, or `Vararg` arguments when inference requires it.
+  - Expose downstream state through accessors or traits. Keep `Base` extensions narrowly dispatched and `==`, `isequal`, and `hash` consistent.
+  - Capture `!!` return values: methods may replace their inputs. Copy cache-aliased results before retaining them across calls; copies of evaluation state should own their mutable buffers.
+  - Pass RNGs explicitly through sampling code. Use `StableRNGs` when tests or doctests depend on exact random values.
+  - Check inference and allocations when changing optics, flattening, or evaluator hot paths; benchmark performance claims.
+  - Test generic code with `Float32`, `BigFloat`, relevant AD types, and non-`Array` inputs where supported.
+  - Test flattening round trips for names, shapes, indices, and numeric types. Run the relevant backend tests for evaluator or AD integration changes.
+
 ## Documentation
 
 `docs/src/interface.md` is marked outdated and aspirational; prefer current docstrings and `docs/src/evaluators.md` for evaluator and AD contracts. Keep `docs/make.jl` navigation in sync with new pages.
