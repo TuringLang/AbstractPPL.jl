@@ -37,11 +37,6 @@ struct Prepared{AD<:AbstractADType,E,C,Order}
     adtype::AD
     evaluator::E
     cache::C
-    function Prepared{AD,E,C,Order}(
-        adtype, evaluator, cache
-    ) where {AD<:AbstractADType,E,C,Order}
-        return new{AD,E,C,Order}(adtype, evaluator, cache)
-    end
 end
 
 function Prepared(

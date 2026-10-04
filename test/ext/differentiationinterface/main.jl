@@ -40,10 +40,11 @@ const DIExt = Base.get_extension(AbstractPPL, :AbstractPPLDifferentiationInterfa
 quadratic(x::AbstractVector{<:Real}) = sum(xi -> xi^2, x)
 
 @testset "AbstractPPLDifferentiationInterfaceExt" begin
-    @testset "ForwardDiff" begin
-        for case in generate_testcases(Val(:vector))
-            run_testcase(case; adtype=AutoForwardDiff(), atol=1e-6, rtol=1e-6)
-        end
+    @testset "ForwardDiff extension takes precedence over DI" begin
+        prep = prepare(AutoForwardDiff(), quadratic, [1.0, 2.0])
+        @test parentmodule(typeof(prep.cache)) ===
+            Base.get_extension(AbstractPPL, :AbstractPPLForwardDiffExt)
+        @test value_and_gradient!!(prep, [1.0, 2.0]) == (5.0, [2.0, 4.0])
     end
 
     # Compiled-tape ReverseDiff closes the evaluator into a `Base.Fix2` target

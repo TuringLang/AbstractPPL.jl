@@ -107,23 +107,9 @@ function _unflatten(x::Tuple, buf::AbstractVector, offset::Int)
     return (first_value, rest_value...), offset
 end
 
-# Generated to keep the result `NamedTuple` type inferable: a recursive `merge`
-# over `Base.tail(Names)` erases parameters and breaks `@inferred` callers.
-@generated function _unflatten(
-    x::NamedTuple{Names}, buf::AbstractVector, offset::Int
-) where {Names}
-    if isempty(Names)
-        return :((NamedTuple(), offset))
-    end
-    block = Expr(:block, :(off = offset))
-    val_syms = Symbol[]
-    for name in Names
-        v = gensym(name)
-        push!(val_syms, v)
-        push!(block.args, :(($v, off) = _unflatten(x[$(QuoteNode(name))], buf, off)))
-    end
-    push!(block.args, :(return (NamedTuple{$Names}(($(val_syms...),)), off)))
-    return block
+function _unflatten(x::NamedTuple{Names}, buf::AbstractVector, offset::Int) where {Names}
+    vals, off = _unflatten(values(x), buf, offset)
+    return NamedTuple{Names}(vals), off
 end
 
 """
