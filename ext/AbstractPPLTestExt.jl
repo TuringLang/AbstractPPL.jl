@@ -36,60 +36,35 @@ Reserved tags (recognised by [`run_testcase`](@ref)):
 `allocations_safe=false` opts the case out of the alloc check
 (cases with an allocating primal or empty-input shortcuts that allocate).
 """
-struct TestCase
+Base.@kwdef struct TestCase
     name::String
     tag::Symbol
     f::Any
     x_proto::Any
-    x::Any
-    value::Any
-    gradient::Any
-    jacobian::Any
-    hessian::Any
-    context::Tuple
-    scratch::Tuple
-    op::Any
-    exception::Any
-    inputs::Any
-    override::Any
-    allocations_safe::Bool
+    x::Any = nothing
+    value::Any = nothing
+    gradient::Any = nothing
+    jacobian::Any = nothing
+    hessian::Any = nothing
+    context::Tuple = ()
+    scratch::Tuple = ()
+    op::Any = nothing
+    exception::Any = nothing
+    inputs::Any = nothing
+    override::Any = nothing
+    allocations_safe::Bool = true
 end
 function TestCase(
     name,
     tag::Symbol,
     f,
     x_proto;
-    x=nothing,
-    value=nothing,
-    gradient=nothing,
-    jacobian=nothing,
-    hessian=nothing,
     context::Tuple=(),
     scratch::Tuple=(),
-    op=nothing,
-    exception=nothing,
-    inputs=nothing,
-    override=nothing,
     allocations_safe::Bool=true,
+    kwargs...,
 )
-    return TestCase(
-        name,
-        tag,
-        f,
-        x_proto,
-        x,
-        value,
-        gradient,
-        jacobian,
-        hessian,
-        context,
-        scratch,
-        op,
-        exception,
-        inputs,
-        override,
-        allocations_safe,
-    )
+    return TestCase(; name, tag, f, x_proto, context, scratch, allocations_safe, kwargs...)
 end
 
 struct QuadraticProblem end
