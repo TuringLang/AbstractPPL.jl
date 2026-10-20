@@ -557,7 +557,16 @@ function Accessors.set(obj, l::_Optic!!{<:Index}, newval)
     end
     return if isempty(cidx.kw)
         # setindex!! doesn't support keyword arguments.
-        BangBang.setindex!!(obj, inner_newval, cidx.ix...)
+        if obj isa Array &&
+            all(index -> index isa Integer || index isa CartesianIndex, cidx.ix) &&
+            inner_newval isa eltype(obj)
+            # BangBang's `possible` treats an array value at a scalar index as a block
+            # assignment and copies `Vector{Any}`. TODO: remove once BangBang accepts it.
+            Base.setindex!(obj, inner_newval, cidx.ix...)
+            obj
+        else
+            BangBang.setindex!!(obj, inner_newval, cidx.ix...)
+        end
     else
         # If there are keyword arguments, we just assume that setindex! will always work.
         # This is a bit dangerous, but fine.
