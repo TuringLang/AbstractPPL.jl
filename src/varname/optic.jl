@@ -557,7 +557,7 @@ function Accessors.set(obj, l::_Optic!!{<:Index}, newval)
     end
     return if isempty(cidx.kw)
         # setindex!! doesn't support keyword arguments.
-        if obj isa Array &&
+        if obj isa Union{Array,SubArray{<:Any,<:Any,<:Array}} &&
             all(index -> index isa Integer || index isa CartesianIndex, cidx.ix) &&
             inner_newval isa eltype(obj)
             # BangBang's `possible` treats an array value at a scalar index as a block
