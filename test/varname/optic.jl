@@ -3,6 +3,7 @@ module OpticTests
 using Test
 using DimensionalData: DimensionalData as DD
 using AbstractPPL
+using OffsetArrays: OffsetArray
 
 @testset "varname/optic.jl" verbose = true begin
     @testset "pretty-printing" begin
@@ -266,6 +267,51 @@ using AbstractPPL
                 @test objectid(x) == old_objid
             end
 
+            @testset "abstract arrays with array values" begin
+                x = Vector{Any}(undef, 2)
+                x2 = set(x, with_mutation(@opticof(_[1])), [1.0, 2.0])
+                @test x[1] == [1.0, 2.0]
+                @test x2 === x
+
+                x = Matrix{Any}(undef, 2, 2)
+                x2 = set(x, with_mutation(@opticof(_[1, 2])), [1.0, 2.0])
+                @test x[1, 2] == [1.0, 2.0]
+                @test x2 === x
+
+                x = Matrix{Any}(undef, 2, 2)
+                x2 = set(x, with_mutation(@opticof(_[CartesianIndex(1, 2)])), [1.0, 2.0])
+                @test x[1, 2] == [1.0, 2.0]
+                @test x2 === x
+
+                x = Any[Any[0.0]]
+                old_inner_objid = objectid(x[1])
+                x2 = set(x, with_mutation(@opticof(_[1][1])), 1.0)
+                @test x[1][1] == 1.0
+                @test x2 === x
+                @test objectid(x[1]) == old_inner_objid
+
+                x = view(Any[0, 0, 0], 2:3)
+                x2 = set(x, with_mutation(@opticof(_[1])), [1.0])
+                @test x2 === x
+                @test x[1] == [1.0]
+                @test parent(x) == Any[0, [1.0], 0]
+
+                x = OffsetArray(Any[0, 0], 0:1)
+                x2 = set(x, with_mutation(@opticof(_[0])), [1.0, 2.0])
+                @test x2 !== x
+                @test x2[0] == [1.0, 2.0]
+
+                x = zeros(1)
+                x2 = set(x, with_mutation(@opticof(_[1])), big(1.0))
+                @test x2[1] isa BigFloat
+                @test x2 !== x
+
+                x = zeros(1)
+                x2 = set(x, with_mutation(@opticof(_[1])), 1)
+                @test x[1] == 1.0
+                @test x2 === x
+            end
+
             @testset "dynamic index" begin
                 x = zeros(2, 2)
                 old_objid = objectid(x)
@@ -275,6 +321,18 @@ using AbstractPPL
                 @test x[begin, end] == 2.0
                 @test x == [0.0 2.0; 0.0 0.0]
                 @test objectid(x) == old_objid
+            end
+
+            @testset "non-scalar and non-Array containers" begin
+                x = zeros(3)
+                x2 = set(x, with_mutation(@opticof(_[1:2][1])), 1.0)
+                @test x2 == [1.0, 0.0, 0.0]
+
+                x = (0.0, 0.0)
+                @test set(x, with_mutation(@opticof(_[1])), 1.0) == (1.0, 0.0)
+
+                x = Dict(1 => 0.0)
+                @test set(x, with_mutation(@opticof(_[1])), 1.0) == Dict(1 => 1.0)
             end
 
             @testset "DimArray, setting a single element" begin

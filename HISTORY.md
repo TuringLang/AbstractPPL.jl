@@ -1,3 +1,7 @@
+## 0.15.7
+
+`set` with a `with_mutation` index optic now mutates an `Array` or its view in place when the value already has its element type, as for a vector stored into a `Vector{Any}`; BangBang copied it before.
+
 ## 0.15.6
 
 Reuse gradient output buffers in the DifferentiationInterface extension via `value_and_gradient!`, including gradient calls on Hessian preparations. Returned gradients alias cache storage, consistent with the existing `!!` contract.
