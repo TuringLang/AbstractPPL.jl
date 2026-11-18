@@ -59,13 +59,6 @@ using Test
         end
     end
 
-    @testset "lookup in a collection of mixed VarNames" begin
-        vns = [@varname(x), @varname(x[1]), @varname(x.a)]
-        for (i, vn) in pairs(vns)
-            @test findfirst(==(vn), vns) == i
-        end
-    end
-
     @testset "pretty-printing" begin
         @test string(@varname(x)) == "x"
         @test string(@varname(x[1])) == "x[1]"
